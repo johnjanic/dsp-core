@@ -28,5 +28,4 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-#include "Source/CircularAudioBuffer.h"
 #include "Source/AudioHistoryBuffer.h"
