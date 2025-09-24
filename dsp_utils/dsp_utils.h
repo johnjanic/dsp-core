@@ -16,7 +16,7 @@
   license:            proprietary/commercial
   minimumCppStandard: 17
 
-  dependencies:       juce_core, juce_gui_basics, juce_data_structures, juce_audio_processors
+  dependencies:       juce_core, juce_data_structures, juce_audio_processors
 
  END_JUCE_MODULE_DECLARATION
 
@@ -29,3 +29,4 @@
 #include <juce_data_structures/juce_data_structures.h>
 
 #include "Source/CircularAudioBuffer.h"
+#include "Source/AudioHistoryBuffer.h"

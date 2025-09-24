@@ -9,3 +9,4 @@
 
 #include "dsp_utils.h"
 #include "Source/CircularAudioBuffer.cpp"
+#include "Source/AudioHistoryBuffer.cpp"
