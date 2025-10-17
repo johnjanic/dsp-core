@@ -7,10 +7,10 @@
 
  BEGIN_JUCE_MODULE_DECLARATION
 
-  ID:                 dsp_utils
+  ID:                 dsp_core
   vendor:             tbd
   version:            1.0.0
-  name:               Transfer Function Editor
+  name:               DSP Core
   description:        A module for creating and editing transfer functions in audio applications.
   website:            tbd
   license:            proprietary/commercial
@@ -24,8 +24,10 @@
 
 
 #pragma once
-#define DSP_UTILS_H_INCLUDED
+#define DSP_CORE_H_INCLUDED
 
 #include <juce_data_structures/juce_data_structures.h>
 
 #include "Source/AudioHistoryBuffer.h"
+#include "Source/ExpressionEvaluator.h"
+#include "Source/TransferFunction.h"

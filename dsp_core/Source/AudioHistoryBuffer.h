@@ -1,6 +1,7 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include <vector>
+#include <algorithm>
 
 class AudioHistoryBuffer
 {
@@ -17,4 +18,3 @@ private:
     int writePos = 0;
     int size = 0;
 };
-#pragma once
