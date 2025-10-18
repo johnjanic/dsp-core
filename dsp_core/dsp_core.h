@@ -30,4 +30,6 @@
 
 #include "Source/AudioHistoryBuffer.h"
 #include "Source/ExpressionEvaluator.h"
+#include "Source/HarmonicLayer.h"
+#include "Source/LayeredTransferFunction.h"
 #include "Source/TransferFunction.h"
