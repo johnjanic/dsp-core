@@ -72,8 +72,30 @@ public:
      *   4. Store normalized composite: Composite[i] = normalizationScalar * UnNorm[i]
      *
      * Critical: Base layer and harmonic evaluations remain unchanged.
+     *
+     * If normalization is deferred (via setDeferNormalization), the normalization scalar
+     * remains frozen and the composite is computed using the existing scalar. This prevents
+     * visual shifting during paint strokes.
      */
     void updateComposite();
+
+    /**
+     * Enable or disable deferred normalization
+     *
+     * When enabled, updateComposite() will freeze the normalization scalar and only
+     * update the composite table using the existing scalar. This prevents visual shifting
+     * during multi-point operations like paint strokes.
+     *
+     * When disabled, normalization resumes normal behavior (recalculating the scalar).
+     *
+     * @param shouldDefer If true, freeze normalization scalar; if false, resume normal behavior
+     */
+    void setDeferNormalization(bool shouldDefer);
+
+    /**
+     * Check if normalization is currently deferred
+     */
+    bool isNormalizationDeferred() const;
 
     //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
@@ -138,6 +160,9 @@ private:
 
     // Normalization scalar (applied to mix, not to layers)
     std::atomic<double> normalizationScalar{ 1.0 };
+
+    // Normalization deferral (prevents visual shifting during paint strokes)
+    bool deferNormalization = false;
 
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;

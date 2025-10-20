@@ -1,6 +1,7 @@
 #include "LayeredTransferFunction.h"
 #include <algorithm>
 #include <cmath>
+#include <juce_data_structures/juce_data_structures.h>
 
 namespace dsp_core {
 
@@ -83,18 +84,37 @@ void LayeredTransferFunction::updateComposite() {
         }
     }
 
-    // Step 2: Compute normalization scalar
-    double normScalar = 1.0;
-    if (maxAbsValue > 1e-12) {  // Avoid division by zero
-        normScalar = 1.0 / maxAbsValue;
+    // Step 2: Compute normalization scalar (or use frozen scalar if deferred)
+    double normScalar = normalizationScalar.load();  // Default to existing scalar
+
+    if (!deferNormalization) {
+        // Normal mode: recalculate normalization scalar
+        normScalar = 1.0;
+        if (maxAbsValue > 1e-12) {  // Avoid division by zero
+            normScalar = 1.0 / maxAbsValue;
+        }
+        normalizationScalar.store(normScalar);
     }
-    normalizationScalar.store(normScalar);
+    // else: deferred mode - keep using existing normScalar
 
     // Step 3: Store normalized composite
     for (int i = 0; i < tableSize; ++i) {
         double normalized = normScalar * unnormalizedMix[i];
         compositeTable[i].store(normalized);
     }
+}
+
+void LayeredTransferFunction::setDeferNormalization(bool shouldDefer) {
+    deferNormalization = shouldDefer;
+
+    // When exiting deferred mode, immediately recalculate normalization
+    if (!shouldDefer) {
+        updateComposite();
+    }
+}
+
+bool LayeredTransferFunction::isNormalizationDeferred() const {
+    return deferNormalization;
 }
 
 double LayeredTransferFunction::normalizeIndex(int index) const {
@@ -236,17 +256,27 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
     juce::ValueTree vt("LayeredTransferFunction");
 
     // Serialize base layer
-    juce::ValueTree baseVT("BaseLayer");
-    juce::MemoryBlock baseBlob;
-    for (int i = 0; i < tableSize; ++i) {
-        double value = baseTable[i].load();
-        baseBlob.append(&value, sizeof(double));
+    if (tableSize > 0) {
+        juce::ValueTree baseVT("BaseLayer");
+        juce::MemoryBlock baseBlob;
+        for (int i = 0; i < tableSize; ++i) {
+            double value = baseTable[i].load();
+            baseBlob.append(&value, sizeof(double));
+        }
+        baseVT.setProperty("tableData", baseBlob, nullptr);
+        vt.addChild(baseVT, -1, nullptr);
+    } else {
+        // Log or handle invalid table size if necessary
+        jassertfalse; // Debug assertion for invalid table size
     }
-    baseVT.setProperty("tableData", baseBlob, nullptr);
-    vt.addChild(baseVT, -1, nullptr);
 
     // Serialize harmonic layer
-    vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
+    if (harmonicLayer) {
+        vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
+    } else {
+        // Log or handle null harmonic layer if necessary
+        jassertfalse; // Debug assertion for null harmonic layer
+    }
 
     // Serialize normalization scalar
     vt.setProperty("normalizationScalar", normalizationScalar.load(), nullptr);
