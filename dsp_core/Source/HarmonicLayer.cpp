@@ -1,6 +1,7 @@
 #include "HarmonicLayer.h"
 #include <cmath>
 #include <algorithm>
+#include <juce_data_structures/juce_data_structures.h>
 
 namespace dsp_core {
 
