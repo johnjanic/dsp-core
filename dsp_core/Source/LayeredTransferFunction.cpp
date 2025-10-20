@@ -52,12 +52,18 @@ const HarmonicLayer& LayeredTransferFunction::getHarmonicLayer() const {
 
 double LayeredTransferFunction::getCompositeValue(int index) const {
     if (index >= 0 && index < tableSize) {
-        return compositeTable[index].load();
+        return compositeTable[index].load() * normalizationScale.load();
     }
     return 0.0;
 }
 
+double LayeredTransferFunction::getNormalizationScale() const {
+    return normalizationScale.load();
+}
+
 void LayeredTransferFunction::updateComposite() {
+    double maxAbsValue = 0.0;
+
     for (int i = 0; i < tableSize; ++i) {
         double x = normalizeIndex(i);
 
@@ -69,16 +75,17 @@ void LayeredTransferFunction::updateComposite() {
         // Mix: WT coefficient × base + harmonics
         double composite = wtMix * baseValue + harmonicValue;
 
-        // Store (no soft-clipping yet - preserve original behavior initially)
+        // Store UNNORMALIZED value
         compositeTable[i].store(composite);
+
+        // Track maximum for normalization scale
+        maxAbsValue = std::max(maxAbsValue, std::abs(composite));
     }
 
-    // DISABLED: normalizeByMaximum() breaks differential solving in drawing mode!
-    // The user draws at position Y, but normalization scales the entire composite table,
-    // so the curve appears at Y * scaleFactor (which changes every stroke).
-    // This invalidates: Base = (Composite - Harmonics) / WT
-    // TODO: Implement soft-clipping or per-sample limiting instead
-    // normalizeByMaximum();
+    // Compute and store normalization scale (applied on read)
+    // This keeps the transfer function visually in [-1, 1] while allowing
+    // differential solving to work correctly (it uses the scale factor)
+    normalizationScale.store(maxAbsValue > 0.0 ? (1.0 / maxAbsValue) : 1.0);
 }
 
 double LayeredTransferFunction::normalizeIndex(int index) const {
@@ -178,19 +185,22 @@ double LayeredTransferFunction::interpolateCatmullRom(double y0, double y1, doub
 }
 
 double LayeredTransferFunction::getSample(int i) const {
+    // Apply normalization scale to all samples (for audio processing)
+    double scale = normalizationScale.load();
+
     bool isBelow = (i < 0);
     bool isAbove = (i > tableSize - 1);
     if (isBelow && (extrapMode == ExtrapolationMode::Linear)) {
         double slope = compositeTable[1].load() - compositeTable[0].load();
-        return compositeTable[0].load() + slope * i;
+        return (compositeTable[0].load() + slope * i) * scale;
     }
     else if (isAbove && extrapMode == ExtrapolationMode::Linear) {
         double slope = compositeTable[tableSize - 1].load() - compositeTable[tableSize - 2].load();
-        return compositeTable[tableSize - 1].load() + slope * (i - tableSize + 1);
+        return (compositeTable[tableSize - 1].load() + slope * (i - tableSize + 1)) * scale;
     }
     else {
         int clampedIdx = juce::jlimit(0, tableSize - 1, i);
-        return compositeTable[clampedIdx].load();
+        return compositeTable[clampedIdx].load() * scale;
     }
 }
 

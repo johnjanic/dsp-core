@@ -46,6 +46,9 @@ public:
     // Composite (final output for audio processing)
     double getCompositeValue(int index) const;
 
+    // Normalization scale (applied on read to keep composite in [-1, 1])
+    double getNormalizationScale() const;
+
     //==========================================================================
     // Composition
     //==========================================================================
@@ -132,6 +135,12 @@ private:
 
     // Composite output (what audio thread reads)
     std::vector<std::atomic<double>> compositeTable;
+
+    // Normalization scale: compositeTable stores unnormalized values,
+    // scale is applied on read via getCompositeValue() and getSample()
+    // This allows differential solving to work correctly while keeping
+    // the transfer function visually normalized to [-1, 1]
+    std::atomic<double> normalizationScale{1.0};
 
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
