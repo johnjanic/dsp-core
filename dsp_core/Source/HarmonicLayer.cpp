@@ -5,36 +5,28 @@
 
 namespace dsp_core {
 
-HarmonicLayer::HarmonicLayer(int numHarmonics)
-    : coefficients(numHarmonics + 1, 0.0) {
-    coefficients[0] = 1.0;  // Default WT mix = 1.0 (full base layer)
-}
-
-void HarmonicLayer::setCoefficient(int harmonicIndex, double value) {
-    if (harmonicIndex >= 0 && harmonicIndex < static_cast<int>(coefficients.size())) {
-        coefficients[harmonicIndex] = value;
-    }
-}
-
-double HarmonicLayer::getCoefficient(int harmonicIndex) const {
-    if (harmonicIndex >= 0 && harmonicIndex < static_cast<int>(coefficients.size())) {
-        return coefficients[harmonicIndex];
-    }
-    return 0.0;
+HarmonicLayer::HarmonicLayer(int numHarmonics_)
+    : numHarmonics(numHarmonics_) {
 }
 
 void HarmonicLayer::setAlgorithm(Algorithm algo) {
     algorithm = algo;
 }
 
-double HarmonicLayer::evaluate(double x, int tableSize) const {
+double HarmonicLayer::evaluate(double x, const std::vector<double>& coefficients, int tableSize) const {
+    // Validate coefficient array size
+    if (static_cast<int>(coefficients.size()) < numHarmonics + 1) {
+        jassertfalse;  // Coefficient array too small
+        return 0.0;
+    }
+
     // Use precomputed tables if available
     if (algorithm == Algorithm::Trig && precomputed && lastTableSize == tableSize) {
         int idx = xToTableIndex(x, tableSize, -1.0, 1.0);
         idx = std::max(0, std::min(tableSize - 1, idx));
 
         double result = 0.0;
-        for (int n = 1; n < static_cast<int>(coefficients.size()); ++n) {
+        for (int n = 1; n <= numHarmonics; ++n) {
             result += coefficients[n] * basisFunctions[n][idx];
         }
         return result;
@@ -53,7 +45,6 @@ void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, doubl
         return;  // Already computed
     }
 
-    const int numHarmonics = static_cast<int>(coefficients.size()) - 1;
     basisFunctions.clear();
     basisFunctions.resize(numHarmonics + 1);
 
@@ -121,13 +112,8 @@ double HarmonicLayer::evaluateChebyshevPolynomial(double x, const std::vector<do
 
 juce::ValueTree HarmonicLayer::toValueTree() const {
     juce::ValueTree vt("HarmonicLayer");
+    vt.setProperty("numHarmonics", numHarmonics, nullptr);
     vt.setProperty("algorithm", algorithm == Algorithm::Trig ? "trig" : "polynomial", nullptr);
-
-    juce::Array<juce::var> coeffArray;
-    for (double c : coefficients) {
-        coeffArray.add(c);
-    }
-    vt.setProperty("coefficients", coeffArray, nullptr);
     return vt;
 }
 
@@ -136,27 +122,24 @@ void HarmonicLayer::fromValueTree(const juce::ValueTree& vt) {
         return;
     }
 
+    // Load numHarmonics (optional - for validation)
+    if (vt.hasProperty("numHarmonics")) {
+        int loadedNumHarmonics = vt.getProperty("numHarmonics");
+        if (loadedNumHarmonics != numHarmonics) {
+            jassertfalse;  // Mismatch in harmonic count
+        }
+    }
+
     // Load algorithm
     juce::String algoStr = vt.getProperty("algorithm", "trig").toString();
     algorithm = (algoStr == "polynomial") ? Algorithm::Polynomial : Algorithm::Trig;
-
-    // Load coefficients
-    if (vt.hasProperty("coefficients")) {
-        juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
-        if (coeffArray != nullptr) {
-            coefficients.clear();
-            for (const auto& var : *coeffArray) {
-                coefficients.push_back(static_cast<double>(var));
-            }
-        }
-    }
 
     // Invalidate precomputed data (will be recomputed on next evaluate)
     precomputed = false;
 }
 
 bool HarmonicLayer::operator==(const HarmonicLayer& other) const {
-    return coefficients == other.coefficients && algorithm == other.algorithm;
+    return numHarmonics == other.numHarmonics && algorithm == other.algorithm;
 }
 
 int HarmonicLayer::xToTableIndex(double x, int tableSize, double minVal, double maxVal) const {

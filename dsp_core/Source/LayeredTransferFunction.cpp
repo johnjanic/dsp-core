@@ -8,8 +8,13 @@ namespace dsp_core {
 LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double maxVal)
     : tableSize(size), minValue(minVal), maxValue(maxVal),
       harmonicLayer(std::make_unique<HarmonicLayer>(19)),
+      coefficients(20, 0.0),  // 20 coefficients: [0] = WT, [1..19] = harmonics
       baseTable(size),
       compositeTable(size) {
+
+    // Initialize coefficients
+    coefficients[0] = 1.0;  // Default WT mix = 1.0 (full base layer)
+    // coefficients[1..19] already initialized to 0.0
 
     // Initialize base layer to identity: y = x
     for (int i = 0; i < tableSize; ++i) {
@@ -51,6 +56,19 @@ const HarmonicLayer& LayeredTransferFunction::getHarmonicLayer() const {
     return *harmonicLayer;
 }
 
+void LayeredTransferFunction::setCoefficient(int index, double value) {
+    if (index >= 0 && index < static_cast<int>(coefficients.size())) {
+        coefficients[index] = value;
+    }
+}
+
+double LayeredTransferFunction::getCoefficient(int index) const {
+    if (index >= 0 && index < static_cast<int>(coefficients.size())) {
+        return coefficients[index];
+    }
+    return 0.0;
+}
+
 double LayeredTransferFunction::getCompositeValue(int index) const {
     if (index >= 0 && index < tableSize) {
         return compositeTable[index].load();
@@ -68,8 +86,8 @@ void LayeredTransferFunction::updateComposite() {
 
         // Get layer values (NEVER modified by this function)
         double baseValue = baseTable[i].load();
-        double harmonicValue = harmonicLayer->evaluate(x, tableSize);
-        double wavetableCoeff = harmonicLayer->getCoefficient(0);
+        double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+        double wavetableCoeff = coefficients[0];  // WT mix coefficient
 
         // Compute unnormalized mix: UnNorm = wtCoeff*Base + HarmonicSum
         // Note: harmonicLayer->evaluate() already sums harmonicCoeff[n] * Harmonic_n(x)
@@ -255,6 +273,13 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
 juce::ValueTree LayeredTransferFunction::toValueTree() const {
     juce::ValueTree vt("LayeredTransferFunction");
 
+    // Serialize coefficients
+    juce::Array<juce::var> coeffArray;
+    for (double c : coefficients) {
+        coeffArray.add(c);
+    }
+    vt.setProperty("coefficients", coeffArray, nullptr);
+
     // Serialize base layer
     if (tableSize > 0) {
         juce::ValueTree baseVT("BaseLayer");
@@ -270,7 +295,7 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
         jassertfalse; // Debug assertion for invalid table size
     }
 
-    // Serialize harmonic layer
+    // Serialize harmonic layer (algorithm settings only, no coefficients)
     if (harmonicLayer) {
         vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
     } else {
@@ -293,6 +318,17 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
         return;
     }
 
+    // Load coefficients
+    if (vt.hasProperty("coefficients")) {
+        juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
+        if (coeffArray != nullptr) {
+            coefficients.clear();
+            for (const auto& var : *coeffArray) {
+                coefficients.push_back(static_cast<double>(var));
+            }
+        }
+    }
+
     // Load base layer
     auto baseVT = vt.getChildWithName("BaseLayer");
     if (baseVT.isValid() && baseVT.hasProperty("tableData")) {
@@ -305,7 +341,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
         }
     }
 
-    // Load harmonic layer
+    // Load harmonic layer (algorithm settings only)
     auto harmonicVT = vt.getChildWithName("HarmonicLayer");
     if (harmonicVT.isValid()) {
         harmonicLayer->fromValueTree(harmonicVT);

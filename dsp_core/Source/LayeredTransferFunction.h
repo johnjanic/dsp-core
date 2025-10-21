@@ -46,9 +46,14 @@ public:
     void setBaseLayerValue(int index, double value);
     void clearBaseLayer();  // Set all base values to 0.0
 
-    // Harmonic layer
+    // Harmonic layer (for algorithm settings only)
     HarmonicLayer& getHarmonicLayer();
     const HarmonicLayer& getHarmonicLayer() const;
+
+    // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)
+    void setCoefficient(int index, double value);
+    double getCoefficient(int index) const;
+    int getNumCoefficients() const { return static_cast<int>(coefficients.size()); }
 
     // Composite (final output for audio processing)
     double getCompositeValue(int index) const;
@@ -150,7 +155,10 @@ private:
     double minValue, maxValue;
 
     // Harmonic layer (declare before tables since constructor initializes it first)
-    std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic coefficients + basis functions
+    std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic basis function evaluator (no data ownership)
+
+    // Coefficient storage (owned by LayeredTransferFunction)
+    std::vector<double> coefficients;  // [0] = WT mix, [1..N] = harmonics
 
     // Layers (NEVER normalized directly - preserved as-is)
     std::vector<std::atomic<double>> baseTable;      // User-drawn wavetable
