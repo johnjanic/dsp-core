@@ -2,9 +2,10 @@
 
 namespace dsp_core::audio_pipeline {
 
-DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioProcessingStage> wrappedStage)
-    : wrappedStage_(std::move(wrappedStage)) {
-    jassert(wrappedStage_ != nullptr);
+DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
+    : effectsPipeline_(std::move(effectsPipeline))
+{
+    jassert(effectsPipeline_ != nullptr);
 }
 
 void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
@@ -12,31 +13,36 @@ void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Assume max 8 channels (stereo, 5.1, 7.1)
     dryBuffer_.setSize(8, samplesPerBlock, false, true, true);
 
-    wrappedStage_->prepareToPlay(sampleRate, samplesPerBlock);
+    // Prepare effects pipeline
+    effectsPipeline_->prepareToPlay(sampleRate, samplesPerBlock);
 }
 
 void DryWetMixStage::process(juce::AudioBuffer<double>& buffer) {
-    // 1. Capture dry signal
+    // 1. Capture dry signal (before any processing)
     captureDrySignal(buffer);
 
-    // 2. Process wet signal through wrapped stage
-    wrappedStage_->process(buffer);
+    // 2. Process wet signal through effects pipeline (includes gain stages)
+    effectsPipeline_->process(buffer);
 
     // 3. Mix dry and wet
     applyMix(buffer);
 }
 
 void DryWetMixStage::reset() {
-    wrappedStage_->reset();
+    effectsPipeline_->reset();
     dryBuffer_.clear();
 }
 
 juce::String DryWetMixStage::getName() const {
-    return "DryWetMix(" + wrappedStage_->getName() + ")";
+    return "DryWetMix(" + effectsPipeline_->getName() + ")";
 }
 
 int DryWetMixStage::getLatencySamples() const {
-    return wrappedStage_->getLatencySamples();
+    return effectsPipeline_->getLatencySamples();
+}
+
+AudioPipeline* DryWetMixStage::getEffectsPipeline() {
+    return effectsPipeline_.get();
 }
 
 void DryWetMixStage::setMixAmount(double mix) {

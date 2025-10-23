@@ -4,7 +4,18 @@ namespace dsp_core::audio_pipeline {
 
 void GainStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
+    maxBlockSize_ = samplesPerBlock;
+
     smoothedGain_.reset(sampleRate, 0.01);  // 10ms ramp time
+
+    // CRITICAL: Prepare gainProcessor ONCE in prepareToPlay, NOT in process()
+    // Calling prepare() in audio thread causes allocations!
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+    spec.numChannels = static_cast<juce::uint32>(numChannels_);
+    gainProcessor_.prepare(spec);
+
     isPrepared_ = true;
 }
 
@@ -14,13 +25,8 @@ void GainStage::process(juce::AudioBuffer<double>& buffer) {
         return;
     }
 
-    // Prepare spec dynamically based on actual buffer
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate = sampleRate_;
-    spec.maximumBlockSize = static_cast<juce::uint32>(buffer.getNumSamples());
-    spec.numChannels = static_cast<juce::uint32>(buffer.getNumChannels());
-
-    gainProcessor_.prepare(spec);
+    // PERFORMANCE FIX: Don't call prepare() here - it allocates memory!
+    // Just set gain and process (like old code)
     gainProcessor_.setGainLinear(smoothedGain_.getNextValue());
 
     // Process buffer

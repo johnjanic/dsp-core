@@ -6,6 +6,7 @@ juce_add_module(dsp_core
     DEPENDS juce::juce_core
             juce::juce_data_structures
             juce::juce_audio_processors
+            juce::juce_dsp
 )
 
 target_sources(dsp_core PRIVATE

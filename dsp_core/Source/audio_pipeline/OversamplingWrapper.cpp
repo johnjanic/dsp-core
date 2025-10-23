@@ -51,9 +51,17 @@ void OversamplingWrapper::process(juce::AudioBuffer<double>& buffer) {
     auto oversampledBlock = oversampler.processSamplesUp(block);
 
     // 2. Create AudioBuffer view of oversampled data
+    // PERFORMANCE FIX: Use pre-allocated array instead of std::vector to avoid allocation
+    const size_t numChannels = oversampledBlock.getNumChannels();
+    jassert(numChannels <= channelPointers_.size());
+
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        channelPointers_[ch] = oversampledBlock.getChannelPointer(ch);
+    }
+
     juce::AudioBuffer<double> oversampledBuffer(
-        const_cast<double**>(oversampledBlock.getChannelPointer(0)),
-        static_cast<int>(oversampledBlock.getNumChannels()),
+        channelPointers_.data(),
+        static_cast<int>(numChannels),
         static_cast<int>(oversampledBlock.getNumSamples())
     );
 

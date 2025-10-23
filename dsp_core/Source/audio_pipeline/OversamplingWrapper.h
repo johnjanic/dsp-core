@@ -55,7 +55,10 @@ private:
     // Pre-allocated oversamplers (1x, 2x, 4x, 8x, 16x)
     std::array<std::unique_ptr<juce::dsp::Oversampling<double>>, 5> oversamplers_;
 
-    int currentOrder_ = 3;  // 8x default
+    // Pre-allocated channel pointers array (avoid std::vector allocation per process call)
+    std::array<double*, 8> channelPointers_;  // Max 8 channels (7.1 surround)
+
+    int currentOrder_ = 0;  // 1x default (no oversampling)
     double sampleRate_ = 44100.0;
     int maxBlockSize_ = 512;
 };

@@ -42,6 +42,8 @@ private:
     juce::dsp::Gain<double> gainProcessor_;
     juce::LinearSmoothedValue<double> smoothedGain_{1.0};
     double sampleRate_ = 44100.0;
+    int maxBlockSize_ = 512;
+    int numChannels_ = 2;
     bool isPrepared_ = false;
 };
 

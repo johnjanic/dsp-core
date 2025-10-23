@@ -16,7 +16,7 @@
   license:            proprietary/commercial
   minimumCppStandard: 17
 
-  dependencies:       juce_core, juce_data_structures, juce_audio_processors
+  dependencies:       juce_core, juce_data_structures, juce_audio_processors, juce_dsp
 
  END_JUCE_MODULE_DECLARATION
 
@@ -27,6 +27,7 @@
 #define DSP_CORE_H_INCLUDED
 
 #include <juce_data_structures/juce_data_structures.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include "Source/AudioHistoryBuffer.h"
 #include "Source/ExpressionEvaluator.h"

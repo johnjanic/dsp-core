@@ -1,27 +1,39 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
+#include "AudioPipeline.h"
 #include <memory>
 
 namespace dsp_core::audio_pipeline {
 
 /**
- * Wrapper stage that applies dry/wet mixing to wrapped stage(s).
+ * Wrapper stage that applies dry/wet mixing to an effects pipeline.
+ *
+ * Wraps an AudioPipeline that typically contains input gain → effects → output gain.
+ * Gain stages are only applied to the wet signal, so 0% mix = pure dry bypass.
  *
  * Usage:
- *   auto waveshaper = std::make_unique<WaveshapingStage>(ltf);
- *   auto mixed = std::make_unique<DryWetMixStage>(std::move(waveshaper));
- *   mixed->setMixAmount(0.5);  // 50% dry, 50% wet
- *   mixed->process(buffer);
+ *   auto effectsPipeline = std::make_unique<AudioPipeline>();
+ *   effectsPipeline->addStage(std::make_unique<GainStage>(), "inputGain");
+ *   effectsPipeline->addStage(std::make_unique<WaveshapingStage>(ltf), "waveshaper");
+ *   effectsPipeline->addStage(std::make_unique<GainStage>(), "outputGain");
  *
- * Can wrap single stage or entire sub-pipeline.
+ *   auto mixed = std::make_unique<DryWetMixStage>(std::move(effectsPipeline));
+ *   mixed->setMixAmount(0.5);  // 50% dry, 50% wet
+ *
+ *   // Access stages via tags
+ *   auto* inputGain = mixed->getEffectsPipeline()->getStage<GainStage>("inputGain");
+ *   inputGain->setGainDB(6.0);
+ *
+ * Signal flow: dry capture → effects pipeline → mix with dry
  */
 class DryWetMixStage : public AudioProcessingStage {
 public:
     /**
-     * Wrap a single stage with dry/wet mixing.
+     * Wrap an effects pipeline with dry/wet mixing.
+     * @param effectsPipeline Pipeline containing the effects chain (e.g., input gain → waveshaper → output gain)
      */
-    explicit DryWetMixStage(std::unique_ptr<AudioProcessingStage> wrappedStage);
+    explicit DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline);
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
@@ -40,11 +52,17 @@ public:
      */
     double getMixAmount() const { return mixAmount_; }
 
+    /**
+     * Get the wrapped effects pipeline for tag-based stage access.
+     * @return Non-owning pointer to effects pipeline
+     */
+    AudioPipeline* getEffectsPipeline();
+
 private:
     void captureDrySignal(const juce::AudioBuffer<double>& buffer);
     void applyMix(juce::AudioBuffer<double>& wetBuffer);
 
-    std::unique_ptr<AudioProcessingStage> wrappedStage_;
+    std::unique_ptr<AudioPipeline> effectsPipeline_;
     juce::AudioBuffer<double> dryBuffer_;
     double mixAmount_ = 1.0;  // 100% wet by default
 };
