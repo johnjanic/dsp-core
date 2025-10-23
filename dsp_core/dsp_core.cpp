@@ -17,3 +17,4 @@
 #include "Source/audio_pipeline/GainStage.cpp"
 #include "Source/audio_pipeline/DryWetMixStage.cpp"
 #include "Source/audio_pipeline/WaveshapingStage.cpp"
+#include "Source/audio_pipeline/OversamplingWrapper.cpp"

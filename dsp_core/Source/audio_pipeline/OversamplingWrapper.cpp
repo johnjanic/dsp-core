@@ -1,0 +1,101 @@
+#include "OversamplingWrapper.h"
+
+namespace dsp_core::audio_pipeline {
+
+OversamplingWrapper::OversamplingWrapper(
+    std::unique_ptr<AudioProcessingStage> wrappedStage,
+    int oversamplingOrder
+)
+    : wrappedStage_(std::move(wrappedStage))
+    , currentOrder_(oversamplingOrder)
+{
+    jassert(wrappedStage_ != nullptr);
+    jassert(oversamplingOrder >= 0 && oversamplingOrder <= 4);
+
+    // Pre-create all oversamplers
+    for (int i = 0; i < 5; ++i) {
+        oversamplers_[i] = std::make_unique<juce::dsp::Oversampling<double>>(
+            2,  // 2 channels (stereo)
+            i,  // Oversampling order
+            juce::dsp::Oversampling<double>::filterHalfBandPolyphaseIIR
+        );
+    }
+}
+
+void OversamplingWrapper::prepareToPlay(double sampleRate, int samplesPerBlock) {
+    sampleRate_ = sampleRate;
+    maxBlockSize_ = samplesPerBlock;
+
+    // Prepare all oversamplers
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+    spec.numChannels = 2;
+
+    for (auto& oversampler : oversamplers_) {
+        oversampler->initProcessing(samplesPerBlock);
+        oversampler->reset();
+    }
+
+    // Prepare wrapped stage at oversampled rate
+    const int factor = 1 << currentOrder_;  // 2^order
+    const int oversampledBlockSize = samplesPerBlock * factor;
+    wrappedStage_->prepareToPlay(sampleRate * factor, oversampledBlockSize);
+}
+
+void OversamplingWrapper::process(juce::AudioBuffer<double>& buffer) {
+    auto& oversampler = *oversamplers_[currentOrder_];
+
+    // 1. Upsample
+    juce::dsp::AudioBlock<double> block(buffer);
+    auto oversampledBlock = oversampler.processSamplesUp(block);
+
+    // 2. Create AudioBuffer view of oversampled data
+    juce::AudioBuffer<double> oversampledBuffer(
+        const_cast<double**>(oversampledBlock.getChannelPointer(0)),
+        static_cast<int>(oversampledBlock.getNumChannels()),
+        static_cast<int>(oversampledBlock.getNumSamples())
+    );
+
+    // 3. Process wrapped stage at high sample rate
+    wrappedStage_->process(oversampledBuffer);
+
+    // 4. Downsample
+    oversampler.processSamplesDown(block);
+}
+
+void OversamplingWrapper::reset() {
+    for (auto& oversampler : oversamplers_) {
+        oversampler->reset();
+    }
+    wrappedStage_->reset();
+}
+
+juce::String OversamplingWrapper::getName() const {
+    const int factor = 1 << currentOrder_;
+    return juce::String(factor) + "x(" + wrappedStage_->getName() + ")";
+}
+
+int OversamplingWrapper::getLatencySamples() const {
+    const auto& oversampler = *oversamplers_[currentOrder_];
+    const int oversamplingLatency = static_cast<int>(oversampler.getLatencyInSamples());
+    const int wrappedLatency = wrappedStage_->getLatencySamples();
+
+    // Wrapped latency is at oversampled rate, convert to base rate
+    const int factor = 1 << currentOrder_;
+    return oversamplingLatency + (wrappedLatency / factor);
+}
+
+void OversamplingWrapper::setOversamplingOrder(int order) {
+    jassert(order >= 0 && order <= 4);
+    if (order == currentOrder_) return;
+
+    currentOrder_ = order;
+
+    // Re-prepare wrapped stage at new sample rate
+    const int factor = 1 << currentOrder_;
+    const int oversampledBlockSize = maxBlockSize_ * factor;
+    wrappedStage_->prepareToPlay(sampleRate_ * factor, oversampledBlockSize);
+}
+
+} // namespace dsp_core::audio_pipeline
