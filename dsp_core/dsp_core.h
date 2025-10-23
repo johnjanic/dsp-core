@@ -33,3 +33,8 @@
 #include "Source/HarmonicLayer.h"
 #include "Source/LayeredTransferFunction.h"
 #include "Source/TransferFunction.h"
+#include "Source/audio_pipeline/AudioProcessingStage.h"
+#include "Source/audio_pipeline/AudioPipeline.h"
+#include "Source/audio_pipeline/GainStage.h"
+#include "Source/audio_pipeline/DryWetMixStage.h"
+#include "Source/audio_pipeline/WaveshapingStage.h"

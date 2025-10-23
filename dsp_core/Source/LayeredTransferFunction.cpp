@@ -19,7 +19,7 @@ LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double
     // Initialize base layer to identity: y = x
     for (int i = 0; i < tableSize; ++i) {
         double x = normalizeIndex(i);
-        baseTable[i].store(x);
+        baseTable[i].store(x, std::memory_order_release);
     }
 
     // Precompute harmonic basis functions
@@ -31,20 +31,20 @@ LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double
 
 double LayeredTransferFunction::getBaseLayerValue(int index) const {
     if (index >= 0 && index < tableSize) {
-        return baseTable[index].load();
+        return baseTable[index].load(std::memory_order_acquire);
     }
     return 0.0;
 }
 
 void LayeredTransferFunction::setBaseLayerValue(int index, double value) {
     if (index >= 0 && index < tableSize) {
-        baseTable[index].store(value);
+        baseTable[index].store(value, std::memory_order_release);
     }
 }
 
 void LayeredTransferFunction::clearBaseLayer() {
     for (int i = 0; i < tableSize; ++i) {
-        baseTable[i].store(0.0);
+        baseTable[i].store(0.0, std::memory_order_release);
     }
 }
 
@@ -71,7 +71,7 @@ double LayeredTransferFunction::getCoefficient(int index) const {
 
 double LayeredTransferFunction::getCompositeValue(int index) const {
     if (index >= 0 && index < tableSize) {
-        return compositeTable[index].load();
+        return compositeTable[index].load(std::memory_order_acquire);
     }
     return 0.0;
 }
@@ -85,7 +85,7 @@ void LayeredTransferFunction::updateComposite() {
         double x = normalizeIndex(i);
 
         // Get layer values (NEVER modified by this function)
-        double baseValue = baseTable[i].load();
+        double baseValue = baseTable[i].load(std::memory_order_acquire);
         double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
         double wavetableCoeff = coefficients[0];  // WT mix coefficient
 
@@ -103,7 +103,7 @@ void LayeredTransferFunction::updateComposite() {
     }
 
     // Step 2: Compute normalization scalar (or use frozen scalar if deferred)
-    double normScalar = normalizationScalar.load();  // Default to existing scalar
+    double normScalar = normalizationScalar.load(std::memory_order_acquire);  // Default to existing scalar
 
     if (!deferNormalization) {
         // Normal mode: recalculate normalization scalar
@@ -111,14 +111,14 @@ void LayeredTransferFunction::updateComposite() {
         if (maxAbsValue > 1e-12) {  // Avoid division by zero
             normScalar = 1.0 / maxAbsValue;
         }
-        normalizationScalar.store(normScalar);
+        normalizationScalar.store(normScalar, std::memory_order_release);
     }
     // else: deferred mode - keep using existing normScalar
 
     // Step 3: Store normalized composite
     for (int i = 0; i < tableSize; ++i) {
         double normalized = normScalar * unnormalizedMix[i];
-        compositeTable[i].store(normalized);
+        compositeTable[i].store(normalized, std::memory_order_release);
     }
 }
 
@@ -176,16 +176,16 @@ double LayeredTransferFunction::interpolateLinear(double x) const {
         bool isAbove = (i > tableSize - 1);
 
         if (isBelow && (extrapMode == ExtrapolationMode::Linear)) {
-            double slope = compositeTable[1].load() - compositeTable[0].load();
-            return compositeTable[0].load() + slope * i;
+            double slope = compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
+            return compositeTable[0].load(std::memory_order_acquire) + slope * i;
         }
         else if (isAbove && extrapMode == ExtrapolationMode::Linear) {
-            double slope = compositeTable[tableSize - 1].load() - compositeTable[tableSize - 2].load();
-            return compositeTable[tableSize - 1].load() + slope * (i - tableSize + 1);
+            double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) - compositeTable[tableSize - 2].load(std::memory_order_acquire);
+            return compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (i - tableSize + 1);
         }
         else {
             int clampedIdx = juce::jlimit(0, tableSize - 1, i);
-            return compositeTable[clampedIdx].load();
+            return compositeTable[clampedIdx].load(std::memory_order_acquire);
         }
     };
 
@@ -207,16 +207,16 @@ double LayeredTransferFunction::interpolateCubic(double x) const {
         bool isAbove = (i > tableSize - 1);
 
         if (isBelow && (extrapMode == ExtrapolationMode::Linear)) {
-            double slope = compositeTable[1].load() - compositeTable[0].load();
-            return compositeTable[0].load() + slope * i;
+            double slope = compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
+            return compositeTable[0].load(std::memory_order_acquire) + slope * i;
         }
         else if (isAbove && extrapMode == ExtrapolationMode::Linear) {
-            double slope = compositeTable[tableSize - 1].load() - compositeTable[tableSize - 2].load();
-            return compositeTable[tableSize - 1].load() + slope * (i - tableSize + 1);
+            double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) - compositeTable[tableSize - 2].load(std::memory_order_acquire);
+            return compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (i - tableSize + 1);
         }
         else {
             int clampedIdx = juce::jlimit(0, tableSize - 1, i);
-            return compositeTable[clampedIdx].load();
+            return compositeTable[clampedIdx].load(std::memory_order_acquire);
         }
     };
 
@@ -245,16 +245,16 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
         bool isAbove = (i > tableSize - 1);
 
         if (isBelow && (extrapMode == ExtrapolationMode::Linear)) {
-            double slope = compositeTable[1].load() - compositeTable[0].load();
-            return compositeTable[0].load() + slope * i;
+            double slope = compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
+            return compositeTable[0].load(std::memory_order_acquire) + slope * i;
         }
         else if (isAbove && extrapMode == ExtrapolationMode::Linear) {
-            double slope = compositeTable[tableSize - 1].load() - compositeTable[tableSize - 2].load();
-            return compositeTable[tableSize - 1].load() + slope * (i - tableSize + 1);
+            double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) - compositeTable[tableSize - 2].load(std::memory_order_acquire);
+            return compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (i - tableSize + 1);
         }
         else {
             int clampedIdx = juce::jlimit(0, tableSize - 1, i);
-            return compositeTable[clampedIdx].load();
+            return compositeTable[clampedIdx].load(std::memory_order_acquire);
         }
     };
 
@@ -285,7 +285,7 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
         juce::ValueTree baseVT("BaseLayer");
         juce::MemoryBlock baseBlob;
         for (int i = 0; i < tableSize; ++i) {
-            double value = baseTable[i].load();
+            double value = baseTable[i].load(std::memory_order_acquire);
             baseBlob.append(&value, sizeof(double));
         }
         baseVT.setProperty("tableData", baseBlob, nullptr);
@@ -304,7 +304,7 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
     }
 
     // Serialize normalization scalar
-    vt.setProperty("normalizationScalar", normalizationScalar.load(), nullptr);
+    vt.setProperty("normalizationScalar", normalizationScalar.load(std::memory_order_acquire), nullptr);
 
     // Serialize settings
     vt.setProperty("interpolationMode", static_cast<int>(interpMode), nullptr);
@@ -337,7 +337,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
         int numValues = static_cast<int>(baseBlob.getSize() / sizeof(double));
 
         for (int i = 0; i < std::min(numValues, tableSize); ++i) {
-            baseTable[i].store(data[i]);
+            baseTable[i].store(data[i], std::memory_order_release);
         }
     }
 
@@ -350,7 +350,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
 
     // Load normalization scalar (optional - will be recomputed anyway)
     if (vt.hasProperty("normalizationScalar")) {
-        normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")));
+        normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")), std::memory_order_release);
     }
 
     // Load settings

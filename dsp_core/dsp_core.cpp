@@ -13,3 +13,7 @@
 #include "Source/HarmonicLayer.cpp"
 #include "Source/LayeredTransferFunction.cpp"
 #include "Source/TransferFunction.cpp"
+#include "Source/audio_pipeline/AudioPipeline.cpp"
+#include "Source/audio_pipeline/GainStage.cpp"
+#include "Source/audio_pipeline/DryWetMixStage.cpp"
+#include "Source/audio_pipeline/WaveshapingStage.cpp"
