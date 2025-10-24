@@ -59,7 +59,7 @@ public:
     double getCompositeValue(int index) const;
 
     // Normalization scalar (read-only access)
-    double getNormalizationScalar() const { return normalizationScalar.load(); }
+    double getNormalizationScalar() const { return normalizationScalar.load(std::memory_order_acquire); }
 
     //==========================================================================
     // Composition
@@ -172,10 +172,16 @@ private:
     // Normalization deferral (prevents visual shifting during paint strokes)
     bool deferNormalization = false;
 
+    // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
+    mutable std::vector<double> unnormalizedMixBuffer;
+
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
 
-    // Interpolation helpers (copy from TransferFunction implementation)
+    // Interpolation helpers with dual-path optimization
+    // Each method has two code paths selected by a single branch on extrapMode:
+    //   - Fast path (Clamp): Direct clamped loads, relaxed memory order (default)
+    //   - Slow path (Linear): Boundary checks + slope calculations for extrapolation
     double interpolate(double x) const;
     double interpolateLinear(double x) const;
     double interpolateCubic(double x) const;
