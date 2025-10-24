@@ -7,10 +7,13 @@
 namespace dsp_core::audio_pipeline {
 
 /**
- * Wrapper stage that applies dry/wet mixing to an effects pipeline.
+ * Wrapper stage that applies dry/wet mixing to an effects pipeline with latency compensation.
  *
  * Wraps an AudioPipeline that typically contains input gain → effects → output gain.
  * Gain stages are only applied to the wet signal, so 0% mix = pure dry bypass.
+ *
+ * Latency compensation: The dry path is delayed by the same amount as the wet path
+ * to prevent comb filtering when mixing the signals together.
  *
  * Usage:
  *   auto effectsPipeline = std::make_unique<AudioPipeline>();
@@ -25,7 +28,8 @@ namespace dsp_core::audio_pipeline {
  *   auto* inputGain = mixed->getEffectsPipeline()->getStage<GainStage>("inputGain");
  *   inputGain->setGainDB(6.0);
  *
- * Signal flow: dry capture → effects pipeline → mix with dry
+ * Signal flow: dry capture → delay buffer → mix with wet
+ *             wet: effects pipeline → mix with dry
  */
 class DryWetMixStage : public AudioProcessingStage {
 public:
@@ -63,7 +67,9 @@ private:
     void applyMix(juce::AudioBuffer<double>& wetBuffer);
 
     std::unique_ptr<AudioPipeline> effectsPipeline_;
-    juce::AudioBuffer<double> dryBuffer_;
+    juce::AudioBuffer<double> dryBuffer_;         // Current dry signal
+    juce::AudioBuffer<double> delayBuffer_;       // Circular buffer for latency compensation
+    int delayBufferWritePos_ = 0;                 // Write position in delay buffer
     double mixAmount_ = 1.0;  // 100% wet by default
 };
 

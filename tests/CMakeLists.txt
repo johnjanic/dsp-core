@@ -37,3 +37,28 @@ endif()
 
 # Also add a simple test that can always be run
 add_test(NAME LayeredTransferFunctionTests COMMAND layered_transfer_function_tests)
+
+# DryWetMixStage tests
+add_executable(dry_wet_mix_stage_tests
+    DryWetMixStageTest.cpp
+)
+
+target_include_directories(dry_wet_mix_stage_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(dry_wet_mix_stage_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(dry_wet_mix_stage_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(dry_wet_mix_stage_tests)
+endif()
+
+add_test(NAME DryWetMixStageTests COMMAND dry_wet_mix_stage_tests)
