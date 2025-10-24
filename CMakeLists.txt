@@ -6,6 +6,7 @@ juce_add_module(dsp_core
     DEPENDS juce::juce_core
             juce::juce_data_structures
             juce::juce_audio_processors
+            juce::juce_dsp
 )
 
 target_sources(dsp_core PRIVATE
@@ -19,4 +20,20 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/LayeredTransferFunction.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioProcessingStage.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioPipeline.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioPipeline.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/GainStage.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/GainStage.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DryWetMixStage.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DryWetMixStage.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/WaveshapingStage.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/WaveshapingStage.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/OversamplingWrapper.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/OversamplingWrapper.cpp"
 )
+
+# Add tests subdirectory if testing is enabled
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

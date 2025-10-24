@@ -16,7 +16,7 @@
   license:            proprietary/commercial
   minimumCppStandard: 17
 
-  dependencies:       juce_core, juce_data_structures, juce_audio_processors
+  dependencies:       juce_core, juce_data_structures, juce_audio_processors, juce_dsp
 
  END_JUCE_MODULE_DECLARATION
 
@@ -27,9 +27,16 @@
 #define DSP_CORE_H_INCLUDED
 
 #include <juce_data_structures/juce_data_structures.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include "Source/AudioHistoryBuffer.h"
 #include "Source/ExpressionEvaluator.h"
 #include "Source/HarmonicLayer.h"
 #include "Source/LayeredTransferFunction.h"
 #include "Source/TransferFunction.h"
+#include "Source/audio_pipeline/AudioProcessingStage.h"
+#include "Source/audio_pipeline/AudioPipeline.h"
+#include "Source/audio_pipeline/GainStage.h"
+#include "Source/audio_pipeline/DryWetMixStage.h"
+#include "Source/audio_pipeline/WaveshapingStage.h"
+#include "Source/audio_pipeline/OversamplingWrapper.h"

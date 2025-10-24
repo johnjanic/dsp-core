@@ -4,7 +4,6 @@
 #include <vector>
 #include <atomic>
 #include <memory>
-#include <functional>
 
 namespace dsp_core {
 
@@ -17,9 +16,17 @@ namespace dsp_core {
  * Architecture:
  *   Base Layer (wavetable) + Harmonic Layer (coefficients) → Composite Table
  *
- * Mixing formula:
- *   Composite(x) = WT_mix × Base(x) + Σ(coeff[n] × Harmonic_n(x))
- *   where WT_mix = harmonicLayer.getCoefficient(0)
+ * Mixing formula (unnormalized):
+ *   UnNormMix[i] = wavetableCoeff × Base[i] + Σ(harmonicCoeff[n] × Harmonic_n[i])
+ *   where wavetableCoeff = harmonicLayer.getCoefficient(0)
+ *
+ * Normalization (applied separately to preserve layer data):
+ *   maxAbsValue = max(abs(UnNormMix[i]))
+ *   normalizationScalar = 1.0 / maxAbsValue
+ *   Composite[i] = normalizationScalar × UnNormMix[i]
+ *
+ * Critical: Layers (baseTable, harmonic evaluations) are NEVER modified by normalization.
+ * This allows seamless coefficient mixing in TransferFunctionController.
  *
  * Thread safety:
  *   - Base layer uses atomics for lock-free reads/writes
@@ -39,15 +46,20 @@ public:
     void setBaseLayerValue(int index, double value);
     void clearBaseLayer();  // Set all base values to 0.0
 
-    // Harmonic layer
+    // Harmonic layer (for algorithm settings only)
     HarmonicLayer& getHarmonicLayer();
     const HarmonicLayer& getHarmonicLayer() const;
+
+    // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)
+    void setCoefficient(int index, double value);
+    double getCoefficient(int index) const;
+    int getNumCoefficients() const { return static_cast<int>(coefficients.size()); }
 
     // Composite (final output for audio processing)
     double getCompositeValue(int index) const;
 
-    // Normalization scale (applied on read to keep composite in [-1, 1])
-    double getNormalizationScale() const;
+    // Normalization scalar (read-only access)
+    double getNormalizationScalar() const { return normalizationScalar.load(std::memory_order_acquire); }
 
     //==========================================================================
     // Composition
@@ -56,10 +68,39 @@ public:
     /**
      * Recompute composite from layers
      *
-     * Call after ANY edit to base or harmonic layer.
-     * This is the critical performance path - uses precomputed harmonics.
+     * Call after ANY edit to base or harmonic layer coefficients.
+     *
+     * Algorithm:
+     *   1. Compute unnormalized mix: UnNorm[i] = wtCoeff*Base[i] + Σ(hCoeff[n]*H_n[i])
+     *   2. Find maxAbsValue = max(abs(UnNorm[i]))
+     *   3. Compute normalizationScalar = 1.0 / maxAbsValue
+     *   4. Store normalized composite: Composite[i] = normalizationScalar * UnNorm[i]
+     *
+     * Critical: Base layer and harmonic evaluations remain unchanged.
+     *
+     * If normalization is deferred (via setDeferNormalization), the normalization scalar
+     * remains frozen and the composite is computed using the existing scalar. This prevents
+     * visual shifting during paint strokes.
      */
     void updateComposite();
+
+    /**
+     * Enable or disable deferred normalization
+     *
+     * When enabled, updateComposite() will freeze the normalization scalar and only
+     * update the composite table using the existing scalar. This prevents visual shifting
+     * during multi-point operations like paint strokes.
+     *
+     * When disabled, normalization resumes normal behavior (recalculating the scalar).
+     *
+     * @param shouldDefer If true, freeze normalization scalar; if false, resume normal behavior
+     */
+    void setDeferNormalization(bool shouldDefer);
+
+    /**
+     * Check if normalization is currently deferred
+     */
+    bool isNormalizationDeferred() const;
 
     //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
@@ -69,26 +110,10 @@ public:
     double getMinSignalValue() const { return minValue; }
     double getMaxSignalValue() const { return maxValue; }
 
-    // Compatibility methods for TransferFunction API
-    // These operate on the COMPOSITE layer (final output)
-    double getTableValue(int index) const { return getCompositeValue(index); }
-    void setTableValue(int index, double value);
-    void applyFunction(std::function<double(double)> func);
-
-    // Serialization compatibility
-    void writeToStream(juce::OutputStream& stream) const;
-    void readFromStream(juce::InputStream& stream);
-
     /**
      * Map table index to normalized position x ∈ [minValue, maxValue]
      */
     double normalizeIndex(int index) const;
-
-    /**
-     * Scale composite table so max(abs(value)) = 1.0
-     * NOTE: Breaks layer ratios. Use soft-clipping in updateComposite() instead.
-     */
-    void normalizeByMaximum();
 
     //==========================================================================
     // Processing (reads composite - thread-safe)
@@ -129,31 +154,38 @@ private:
     int tableSize;
     double minValue, maxValue;
 
-    // Layers
-    std::vector<std::atomic<double>> baseTable;      // User-drawn
-    std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic coefficients
+    // Harmonic layer (declare before tables since constructor initializes it first)
+    std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic basis function evaluator (no data ownership)
+
+    // Coefficient storage (owned by LayeredTransferFunction)
+    std::vector<double> coefficients;  // [0] = WT mix, [1..N] = harmonics
+
+    // Layers (NEVER normalized directly - preserved as-is)
+    std::vector<std::atomic<double>> baseTable;      // User-drawn wavetable
 
     // Composite output (what audio thread reads)
     std::vector<std::atomic<double>> compositeTable;
 
-    // Normalization scale: compositeTable stores unnormalized values,
-    // scale is applied on read via getCompositeValue() and getSample()
-    // This allows differential solving to work correctly while keeping
-    // the transfer function visually normalized to [-1, 1]
-    std::atomic<double> normalizationScale{1.0};
+    // Normalization scalar (applied to mix, not to layers)
+    std::atomic<double> normalizationScalar{ 1.0 };
+
+    // Normalization deferral (prevents visual shifting during paint strokes)
+    bool deferNormalization = false;
+
+    // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
+    mutable std::vector<double> unnormalizedMixBuffer;
 
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
 
-    // Interpolation helpers (adapted from TransferFunction)
+    // Interpolation helpers with dual-path optimization
+    // Each method has two code paths selected by a single branch on extrapMode:
+    //   - Fast path (Clamp): Direct clamped loads, relaxed memory order (default)
+    //   - Slow path (Linear): Boundary checks + slope calculations for extrapolation
     double interpolate(double x) const;
-    double applyTransferFunctionLinear(double x) const;
-    double applyTransferFunctionCubic(double x) const;
-    double applyTransferFunctionCatmullRom(double x) const;
-    double interpolateLinear(double y0, double y1, double t) const;
-    double interpolateCubic(double y0, double y1, double y2, double y3, double t) const;
-    double interpolateCatmullRom(double y0, double y1, double y2, double y3, double t) const;
-    double getSample(int i) const;
+    double interpolateLinear(double x) const;
+    double interpolateCubic(double x) const;
+    double interpolateCatmullRom(double x) const;
 };
 
 } // namespace dsp_core

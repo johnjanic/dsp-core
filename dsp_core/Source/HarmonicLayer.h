@@ -1,18 +1,21 @@
 #pragma once
 #include <juce_core/juce_core.h>
 #include <vector>
-#include <atomic>
 
 namespace dsp_core {
 
 /**
- * HarmonicLayer - Harmonic waveshaping coefficients with optimized evaluation
+ * HarmonicLayer - Harmonic waveshaping evaluator with optimized computation
  *
- * Stores harmonic coefficients and evaluates Chebyshev-based waveshaping functions.
+ * Evaluates Chebyshev-based waveshaping functions using external coefficient data.
  * Uses precomputed basis functions for 10-50x performance improvement.
  *
- * coefficients[0] = WT (wavetable mix) - controls base layer blending
- * coefficients[1..N] = harmonic amplitudes
+ * Design: LayeredTransferFunction owns coefficients; HarmonicLayer is a pure evaluator.
+ * This separates data ownership from computation logic.
+ *
+ * Expected coefficient layout (owned by caller):
+ *   coefficients[0] = WT (wavetable mix) - controls base layer blending (unused by this class)
+ *   coefficients[1..N] = harmonic amplitudes (used by evaluate())
  */
 class HarmonicLayer {
 public:
@@ -21,15 +24,13 @@ public:
         Polynomial  // Alternative: Clenshaw's algorithm for Chebyshev polynomials
     };
 
-    explicit HarmonicLayer(int numHarmonics = 19);
+    explicit HarmonicLayer(int numHarmonics = 40);
 
     //==========================================================================
-    // Coefficient Access
+    // Configuration
     //==========================================================================
 
-    void setCoefficient(int harmonicIndex, double value);
-    double getCoefficient(int harmonicIndex) const;
-    int getNumHarmonics() const { return static_cast<int>(coefficients.size()) - 1; }
+    int getNumHarmonics() const { return numHarmonics; }
 
     void setAlgorithm(Algorithm algo);
     Algorithm getAlgorithm() const { return algorithm; }
@@ -42,10 +43,13 @@ public:
      * Evaluate harmonic contribution at normalized position x ∈ [-1, 1]
      *
      * @param x Normalized position in transfer function domain
+     * @param coefficients External coefficient array (must have size >= numHarmonics + 1)
+     *                     coefficients[0] is ignored (WT mix, used by caller)
+     *                     coefficients[1..N] are harmonic amplitudes
      * @param tableSize Size of the transfer function table (for basis lookup)
      * @return Sum of weighted harmonics (does NOT include WT * base)
      */
-    double evaluate(double x, int tableSize) const;
+    double evaluate(double x, const std::vector<double>& coefficients, int tableSize) const;
 
     //==========================================================================
     // Precomputation (call once, or when table size changes)
@@ -73,7 +77,7 @@ public:
     bool operator==(const HarmonicLayer& other) const;
 
 private:
-    std::vector<double> coefficients;  // [0] = WT mix, [1..N] = harmonics
+    int numHarmonics;
     Algorithm algorithm = Algorithm::Trig;
 
     // Precomputed basis functions: [harmonic_index][table_index]
@@ -81,7 +85,7 @@ private:
     mutable bool precomputed = false;
     mutable int lastTableSize = 0;
 
-    // Chebyshev evaluation functions (moved from HarmonicMode)
+    // Chebyshev evaluation functions
     static double evaluateChebyshevTrig(double x, const std::vector<double>& coeffs);
     static double evaluateChebyshevPolynomial(double x, const std::vector<double>& coeffs);
 
