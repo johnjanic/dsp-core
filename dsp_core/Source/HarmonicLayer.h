@@ -24,7 +24,7 @@ public:
         Polynomial  // Alternative: Clenshaw's algorithm for Chebyshev polynomials
     };
 
-    explicit HarmonicLayer(int numHarmonics = 19);
+    explicit HarmonicLayer(int numHarmonics = 40);
 
     //==========================================================================
     // Configuration

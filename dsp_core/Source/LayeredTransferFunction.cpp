@@ -18,8 +18,8 @@ namespace dsp_core {
 
 LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double maxVal)
     : tableSize(size), minValue(minVal), maxValue(maxVal),
-      harmonicLayer(std::make_unique<HarmonicLayer>(19)),
-      coefficients(20, 0.0),  // 20 coefficients: [0] = WT, [1..19] = harmonics
+      harmonicLayer(std::make_unique<HarmonicLayer>(40)),
+      coefficients(41, 0.0),  // 41 coefficients: [0] = WT, [1..40] = harmonics
       baseTable(size),
       compositeTable(size) {
 
@@ -28,7 +28,7 @@ LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double
 
     // Initialize coefficients
     coefficients[0] = 1.0;  // Default WT mix = 1.0 (full base layer)
-    // coefficients[1..19] already initialized to 0.0
+    // coefficients[1..40] already initialized to 0.0
 
     // Initialize base layer to identity: y = x
     for (int i = 0; i < tableSize; ++i) {
