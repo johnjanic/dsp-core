@@ -45,11 +45,15 @@ private:
     static void clampToRange(std::vector<Sample>& samples);
 
     // Step 2: Ramer-Douglas-Peucker simplification
+    // DEPRECATED: RDP-based approach (replaced by greedy algorithm)
+    // Kept for reference only - not called by fitCurve()
+    [[deprecated("Use greedySplineFit() instead")]]
     static std::vector<SplineAnchor> ramerDouglasPeucker(
         const std::vector<Sample>& samples,
         const SplineFitConfig& config
     );
 
+    [[deprecated("Use greedySplineFit() instead")]]
     static void rdpRecursive(
         const std::vector<Sample>& samples,
         size_t startIdx,
@@ -58,6 +62,7 @@ private:
         std::vector<bool>& keep
     );
 
+    [[deprecated("Use greedySplineFit() instead")]]
     static double computeHybridError(
         const Sample& point,
         const Sample& lineStart,
@@ -66,6 +71,7 @@ private:
         double beta
     );
 
+    [[deprecated("Use greedySplineFit() instead")]]
     static double estimateDerivative(
         const std::vector<Sample>& samples,
         size_t index
@@ -78,6 +84,23 @@ private:
     );
 
     static double harmonicMean(double a, double b, double wa, double wb);
+
+    // Greedy spline fitting (replaces RDP + refinement)
+    static std::vector<SplineAnchor> greedySplineFit(
+        const std::vector<Sample>& samples,
+        const SplineFitConfig& config
+    );
+
+    // Find sample with worst fit error
+    struct WorstFitResult {
+        size_t sampleIndex;
+        double maxError;
+    };
+
+    static WorstFitResult findWorstFitSample(
+        const std::vector<Sample>& samples,
+        const std::vector<SplineAnchor>& anchors
+    );
 
     SplineFitter() = delete;  // Pure static utility
 };

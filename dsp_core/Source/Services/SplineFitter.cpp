@@ -31,26 +31,26 @@ SplineFitResult SplineFitter::fitCurve(
         return result;
     }
 
-    // Step 2: RDP simplification
-    auto anchors = ramerDouglasPeucker(samples, config);
+    // Step 2: Greedy spline fitting (REPLACES RDP + refinement)
+    std::cerr << "[DEBUG] fitCurve: samples=" << samples.size()
+              << ", tolerance=" << config.positionTolerance
+              << ", maxAnchors=" << config.maxAnchors << std::endl;
+
+    auto anchors = greedySplineFit(samples, config);
+
+    std::cerr << "[DEBUG] fitCurve: greedySplineFit returned "
+              << anchors.size() << " anchors" << std::endl;
 
     if (anchors.empty()) {
         result.success = false;
-        result.message = "RDP failed to produce anchors";
+        result.message = "Greedy fit failed to produce anchors";
         return result;
     }
 
-    // Enforce maxAnchors limit
-    if (anchors.size() > static_cast<size_t>(config.maxAnchors)) {
-        // Too many anchors - trim to max (keep endpoints + evenly spaced)
-        // For now, just truncate (TODO: smarter selection in future)
-        anchors.resize(config.maxAnchors);
-    }
+    // Note: No need for endpoint truncation fix - greedy algorithm
+    // naturally respects maxAnchors limit during iteration
 
-    // Step 3: PCHIP tangent computation
-    computePCHIPTangents(anchors, config);
-
-    // Step 4: Error analysis
+    // Step 3: Error analysis
     // Compute error statistics by comparing original samples to fitted spline
     double maxErr = 0.0;
     double sumErr = 0.0;
@@ -169,7 +169,10 @@ void SplineFitter::clampToRange(std::vector<Sample>& samples) {
 }
 
 //==============================================================================
-// Step 2: Ramer-Douglas-Peucker Simplification
+// DEPRECATED RDP IMPLEMENTATION (Kept for reference)
+// Issue: RDP measures error against straight lines, but PCHIP uses cubic curves
+// This objective function mismatch caused "bowing artifacts" in straight regions
+// Replaced by greedy spline-aware fitting (see greedySplineFit)
 //==============================================================================
 
 std::vector<SplineAnchor> SplineFitter::ramerDouglasPeucker(
@@ -361,6 +364,137 @@ double SplineFitter::harmonicMean(double a, double b, double wa, double wb) {
         return 0.0;
     }
     return (wa + wb) / (wa / a + wb / b);
+}
+
+//==============================================================================
+// Greedy Spline Fitting (Replaces RDP)
+//==============================================================================
+
+SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
+    const std::vector<Sample>& samples,
+    const std::vector<SplineAnchor>& anchors) {
+
+    WorstFitResult result{0, 0.0};
+
+    if (anchors.size() < 2) {
+        return result;
+    }
+
+    // Scan all samples, find worst error
+    for (size_t i = 0; i < samples.size(); ++i) {
+        const auto& sample = samples[i];
+
+        // Skip samples that already have anchors at their x position
+        bool hasAnchor = std::any_of(anchors.begin(), anchors.end(),
+            [&sample](const SplineAnchor& a) {
+                return std::abs(a.x - sample.x) < 1e-9;
+            });
+
+        if (hasAnchor) {
+            continue;  // Skip this sample
+        }
+
+        // Evaluate PCHIP spline at this x position
+        double splineY = SplineEvaluator::evaluate(anchors, sample.x);
+
+        // Compute absolute error
+        double error = std::abs(sample.y - splineY);
+
+        if (error > result.maxError) {
+            result.maxError = error;
+            result.sampleIndex = i;
+        }
+    }
+
+    return result;
+}
+
+std::vector<SplineAnchor> SplineFitter::greedySplineFit(
+    const std::vector<Sample>& samples,
+    const SplineFitConfig& config) {
+
+    if (samples.size() < 2) {
+        std::cerr << "[DEBUG] greedySplineFit: samples.size() < 2, returning empty" << std::endl;
+        return {};
+    }
+
+    // Start with just endpoints
+    std::vector<SplineAnchor> anchors;
+    anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
+    anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
+
+    std::cerr << "[DEBUG] greedySplineFit: starting with " << anchors.size() << " endpoint anchors" << std::endl;
+    std::cerr << "[DEBUG] greedySplineFit: loop will run max " << (config.maxAnchors - 2) << " iterations" << std::endl;
+
+    // Iteratively insert anchors at worst-error locations
+    DBG("Greedy fit starting: samples=" << samples.size()
+        << ", tolerance=" << config.positionTolerance
+        << ", maxAnchors=" << config.maxAnchors);
+
+    for (int iteration = 0; iteration < config.maxAnchors - 2; ++iteration) {
+        std::cerr << "[DEBUG] greedySplineFit: iteration " << iteration << std::endl;
+        // Compute tangents for current anchor set
+        computePCHIPTangents(anchors, config);
+
+        // Find sample with highest error
+        auto worst = findWorstFitSample(samples, anchors);
+
+        std::cerr << "[DEBUG] iteration " << iteration
+                  << ": maxError=" << worst.maxError
+                  << ", tolerance=" << config.positionTolerance
+                  << ", worstSampleIdx=" << worst.sampleIndex << std::endl;
+
+        DBG("Greedy iteration " << iteration
+            << ": anchors=" << anchors.size()
+            << ", maxError=" << worst.maxError
+            << ", tolerance=" << config.positionTolerance);
+
+        // Converged?
+        if (worst.maxError <= config.positionTolerance) {
+            std::cerr << "[DEBUG] CONVERGED at iteration " << iteration << std::endl;
+            DBG("Greedy fit converged at iteration " << iteration
+                << ", anchors=" << anchors.size()
+                << ", error=" << worst.maxError);
+            break;
+        }
+
+        // Insert anchor at worst-fit location
+        const auto& worstSample = samples[worst.sampleIndex];
+
+        // Find insertion point (maintain sorted order by x)
+        auto insertPos = std::lower_bound(
+            anchors.begin(), anchors.end(), worstSample.x,
+            [](const SplineAnchor& a, double x) { return a.x < x; }
+        );
+
+        // Don't insert duplicate x positions
+        // Check if an anchor already exists at this x position
+        bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
+            [&worstSample](const SplineAnchor& a) {
+                return std::abs(a.x - worstSample.x) < 1e-9;
+            });
+
+        if (isDuplicate) {
+            std::cerr << "[DEBUG] DUPLICATE detected at x=" << worstSample.x << ", BREAKING" << std::endl;
+            DBG("Skipping duplicate anchor at x=" << worstSample.x);
+            break;  // No progress possible
+        }
+
+        anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+        std::cerr << "[DEBUG] Inserted anchor at x=" << worstSample.x << ", y=" << worstSample.y
+                  << ", total anchors=" << anchors.size() << std::endl;
+
+        DBG("Greedy iteration " << iteration
+            << ": inserted anchor at x=" << worstSample.x
+            << ", y=" << worstSample.y
+            << ", error before=" << worst.maxError
+            << ", anchors=" << anchors.size());
+    }
+
+    // Final tangent computation
+    computePCHIPTangents(anchors, config);
+
+    return anchors;
 }
 
 } // namespace Services

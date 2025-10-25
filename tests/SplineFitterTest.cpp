@@ -500,4 +500,268 @@ TEST_F(SplineFitterTest, Integration_FitAndReconstruct) {
     EXPECT_GT(matchCount, 20) << "Reconstruction quality too low";
 }
 
+//==============================================================================
+// Comprehensive Real-World Function Tests
+//==============================================================================
+
+/**
+ * Test tanh curves with varying steepness
+ * tanh(nx) becomes steeper as n increases, testing the algorithm's ability
+ * to handle different curvature characteristics
+ */
+TEST_F(SplineFitterTest, TanhCurves_VariousSteepness) {
+    // Test tanh(1x) through tanh(20x)
+    std::vector<int> steepnessFactors = {1, 2, 5, 10, 15, 20};
+
+    for (int n : steepnessFactors) {
+        // Set base layer to tanh(n*x)
+        for (int i = 0; i < 256; ++i) {
+            double x = ltf->normalizeIndex(i);
+            ltf->setBaseLayerValue(i, std::tanh(n * x));
+        }
+
+        // Fit with tight tolerance for accuracy
+        auto config = dsp_core::SplineFitConfig::tight();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        EXPECT_TRUE(result.success) << "tanh(" << n << "x) fit failed";
+
+        // Error should be below tolerance
+        EXPECT_LT(result.maxError, config.positionTolerance * 2.0)
+            << "tanh(" << n << "x) max error too high: " << result.maxError;
+
+        // Steeper curves should require more anchors
+        if (n > 1) {
+            EXPECT_GT(result.numAnchors, 2)
+                << "tanh(" << n << "x) should need more than endpoint anchors";
+        }
+
+        // Verify reconstruction quality at midpoint (steepest part)
+        double midX = 0.0;
+        double expected = std::tanh(n * midX);
+        double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, midX);
+        double midError = std::abs(expected - fitted);
+
+        EXPECT_LT(midError, config.positionTolerance)
+            << "tanh(" << n << "x) poor fit at steep midpoint, error=" << midError;
+    }
+}
+
+/**
+ * Test all 40 trigonometric harmonic basis functions
+ * These are the functions used in HarmonicMode:
+ * - Even harmonics: cos(n * acos(x))
+ * - Odd harmonics: sin(n * asin(x))
+ */
+TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
+    const int NUM_HARMONICS = 40;
+
+    for (int n = 1; n <= NUM_HARMONICS; ++n) {
+        // Set base layer to nth harmonic basis function
+        for (int i = 0; i < 256; ++i) {
+            double x = ltf->normalizeIndex(i);
+
+            // Clamp x to [-1, 1] for acos/asin
+            x = std::max(-1.0, std::min(1.0, x));
+
+            double y;
+            if (n % 2 == 0) {
+                // Even harmonic: cos(n * acos(x))
+                y = std::cos(n * std::acos(x));
+            } else {
+                // Odd harmonic: sin(n * asin(x))
+                y = std::sin(n * std::asin(x));
+            }
+
+            ltf->setBaseLayerValue(i, y);
+        }
+
+        // Use balanced config (good quality, reasonable anchor count)
+        auto config = dsp_core::SplineFitConfig::tight();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        EXPECT_TRUE(result.success) << "Harmonic " << n << " fit failed";
+
+        // Error should be reasonable
+        EXPECT_LT(result.maxError, config.positionTolerance * 2.0)
+            << "Harmonic " << n << " max error too high: " << result.maxError;
+
+        // Higher harmonics should need more anchors (more oscillations)
+        if (n >= 5) {
+            EXPECT_GT(result.numAnchors, 5)
+                << "Harmonic " << n << " should need multiple anchors for oscillations";
+        }
+
+        // Verify reconstruction at a few key points
+        std::vector<double> testPoints = {-0.9, -0.5, 0.0, 0.5, 0.9};
+        for (double testX : testPoints) {
+            double expected;
+            if (n % 2 == 0) {
+                expected = std::cos(n * std::acos(testX));
+            } else {
+                expected = std::sin(n * std::asin(testX));
+            }
+
+            double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, testX);
+            double error = std::abs(expected - fitted);
+
+            EXPECT_LT(error, config.positionTolerance * 2.0)
+                << "Harmonic " << n << " poor fit at x=" << testX
+                << ", expected=" << expected << ", fitted=" << fitted;
+        }
+    }
+}
+
+/**
+ * Test performance with complex high-frequency content
+ * Ensures greedy algorithm doesn't hang on difficult curves
+ */
+TEST_F(SplineFitterTest, Performance_ComplexCurves) {
+    // Test several challenging curves
+    std::vector<std::function<double(double)>> testFunctions = {
+        [](double x) { return std::tanh(20.0 * x); },                    // Very steep
+        [](double x) { return std::sin(10.0 * M_PI * x); },              // High frequency
+        [](double x) { return x * std::sin(15.0 * M_PI * x); },          // Modulated
+        [](double x) { return std::cos(8.0 * std::acos(std::max(-1.0, std::min(1.0, x)))); }  // Harmonic 8
+    };
+
+    for (size_t idx = 0; idx < testFunctions.size(); ++idx) {
+        // Set base layer to test function
+        for (int i = 0; i < 256; ++i) {
+            double x = ltf->normalizeIndex(i);
+            ltf->setBaseLayerValue(i, testFunctions[idx](x));
+        }
+
+        auto config = dsp_core::SplineFitConfig::tight();
+
+        // Measure execution time
+        auto startTime = std::chrono::high_resolution_clock::now();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+        auto endTime = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+        EXPECT_TRUE(result.success) << "Test function " << idx << " fit failed";
+
+        // Should complete in reasonable time (< 100ms)
+        EXPECT_LT(duration.count(), 100)
+            << "Test function " << idx << " took too long: " << duration.count() << "ms";
+
+        // Should achieve reasonable accuracy
+        EXPECT_LT(result.maxError, config.positionTolerance * 3.0)
+            << "Test function " << idx << " error too high: " << result.maxError;
+    }
+}
+
+/**
+ * Test edge case: extremely steep tanh(100x)
+ * This approaches a step function and tests the algorithm's limits
+ */
+TEST_F(SplineFitterTest, EdgeCase_ExtremelySteepTanh) {
+    // tanh(100x) is almost a step function
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, std::tanh(100.0 * x));
+    }
+
+    auto config = dsp_core::SplineFitConfig::tight();
+    config.maxAnchors = 64;  // May need many anchors for near-discontinuity
+
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    EXPECT_TRUE(result.success);
+
+    // Should use many anchors near x=0 (steep transition)
+    EXPECT_GT(result.numAnchors, 10) << "Extremely steep curve needs many anchors";
+
+    // Error may be higher due to near-discontinuity, but should still be reasonable
+    EXPECT_LT(result.maxError, 0.05) << "Even steep curves should fit reasonably well";
+}
+
+/**
+ * Test quality: verify fitted curve is smooth (C1 continuous)
+ * Check that PCHIP tangents create a smooth curve without kinks
+ */
+TEST_F(SplineFitterTest, Quality_SmoothnessC1Continuity) {
+    // Use a smooth curve (tanh(3x))
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, std::tanh(3.0 * x));
+    }
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    EXPECT_TRUE(result.success);
+
+    // Evaluate derivative at many points to check for discontinuities
+    const int NUM_SAMPLES = 1000;
+    double prevDerivative = 0.0;
+    bool first = true;
+    int largeJumps = 0;
+
+    for (int i = 0; i < NUM_SAMPLES; ++i) {
+        double x = -1.0 + (2.0 * i) / (NUM_SAMPLES - 1);
+        double derivative = dsp_core::Services::SplineEvaluator::evaluateDerivative(result.anchors, x);
+
+        if (!first) {
+            double derivativeChange = std::abs(derivative - prevDerivative);
+            // Large sudden jumps in derivative indicate C1 discontinuity (kinks)
+            if (derivativeChange > 2.0) {  // Threshold for "large jump"
+                largeJumps++;
+            }
+        }
+
+        prevDerivative = derivative;
+        first = false;
+    }
+
+    // PCHIP should maintain C1 continuity - no sudden derivative jumps
+    EXPECT_LT(largeJumps, NUM_SAMPLES / 100)  // < 1% of samples
+        << "Too many derivative discontinuities detected: " << largeJumps;
+}
+
+/**
+ * Test regression: the "bowing artifact" bug
+ * Straight line + localized scribble should not bow in straight regions
+ */
+TEST_F(SplineFitterTest, Regression_NoBowingInStraightRegions) {
+    // Left straight region: y = x
+    for (int i = 0; i < 100; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, x);
+    }
+
+    // Middle scribble: high-frequency noise
+    for (int i = 100; i < 130; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, x + 0.15 * std::sin(30.0 * M_PI * x));
+    }
+
+    // Right straight region: y = x
+    for (int i = 130; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, x);
+    }
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    EXPECT_TRUE(result.success);
+
+    // Measure error in right straight region (far from scribble)
+    double maxErrorInStraightRegion = 0.0;
+    for (int i = 180; i < 240; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double expected = x;  // Should be linear
+        double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, x);
+        double error = std::abs(expected - fitted);
+        maxErrorInStraightRegion = std::max(maxErrorInStraightRegion, error);
+    }
+
+    // Straight region should have very low error (< 1%)
+    EXPECT_LT(maxErrorInStraightRegion, 0.01)
+        << "Bowing artifact detected in straight region: error=" << maxErrorInStraightRegion;
+}
+
 } // namespace dsp_core_test
