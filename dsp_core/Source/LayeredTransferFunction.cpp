@@ -120,10 +120,14 @@ void LayeredTransferFunction::updateComposite() {
         }
     }
 
-    // Step 2: Compute normalization scalar (or use frozen scalar if deferred)
+    // Step 2: Compute normalization scalar (or use frozen/disabled scalar)
     double normScalar = normalizationScalar.load(std::memory_order_acquire);  // Default to existing scalar
 
-    if (!deferNormalization) {
+    if (!normalizationEnabled) {
+        // Normalization disabled: bypass scaling (allow values > ±1.0)
+        normScalar = 1.0;
+        normalizationScalar.store(normScalar, std::memory_order_release);
+    } else if (!deferNormalization) {
         // Normal mode: recalculate normalization scalar
         normScalar = 1.0;
         if (maxAbsValue > 1e-12) {  // Avoid division by zero
@@ -151,6 +155,18 @@ void LayeredTransferFunction::setDeferNormalization(bool shouldDefer) {
 
 bool LayeredTransferFunction::isNormalizationDeferred() const {
     return deferNormalization;
+}
+
+void LayeredTransferFunction::setNormalizationEnabled(bool enabled) {
+    normalizationEnabled = enabled;
+
+    // Immediately update composite to apply new normalization state
+    // This ensures the change takes effect without waiting for next model mutation
+    updateComposite();
+}
+
+bool LayeredTransferFunction::isNormalizationEnabled() const {
+    return normalizationEnabled;
 }
 
 double LayeredTransferFunction::normalizeIndex(int index) const {
@@ -375,6 +391,9 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
     // Serialize normalization scalar
     vt.setProperty("normalizationScalar", normalizationScalar.load(std::memory_order_acquire), nullptr);
 
+    // Serialize normalization enabled state
+    vt.setProperty("normalizationEnabled", normalizationEnabled, nullptr);
+
     // Serialize settings
     vt.setProperty("interpolationMode", static_cast<int>(interpMode), nullptr);
     vt.setProperty("extrapolationMode", static_cast<int>(extrapMode), nullptr);
@@ -420,6 +439,13 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     // Load normalization scalar (optional - will be recomputed anyway)
     if (vt.hasProperty("normalizationScalar")) {
         normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")), std::memory_order_release);
+    }
+
+    // Load normalization enabled state (default to true if not present for backward compatibility)
+    if (vt.hasProperty("normalizationEnabled")) {
+        normalizationEnabled = static_cast<bool>(vt.getProperty("normalizationEnabled"));
+    } else {
+        normalizationEnabled = true;  // Safe default for old presets
     }
 
     // Load settings

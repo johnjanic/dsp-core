@@ -102,6 +102,25 @@ public:
      */
     bool isNormalizationDeferred() const;
 
+    /**
+     * Enable or disable automatic normalization
+     *
+     * When disabled, the normalization scalar is fixed at 1.0, effectively bypassing
+     * the automatic scaling that keeps output in [-1, 1]. This allows for creative
+     * distortion effects or preserving exact mathematical relationships.
+     *
+     * WARNING: Disabling normalization can result in output values > ±1.0, which may
+     * cause clipping or distortion in the audio output.
+     *
+     * @param enabled If true, enable automatic normalization (default); if false, bypass normalization
+     */
+    void setNormalizationEnabled(bool enabled);
+
+    /**
+     * Check if automatic normalization is enabled
+     */
+    bool isNormalizationEnabled() const;
+
     //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
     //==========================================================================
@@ -171,6 +190,9 @@ private:
 
     // Normalization deferral (prevents visual shifting during paint strokes)
     bool deferNormalization = false;
+
+    // Normalization enable/disable (allows bypassing auto-normalization for creative effects)
+    bool normalizationEnabled = true;  // Default: enabled (safe behavior)
 
     // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
     mutable std::vector<double> unnormalizedMixBuffer;
