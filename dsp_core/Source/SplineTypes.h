@@ -52,7 +52,7 @@ struct SplineFitConfig {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.002;
         cfg.derivativeTolerance = 0.05;
-        cfg.maxAnchors = 64;
+        cfg.maxAnchors = 128;  // Increased from 64 to allow better convergence for steep curves
         return cfg;
     }
 

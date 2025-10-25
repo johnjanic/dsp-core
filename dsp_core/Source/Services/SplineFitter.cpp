@@ -82,7 +82,7 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
 
     const int tableSize = ltf.getTableSize();
     std::vector<Sample> samples;
-    samples.reserve(tableSize);
+    samples.reserve(tableSize * 2);  // Reserve extra space for densification
 
     // Raster-to-polyline: sample entire baseLayer
     for (int i = 0; i < tableSize; ++i) {
@@ -90,6 +90,25 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
         double y = ltf.getBaseLayerValue(i);
         samples.push_back({x, y});
     }
+
+    // Phase 2.1 (Simplified): Add midpoint samples for better coverage
+    // This helps catch errors between the original 256 sample points
+    std::vector<Sample> densified;
+    densified.reserve(samples.size() * 2);
+
+    for (size_t i = 0; i < samples.size(); ++i) {
+        densified.push_back(samples[i]);
+
+        // Add midpoint sample between this and next point
+        if (i < samples.size() - 1) {
+            double midX = (samples[i].x + samples[i+1].x) / 2.0;
+            // Interpolate y value (simple linear interpolation is fine here)
+            double midY = (samples[i].y + samples[i+1].y) / 2.0;
+            densified.push_back({midX, midY});
+        }
+    }
+
+    samples = std::move(densified);
 
     // Sort by x (should already be sorted, but ensure)
     sortByX(samples);
@@ -355,6 +374,63 @@ void SplineFitter::computePCHIPTangents(
         // Enforce slope caps (for anti-aliasing)
         anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope,
                                            anchors[i].tangent);
+    }
+
+    // Phase 1.1: Overshoot detection and correction
+    // Check if PCHIP cubic overshoots the monotonic range between anchors
+    // This prevents visual "bulges" and sonic artifacts in smooth regions
+    const int maxOvershootIterations = 3;  // Iterative refinement
+    for (int iter = 0; iter < maxOvershootIterations; ++iter) {
+        bool hadOvershoot = false;
+
+        for (int i = 0; i < n - 1; ++i) {
+            // Sample cubic at 5 interior points between anchors
+            const double yMin = std::min(anchors[i].y, anchors[i+1].y);
+            const double yMax = std::max(anchors[i].y, anchors[i+1].y);
+            const double overshootTolerance = 0.001;  // Allow tiny numerical error
+
+            for (int j = 1; j < 5; ++j) {
+                const double t = j / 5.0;
+                const double x = anchors[i].x + t * (anchors[i+1].x - anchors[i].x);
+                const double y = SplineEvaluator::evaluateSegment(anchors[i], anchors[i+1], x);
+
+                // If cubic overshoots endpoint range, scale tangents down
+                if (y < yMin - overshootTolerance || y > yMax + overshootTolerance) {
+                    const double dampingFactor = 0.7;  // Reduce tangents by 30%
+                    anchors[i].tangent *= dampingFactor;
+                    anchors[i+1].tangent *= dampingFactor;
+                    hadOvershoot = true;
+                    break;  // Move to next segment
+                }
+            }
+        }
+
+        // If no overshoots detected, we're done
+        if (!hadOvershoot) {
+            break;
+        }
+    }
+
+    // Phase 1.2: Length-based tangent scaling
+    // Very long segments (sparse anchor distribution) need gentler tangents to avoid oscillation
+    // Only apply scaling to segments longer than threshold (0.3 = 15% of full range)
+    const double longSegmentThreshold = 0.3;
+    for (int i = 0; i < n - 1; ++i) {
+        const double segmentLength = anchors[i+1].x - anchors[i].x;
+
+        if (segmentLength > longSegmentThreshold) {
+            // Scale factor for long segments: gradually reduce tangents
+            // Formula: min(1.0, threshold / segmentLength)
+            // Example: length=0.4 → factor=0.75, length=0.6 → factor=0.5
+            const double lengthFactor = std::min(1.0, longSegmentThreshold / segmentLength);
+
+            anchors[i].tangent *= lengthFactor;
+
+            // Also scale the next anchor's tangent if it's the last one
+            if (i == n - 2) {
+                anchors[i+1].tangent *= lengthFactor;
+            }
+        }
     }
 }
 

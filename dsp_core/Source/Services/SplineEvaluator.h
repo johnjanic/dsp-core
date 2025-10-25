@@ -38,16 +38,17 @@ public:
         double x
     );
 
-private:
-    // Find segment containing x (binary search)
-    static int findSegment(const std::vector<SplineAnchor>& anchors, double x);
-
     // Evaluate Hermite polynomial on segment [i, i+1]
+    // Made public for use by SplineFitter's overshoot detection
     static double evaluateSegment(
         const SplineAnchor& p0,
         const SplineAnchor& p1,
         double x
     );
+
+private:
+    // Find segment containing x (binary search)
+    static int findSegment(const std::vector<SplineAnchor>& anchors, double x);
 
     // Evaluate Hermite derivative on segment [i, i+1]
     static double evaluateSegmentDerivative(
