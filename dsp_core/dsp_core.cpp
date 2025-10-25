@@ -13,6 +13,8 @@
 #include "Source/HarmonicLayer.cpp"
 #include "Source/LayeredTransferFunction.cpp"
 #include "Source/TransferFunction.cpp"
+#include "Source/Services/SplineFitter.cpp"
+#include "Source/Services/SplineEvaluator.cpp"
 #include "Source/audio_pipeline/AudioPipeline.cpp"
 #include "Source/audio_pipeline/GainStage.cpp"
 #include "Source/audio_pipeline/DryWetMixStage.cpp"

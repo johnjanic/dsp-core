@@ -62,3 +62,53 @@ else()
 endif()
 
 add_test(NAME DryWetMixStageTests COMMAND dry_wet_mix_stage_tests)
+
+# SplineFitter tests
+add_executable(spline_fitter_tests
+    SplineFitterTest.cpp
+)
+
+target_include_directories(spline_fitter_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_fitter_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_fitter_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_fitter_tests)
+endif()
+
+add_test(NAME SplineFitterTests COMMAND spline_fitter_tests)
+
+# SplineEvaluator tests
+add_executable(spline_evaluator_tests
+    SplineEvaluatorTest.cpp
+)
+
+target_include_directories(spline_evaluator_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_evaluator_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_evaluator_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_evaluator_tests)
+endif()
+
+add_test(NAME SplineEvaluatorTests COMMAND spline_evaluator_tests)
