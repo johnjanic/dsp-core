@@ -287,3 +287,91 @@ TEST_F(SplineEvaluatorTest, CustomTangentOverride) {
     double deriv_end = SplineEvaluator::evaluateDerivative(custom, 1.0);
     EXPECT_NEAR(deriv_end, 0.0, 1e-6);
 }
+
+//==============================================================================
+// Batch Evaluation Tests
+//==============================================================================
+
+TEST_F(SplineEvaluatorTest, BatchEvaluateMatchesSingleEvaluate) {
+    // Test that batch evaluation produces identical results to individual calls
+    const int count = 256;
+    std::vector<double> xValues(count);
+    std::vector<double> yBatch(count);
+
+    // Generate sorted X values from -1 to 1
+    for (int i = 0; i < count; ++i) {
+        xValues[i] = -1.0 + (2.0 * i / (count - 1));
+    }
+
+    // Batch evaluate
+    SplineEvaluator::evaluateBatch(
+        monotonicAnchors,
+        xValues.data(),
+        yBatch.data(),
+        count
+    );
+
+    // Compare with individual evaluations
+    for (int i = 0; i < count; ++i) {
+        double yIndividual = SplineEvaluator::evaluate(monotonicAnchors, xValues[i]);
+        EXPECT_NEAR(yBatch[i], yIndividual, kTolerance)
+            << "Mismatch at index " << i << ", x=" << xValues[i];
+    }
+}
+
+TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesEmptyAnchors) {
+    const int count = 10;
+    std::vector<double> xValues(count, 0.5);
+    std::vector<double> yValues(count);
+
+    std::vector<SplineAnchor> empty;
+    SplineEvaluator::evaluateBatch(empty, xValues.data(), yValues.data(), count);
+
+    for (int i = 0; i < count; ++i) {
+        EXPECT_DOUBLE_EQ(yValues[i], 0.0);
+    }
+}
+
+TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesSingleAnchor) {
+    const int count = 10;
+    std::vector<double> xValues(count);
+    std::vector<double> yValues(count);
+
+    for (int i = 0; i < count; ++i) {
+        xValues[i] = -1.0 + (2.0 * i / (count - 1));
+    }
+
+    std::vector<SplineAnchor> single = {{0.5, 0.7, false, 0.0}};
+    SplineEvaluator::evaluateBatch(single, xValues.data(), yValues.data(), count);
+
+    for (int i = 0; i < count; ++i) {
+        EXPECT_DOUBLE_EQ(yValues[i], 0.7);
+    }
+}
+
+TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesBoundaryConditions) {
+    const int count = 20;
+    std::vector<double> xValues(count);
+    std::vector<double> yValues(count);
+
+    // Test values before, within, and after anchor range
+    for (int i = 0; i < count; ++i) {
+        xValues[i] = -2.0 + (4.0 * i / (count - 1));  // Range [-2, 2]
+    }
+
+    SplineEvaluator::evaluateBatch(
+        sCurveAnchors,  // Anchors range from -1 to 1
+        xValues.data(),
+        yValues.data(),
+        count
+    );
+
+    // Values before first anchor should equal first anchor's y
+    for (int i = 0; i < count; ++i) {
+        if (xValues[i] < -1.0) {
+            EXPECT_DOUBLE_EQ(yValues[i], -1.0) << "Before range at x=" << xValues[i];
+        } else if (xValues[i] > 1.0) {
+            EXPECT_DOUBLE_EQ(yValues[i], 1.0) << "After range at x=" << xValues[i];
+        }
+    }
+}

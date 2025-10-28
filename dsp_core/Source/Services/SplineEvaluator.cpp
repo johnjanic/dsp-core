@@ -24,6 +24,66 @@ double SplineEvaluator::evaluate(
     return evaluateSegment(anchors[segIdx], anchors[segIdx + 1], x);
 }
 
+void SplineEvaluator::evaluateBatch(
+    const std::vector<SplineAnchor>& anchors,
+    const double* xValues,
+    double* yValues,
+    int count) {
+
+    if (count <= 0) return;
+
+    // Degenerate cases
+    if (anchors.empty()) {
+        std::fill(yValues, yValues + count, 0.0);
+        return;
+    }
+    if (anchors.size() == 1) {
+        std::fill(yValues, yValues + count, anchors[0].y);
+        return;
+    }
+
+    // Incremental segment search (assumes xValues are sorted)
+    // This eliminates 256 binary searches, replacing with linear scan
+    int currentSegment = 0;
+
+    for (int i = 0; i < count; ++i) {
+        double x = xValues[i];
+
+        // Advance segment while x is beyond current segment's end
+        // This works because xValues are sorted (each x >= previous x)
+        while (currentSegment < static_cast<int>(anchors.size()) - 1 &&
+               x > anchors[currentSegment + 1].x) {
+            ++currentSegment;
+        }
+
+        // Handle out-of-bounds cases
+        if (x < anchors.front().x) {
+            yValues[i] = anchors.front().y;
+            currentSegment = 0;  // Reset for next iteration
+        }
+        else if (x > anchors.back().x) {
+            yValues[i] = anchors.back().y;
+            currentSegment = static_cast<int>(anchors.size()) - 2;  // Stay at last segment
+        }
+        else {
+            // Clamp to valid segment range (safety check)
+            if (currentSegment >= static_cast<int>(anchors.size()) - 1) {
+                currentSegment = static_cast<int>(anchors.size()) - 2;
+            }
+            if (currentSegment < 0) {
+                currentSegment = 0;
+            }
+
+            // Evaluate segment using cubic Hermite interpolation
+            yValues[i] = evaluateSegment(
+                anchors[currentSegment],
+                anchors[currentSegment + 1],
+                x
+            );
+        }
+    }
+}
+
 double SplineEvaluator::evaluateDerivative(
     const std::vector<SplineAnchor>& anchors,
     double x) {

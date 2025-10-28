@@ -112,3 +112,28 @@ else()
 endif()
 
 add_test(NAME SplineEvaluatorTests COMMAND spline_evaluator_tests)
+
+# DCBlockingFilter tests
+add_executable(dc_blocking_filter_tests
+    DCBlockingFilterTest.cpp
+)
+
+target_include_directories(dc_blocking_filter_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(dc_blocking_filter_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(dc_blocking_filter_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(dc_blocking_filter_tests)
+endif()
+
+add_test(NAME DCBlockingFilterTests COMMAND dc_blocking_filter_tests)

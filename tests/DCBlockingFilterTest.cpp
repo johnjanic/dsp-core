@@ -1,0 +1,374 @@
+#include <gtest/gtest.h>
+#include "../dsp_core/Source/audio_pipeline/DCBlockingFilter.h"
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <cmath>
+
+using namespace dsp_core::audio_pipeline;
+
+class DCBlockingFilterTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        filter_ = std::make_unique<DCBlockingFilter>();
+        filter_->prepareToPlay(44100.0, 512);
+    }
+
+    std::unique_ptr<DCBlockingFilter> filter_;
+
+    // Helper: Fill buffer with DC offset
+    void fillWithDC(juce::AudioBuffer<double>& buffer, double dcValue) {
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+            for (int i = 0; i < buffer.getNumSamples(); ++i) {
+                buffer.setSample(ch, i, dcValue);
+            }
+        }
+    }
+
+    // Helper: Fill buffer with sine wave
+    void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate, double amplitude = 1.0, double dcOffset = 0.0) {
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+            for (int i = 0; i < buffer.getNumSamples(); ++i) {
+                double phase = 2.0 * M_PI * frequency * i / sampleRate;
+                buffer.setSample(ch, i, amplitude * std::sin(phase) + dcOffset);
+            }
+        }
+    }
+
+    // Helper: Measure RMS of buffer
+    double measureRMS(const juce::AudioBuffer<double>& buffer) {
+        double sumSquares = 0.0;
+        int totalSamples = 0;
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+            for (int i = 0; i < buffer.getNumSamples(); ++i) {
+                double sample = buffer.getSample(ch, i);
+                sumSquares += sample * sample;
+                totalSamples++;
+            }
+        }
+        return std::sqrt(sumSquares / totalSamples);
+    }
+
+    // Helper: Measure mean (DC) of buffer
+    double measureMean(const juce::AudioBuffer<double>& buffer) {
+        double sum = 0.0;
+        int totalSamples = 0;
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+            for (int i = 0; i < buffer.getNumSamples(); ++i) {
+                sum += buffer.getSample(ch, i);
+                totalSamples++;
+            }
+        }
+        return sum / totalSamples;
+    }
+};
+
+// Test 1: Remove pure DC offset
+TEST_F(DCBlockingFilterTest, RemovesPureDC) {
+    const double dcOffset = 0.5;
+    // 5Hz filter needs ~200ms to converge (5 time constants)
+    // At 44.1kHz, that's ~8800 samples
+    const int warmupSamples = 10000;
+
+    // Create buffer with pure DC
+    juce::AudioBuffer<double> buffer(2, 512);
+    fillWithDC(buffer, dcOffset);
+
+    // Process multiple blocks to allow filter to converge
+    const int numBlocks = (warmupSamples / 512) + 2;
+    for (int block = 0; block < numBlocks; ++block) {
+        fillWithDC(buffer, dcOffset);
+        filter_->process(buffer);
+    }
+
+    // After convergence, DC should be significantly reduced
+    // 5Hz HPF won't completely remove DC instantly, but should reduce it
+    double meanAfterFiltering = std::abs(measureMean(buffer));
+
+    EXPECT_LT(meanAfterFiltering, 0.05)
+        << "DC blocking filter should significantly reduce DC offset after convergence";
+
+    // Verify each channel
+    for (int ch = 0; ch < 2; ++ch) {
+        double channelMean = 0.0;
+        for (int i = 0; i < 512; ++i) {
+            channelMean += buffer.getSample(ch, i);
+        }
+        channelMean = std::abs(channelMean) / 512;
+
+        EXPECT_LT(channelMean, 0.05)
+            << "Channel " << ch << " should have significantly reduced DC after filtering";
+    }
+}
+
+// Test 2: Preserve 20Hz sine wave (passband)
+TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
+    const double frequency = 20.0;
+    const double sampleRate = 44100.0;
+    const double amplitude = 1.0;
+    const int warmupSamples = 10000;
+
+    // Warmup filter with continuous sine wave
+    juce::AudioBuffer<double> warmupBuffer(2, 512);
+    double phase = 0.0;
+    for (int block = 0; block < warmupSamples / 512; ++block) {
+        for (int ch = 0; ch < 2; ++ch) {
+            for (int i = 0; i < 512; ++i) {
+                double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+                warmupBuffer.setSample(ch, i, amplitude * std::sin(samplePhase));
+            }
+        }
+        filter_->process(warmupBuffer);
+        phase += 2.0 * M_PI * frequency * 512 / sampleRate;
+    }
+
+    // Continue with same phase for test measurement
+    juce::AudioBuffer<double> buffer(2, 512);
+    for (int ch = 0; ch < 2; ++ch) {
+        for (int i = 0; i < 512; ++i) {
+            double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+            buffer.setSample(ch, i, amplitude * std::sin(samplePhase));
+        }
+    }
+
+    double rmsBeforeFiltering = measureRMS(buffer);
+
+    // Create copy for filtering (to preserve original for comparison)
+    juce::AudioBuffer<double> filteredBuffer(2, 512);
+    filteredBuffer.copyFrom(0, 0, buffer, 0, 0, 512);
+    filteredBuffer.copyFrom(1, 0, buffer, 1, 0, 512);
+
+    filter_->process(filteredBuffer);
+    double rmsAfterFiltering = measureRMS(filteredBuffer);
+
+    // At 20Hz with 5Hz cutoff (4x ratio), 1st-order HPF has:
+    // H(f) = f/fc / sqrt(1 + (f/fc)^2) = 4 / sqrt(17) ≈ 0.97
+    // So we expect ~97% amplitude preservation at 20Hz
+    double attenuationRatio = rmsAfterFiltering / rmsBeforeFiltering;
+
+    EXPECT_GT(attenuationRatio, 0.90)
+        << "20Hz sine should pass through with minimal attenuation (ratio: "
+        << attenuationRatio << ")";
+}
+
+// Test 3: Harmonic preservation - verify no even harmonic distortion
+TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
+    const double fundamental = 100.0;
+    const double sampleRate = 44100.0;
+    const int numSamples = 4410;  // 0.1 second for FFT analysis
+    const int warmupSamples = 2000;
+
+    // Create buffer with 100Hz sine (odd harmonic structure)
+    juce::AudioBuffer<double> buffer(1, numSamples);
+    for (int i = 0; i < numSamples; ++i) {
+        double phase = 2.0 * M_PI * fundamental * i / sampleRate;
+        buffer.setSample(0, i, std::sin(phase));
+    }
+
+    // Warmup filter
+    for (int block = 0; block < warmupSamples / 512; ++block) {
+        juce::AudioBuffer<double> warmupBuffer(1, 512);
+        for (int i = 0; i < 512; ++i) {
+            double phase = 2.0 * M_PI * fundamental * i / sampleRate;
+            warmupBuffer.setSample(0, i, std::sin(phase));
+        }
+        filter_->process(warmupBuffer);
+    }
+
+    // Process test buffer in chunks
+    const int blockSize = 512;
+    for (int offset = 0; offset < numSamples; offset += blockSize) {
+        int samplesThisBlock = std::min(blockSize, numSamples - offset);
+        juce::AudioBuffer<double> block(1, samplesThisBlock);
+
+        for (int i = 0; i < samplesThisBlock; ++i) {
+            block.setSample(0, i, buffer.getSample(0, offset + i));
+        }
+
+        filter_->process(block);
+
+        for (int i = 0; i < samplesThisBlock; ++i) {
+            buffer.setSample(0, offset + i, block.getSample(0, i));
+        }
+    }
+
+    // Simple harmonic analysis: check for even harmonics (200Hz, 400Hz)
+    // A pure sine should not introduce even harmonics
+    // We'll check correlation with 200Hz sine (2nd harmonic)
+    double evenHarmonicEnergy = 0.0;
+    double fundamentalEnergy = 0.0;
+
+    for (int i = 0; i < numSamples; ++i) {
+        double sample = buffer.getSample(0, i);
+
+        // Correlate with 2nd harmonic (200Hz)
+        double evenPhase = 2.0 * M_PI * (2.0 * fundamental) * i / sampleRate;
+        evenHarmonicEnergy += sample * std::sin(evenPhase);
+
+        // Correlate with fundamental (100Hz)
+        double fundPhase = 2.0 * M_PI * fundamental * i / sampleRate;
+        fundamentalEnergy += sample * std::sin(fundPhase);
+    }
+
+    evenHarmonicEnergy = std::abs(evenHarmonicEnergy);
+    fundamentalEnergy = std::abs(fundamentalEnergy);
+
+    // Even harmonic should be much smaller than fundamental
+    double harmonicRatio = evenHarmonicEnergy / fundamentalEnergy;
+
+    EXPECT_LT(harmonicRatio, 0.01)
+        << "DC blocking filter should not introduce even harmonics (ratio: "
+        << harmonicRatio << ")";
+}
+
+// Test 4: Verify enabled/disabled state
+TEST_F(DCBlockingFilterTest, EnabledDisabledState) {
+    const double dcOffset = 0.5;
+
+    // Create buffer with DC
+    juce::AudioBuffer<double> buffer(2, 512);
+    fillWithDC(buffer, dcOffset);
+
+    // Store original
+    juce::AudioBuffer<double> original(2, 512);
+    original.copyFrom(0, 0, buffer, 0, 0, 512);
+    original.copyFrom(1, 0, buffer, 1, 0, 512);
+
+    // Disable filter
+    filter_->setEnabled(false);
+    EXPECT_FALSE(filter_->isEnabled());
+
+    // Process should be bypassed
+    filter_->process(buffer);
+
+    // Buffer should be unchanged
+    for (int ch = 0; ch < 2; ++ch) {
+        for (int i = 0; i < 512; ++i) {
+            EXPECT_DOUBLE_EQ(buffer.getSample(ch, i), original.getSample(ch, i))
+                << "Disabled filter should bypass processing";
+        }
+    }
+
+    // Re-enable
+    filter_->setEnabled(true);
+    EXPECT_TRUE(filter_->isEnabled());
+}
+
+// Test 5: Cutoff frequency adjustment
+TEST_F(DCBlockingFilterTest, CutoffFrequencyAdjustment) {
+    // Set cutoff to 10Hz
+    filter_->setCutoffFrequency(10.0);
+    EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 10.0);
+
+    // Set to edge cases
+    filter_->setCutoffFrequency(1.0);  // Min
+    EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 1.0);
+
+    filter_->setCutoffFrequency(20.0);  // Max
+    EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 20.0);
+
+    // Test clamping (values outside 1-20Hz range)
+    filter_->setCutoffFrequency(0.5);  // Below min
+    EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 1.0);
+
+    filter_->setCutoffFrequency(50.0);  // Above max
+    EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 20.0);
+}
+
+// Test 6: Reset clears filter state
+TEST_F(DCBlockingFilterTest, ResetClearsState) {
+    const double dcOffset = 0.5;
+
+    // Process some DC offset
+    juce::AudioBuffer<double> buffer(2, 512);
+    for (int block = 0; block < 5; ++block) {
+        fillWithDC(buffer, dcOffset);
+        filter_->process(buffer);
+    }
+
+    // Reset filter
+    filter_->reset();
+
+    // Process DC again - should take time to converge again
+    fillWithDC(buffer, dcOffset);
+    filter_->process(buffer);
+
+    // Immediately after reset, filter hasn't converged yet
+    // So output should still have significant DC (not fully removed)
+    double meanAfterReset = std::abs(measureMean(buffer));
+
+    // Should be closer to input DC than fully converged state
+    EXPECT_GT(meanAfterReset, 0.1)
+        << "Reset filter should not immediately remove DC (needs convergence)";
+}
+
+// Test 7: Multi-channel processing
+TEST_F(DCBlockingFilterTest, MultiChannelProcessing) {
+    const int numChannels = 8;
+    const double dcOffset = 0.3;
+    const int warmupSamples = 10000;
+
+    juce::AudioBuffer<double> buffer(numChannels, 512);
+
+    // Warmup
+    for (int block = 0; block < warmupSamples / 512; ++block) {
+        fillWithDC(buffer, dcOffset);
+        filter_->process(buffer);
+    }
+
+    // Test processing
+    fillWithDC(buffer, dcOffset);
+    filter_->process(buffer);
+
+    // All channels should have DC significantly reduced
+    for (int ch = 0; ch < numChannels; ++ch) {
+        double channelMean = 0.0;
+        for (int i = 0; i < 512; ++i) {
+            channelMean += buffer.getSample(ch, i);
+        }
+        channelMean = std::abs(channelMean) / 512;
+
+        EXPECT_LT(channelMean, 0.05)
+            << "Channel " << ch << " should have DC significantly reduced";
+    }
+}
+
+// Test 8: Sine wave with DC offset - remove DC, preserve AC
+TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
+    const double frequency = 440.0;  // A4
+    const double sampleRate = 44100.0;
+    const double amplitude = 0.5;
+    const double dcOffset = 0.3;
+    const int warmupSamples = 10000;
+
+    juce::AudioBuffer<double> buffer(2, 512);
+
+    // Warmup filter with continuous waveform
+    double phase = 0.0;
+    for (int block = 0; block < warmupSamples / 512; ++block) {
+        for (int ch = 0; ch < 2; ++ch) {
+            for (int i = 0; i < 512; ++i) {
+                double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+                buffer.setSample(ch, i, amplitude * std::sin(samplePhase) + dcOffset);
+            }
+        }
+        filter_->process(buffer);
+        phase += 2.0 * M_PI * frequency * 512 / sampleRate;
+    }
+
+    // Process test signal
+    fillWithSine(buffer, frequency, sampleRate, amplitude, dcOffset);
+    filter_->process(buffer);
+
+    // Check that DC is significantly reduced
+    double mean = std::abs(measureMean(buffer));
+    EXPECT_LT(mean, 0.1)
+        << "DC component should be significantly reduced";
+
+    // Check that AC is preserved (RMS should be close to amplitude/sqrt(2))
+    double rms = measureRMS(buffer);
+    double expectedRMS = amplitude / std::sqrt(2.0);
+
+    // Allow some tolerance for filter transient and phase shift
+    EXPECT_NEAR(rms, expectedRMS, 0.15)
+        << "AC component should be preserved (RMS: " << rms
+        << " expected: " << expectedRMS << ")";
+}

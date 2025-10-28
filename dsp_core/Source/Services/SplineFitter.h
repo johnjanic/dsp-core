@@ -30,6 +30,13 @@ public:
         const SplineFitConfig& config = SplineFitConfig::smooth()
     );
 
+    // Tangent computation (exposed for manual anchor manipulation)
+    // Recomputes PCHIP tangents for anchors after position changes
+    static void computePCHIPTangents(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config = SplineFitConfig::smooth()
+    );
+
 private:
     // Step 1: Sample & sanitize
     struct Sample { double x, y; };
@@ -77,12 +84,7 @@ private:
         size_t index
     );
 
-    // Step 3: PCHIP tangent computation
-    static void computePCHIPTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
-
+    // Step 3: PCHIP tangent computation helpers
     static double harmonicMean(double a, double b, double wa, double wb);
 
     // Greedy spline fitting (replaces RDP + refinement)

@@ -43,3 +43,4 @@
 #include "Source/audio_pipeline/DryWetMixStage.h"
 #include "Source/audio_pipeline/WaveshapingStage.h"
 #include "Source/audio_pipeline/OversamplingWrapper.h"
+#include "Source/audio_pipeline/DCBlockingFilter.h"

@@ -36,6 +36,8 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/WaveshapingStage.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/OversamplingWrapper.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/OversamplingWrapper.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCBlockingFilter.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCBlockingFilter.cpp"
 )
 
 # Add tests subdirectory if testing is enabled

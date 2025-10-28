@@ -20,3 +20,4 @@
 #include "Source/audio_pipeline/DryWetMixStage.cpp"
 #include "Source/audio_pipeline/WaveshapingStage.cpp"
 #include "Source/audio_pipeline/OversamplingWrapper.cpp"
+#include "Source/audio_pipeline/DCBlockingFilter.cpp"
