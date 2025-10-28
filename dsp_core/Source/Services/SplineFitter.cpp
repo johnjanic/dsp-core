@@ -32,14 +32,7 @@ SplineFitResult SplineFitter::fitCurve(
     }
 
     // Step 2: Greedy spline fitting (REPLACES RDP + refinement)
-    std::cerr << "[DEBUG] fitCurve: samples=" << samples.size()
-              << ", tolerance=" << config.positionTolerance
-              << ", maxAnchors=" << config.maxAnchors << std::endl;
-
     auto anchors = greedySplineFit(samples, config);
-
-    std::cerr << "[DEBUG] fitCurve: greedySplineFit returned "
-              << anchors.size() << " anchors" << std::endl;
 
     if (anchors.empty()) {
         result.success = false;
@@ -489,50 +482,25 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     const std::vector<Sample>& samples,
     const SplineFitConfig& config) {
 
-    if (samples.size() < 2) {
-        std::cerr << "[DEBUG] greedySplineFit: samples.size() < 2, returning empty" << std::endl;
+    if (samples.size() < 2)
         return {};
-    }
 
     // Start with just endpoints
     std::vector<SplineAnchor> anchors;
     anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
     anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
 
-    std::cerr << "[DEBUG] greedySplineFit: starting with " << anchors.size() << " endpoint anchors" << std::endl;
-    std::cerr << "[DEBUG] greedySplineFit: loop will run max " << (config.maxAnchors - 2) << " iterations" << std::endl;
-
     // Iteratively insert anchors at worst-error locations
-    DBG("Greedy fit starting: samples=" << samples.size()
-        << ", tolerance=" << config.positionTolerance
-        << ", maxAnchors=" << config.maxAnchors);
-
     for (int iteration = 0; iteration < config.maxAnchors - 2; ++iteration) {
-        std::cerr << "[DEBUG] greedySplineFit: iteration " << iteration << std::endl;
         // Compute tangents for current anchor set
         computePCHIPTangents(anchors, config);
 
         // Find sample with highest error
         auto worst = findWorstFitSample(samples, anchors);
 
-        std::cerr << "[DEBUG] iteration " << iteration
-                  << ": maxError=" << worst.maxError
-                  << ", tolerance=" << config.positionTolerance
-                  << ", worstSampleIdx=" << worst.sampleIndex << std::endl;
-
-        DBG("Greedy iteration " << iteration
-            << ": anchors=" << anchors.size()
-            << ", maxError=" << worst.maxError
-            << ", tolerance=" << config.positionTolerance);
-
         // Converged?
-        if (worst.maxError <= config.positionTolerance) {
-            std::cerr << "[DEBUG] CONVERGED at iteration " << iteration << std::endl;
-            DBG("Greedy fit converged at iteration " << iteration
-                << ", anchors=" << anchors.size()
-                << ", error=" << worst.maxError);
+        if (worst.maxError <= config.positionTolerance)
             break;
-        }
 
         // Insert anchor at worst-fit location
         const auto& worstSample = samples[worst.sampleIndex];
@@ -550,21 +518,10 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
                 return std::abs(a.x - worstSample.x) < 1e-9;
             });
 
-        if (isDuplicate) {
-            std::cerr << "[DEBUG] DUPLICATE detected at x=" << worstSample.x << ", BREAKING" << std::endl;
-            DBG("Skipping duplicate anchor at x=" << worstSample.x);
+        if (isDuplicate)
             break;  // No progress possible
-        }
 
         anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
-        std::cerr << "[DEBUG] Inserted anchor at x=" << worstSample.x << ", y=" << worstSample.y
-                  << ", total anchors=" << anchors.size() << std::endl;
-
-        DBG("Greedy iteration " << iteration
-            << ": inserted anchor at x=" << worstSample.x
-            << ", y=" << worstSample.y
-            << ", error before=" << worst.maxError
-            << ", anchors=" << anchors.size());
     }
 
     // Final tangent computation
