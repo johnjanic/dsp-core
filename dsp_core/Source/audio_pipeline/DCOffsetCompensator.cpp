@@ -117,13 +117,13 @@ void DCOffsetCompensator::notifyTransferFunctionChanged(bool isInteractiveEdit)
     currentBias_.store(result.inputValue, std::memory_order_release);
 
     // Debug logging
-    DBG("DCOffsetCompensator: Bias updated to " << result.inputValue
-        << " (f(x*)=" << result.outputValue << ", exact=" << result.hasExactZero << ")");
+    DBG("DCOffsetCompensator: Bias updated to " + juce::String(result.inputValue) +
+        " (f(x*)=" + juce::String(result.outputValue) + ", exact=" + juce::String(result.hasExactZero) + ")");
 
     // Warn if no exact zero found and residual DC is significant
     if (!result.hasExactZero && std::abs(result.outputValue) > 0.05) {
-        DBG("WARNING: DCOffsetCompensator: No exact zero crossing found. "
-            << "Residual DC offset: " << result.outputValue);
+        DBG("WARNING: DCOffsetCompensator: No exact zero crossing found. " +
+            juce::String("Residual DC offset: ") + juce::String(result.outputValue));
     }
 }
 
