@@ -1052,4 +1052,214 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
     }
 }
 
+//==============================================================================
+// Harmonic Waveshaper Tests (Chebyshev-style trig functions)
+// Tests spline fitting for all 40 harmonics used in HarmonicMode
+//==============================================================================
+
+/**
+ * Helper: Set base layer to harmonic waveshaper
+ * Uses same trig formulas as HarmonicLayer:
+ *   - Odd harmonics: sin(n * asin(x))
+ *   - Even harmonics: cos(n * acos(x))
+ */
+void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber, double amplitude = 1.0) {
+    for (int i = 0; i < ltf.getTableSize(); ++i) {
+        double x = ltf.normalizeIndex(i);
+        x = std::max(-1.0, std::min(1.0, x));  // Clamp for trig safety
+
+        double y = 0.0;
+        if (harmonicNumber % 2 == 0) {
+            // Even harmonics: cos(n * acos(x))
+            y = std::cos(harmonicNumber * std::acos(x));
+        } else {
+            // Odd harmonics: sin(n * asin(x))
+            y = std::sin(harmonicNumber * std::asin(x));
+        }
+
+        ltf.setBaseLayerValue(i, amplitude * y);
+    }
+}
+
+/**
+ * Helper: Set base layer to mixed curve (50% identity + 50% harmonic)
+ */
+void setMixedCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber) {
+    for (int i = 0; i < ltf.getTableSize(); ++i) {
+        double x = ltf.normalizeIndex(i);
+        x = std::max(-1.0, std::min(1.0, x));  // Clamp for trig safety
+
+        // 50% identity
+        double identity = x;
+
+        // 50% harmonic
+        double harmonic = 0.0;
+        if (harmonicNumber % 2 == 0) {
+            harmonic = std::cos(harmonicNumber * std::acos(x));
+        } else {
+            harmonic = std::sin(harmonicNumber * std::asin(x));
+        }
+
+        ltf.setBaseLayerValue(i, 0.5 * identity + 0.5 * harmonic);
+    }
+}
+
+/**
+ * Test all 40 harmonics individually
+ * Reports anchor count for each harmonic to identify problematic cases
+ */
+TEST_F(SplineFitterTest, AllHarmonics_PureWaveshapers) {
+    auto config = dsp_core::SplineFitConfig::smooth();  // maxAnchors = 24
+
+    std::cout << "\n=== Pure Harmonic Waveshapers (maxAnchors=" << config.maxAnchors << ") ===" << std::endl;
+    std::cout << "Harmonic | Anchors | MaxError | Spatial Distribution (Left|Mid|Right)" << std::endl;
+    std::cout << "---------|---------|----------|--------------------------------------" << std::endl;
+
+    for (int n = 1; n <= 40; ++n) {
+        setHarmonicCurve(*ltf, n);
+
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        EXPECT_TRUE(result.success) << "Harmonic " << n << " fit failed";
+
+        // Analyze spatial distribution of anchors
+        int leftCount = 0, midCount = 0, rightCount = 0;
+        for (const auto& anchor : result.anchors) {
+            if (anchor.x < -0.33) leftCount++;
+            else if (anchor.x > 0.33) rightCount++;
+            else midCount++;
+        }
+
+        // Print results
+        std::cout << std::setw(8) << n << " | "
+                  << std::setw(7) << result.numAnchors << " | "
+                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
+                  << std::setw(4) << leftCount << " | "
+                  << std::setw(3) << midCount << " | "
+                  << std::setw(5) << rightCount << std::endl;
+
+        // CRITICAL: Check for asymmetric clustering
+        // For symmetric harmonics, left and right should be roughly balanced
+        if (n >= 10) {  // High-frequency harmonics
+            // Allow 2:1 ratio, but not 10:1 or infinite clustering
+            int maxSide = std::max(leftCount, rightCount);
+            int minSide = std::min(leftCount, rightCount);
+
+            if (minSide > 0) {  // Avoid divide by zero
+                double asymmetryRatio = static_cast<double>(maxSide) / minSide;
+                EXPECT_LT(asymmetryRatio, 5.0)
+                    << "Harmonic " << n << " has severe asymmetric clustering: "
+                    << leftCount << " left vs " << rightCount << " right";
+            }
+        }
+
+        // Sanity check: shouldn't exceed maxAnchors significantly
+        // (allowing small buffer for mandatory feature anchors)
+        EXPECT_LE(result.numAnchors, config.maxAnchors * 2)
+            << "Harmonic " << n << " exceeded anchor limit by 2x!";
+    }
+}
+
+/**
+ * Test all 40 harmonics mixed 50/50 with identity
+ * This simulates realistic use case where wavetable (identity) is blended with harmonics
+ */
+TEST_F(SplineFitterTest, AllHarmonics_MixedWithIdentity) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== Mixed Curves (50% Identity + 50% Harmonic) ===" << std::endl;
+    std::cout << "Harmonic | Anchors | MaxError | Spatial Distribution (Left|Mid|Right)" << std::endl;
+    std::cout << "---------|---------|----------|--------------------------------------" << std::endl;
+
+    for (int n = 1; n <= 40; ++n) {
+        setMixedCurve(*ltf, n);
+
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        EXPECT_TRUE(result.success) << "Mixed harmonic " << n << " fit failed";
+
+        // Analyze spatial distribution
+        int leftCount = 0, midCount = 0, rightCount = 0;
+        for (const auto& anchor : result.anchors) {
+            if (anchor.x < -0.33) leftCount++;
+            else if (anchor.x > 0.33) rightCount++;
+            else midCount++;
+        }
+
+        std::cout << std::setw(8) << n << " | "
+                  << std::setw(7) << result.numAnchors << " | "
+                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
+                  << std::setw(4) << leftCount << " | "
+                  << std::setw(3) << midCount << " | "
+                  << std::setw(5) << rightCount << std::endl;
+
+        // Mixed curves should have even better symmetry than pure harmonics
+        if (n >= 10) {
+            int maxSide = std::max(leftCount, rightCount);
+            int minSide = std::min(leftCount, rightCount);
+
+            if (minSide > 0) {
+                double asymmetryRatio = static_cast<double>(maxSide) / minSide;
+                EXPECT_LT(asymmetryRatio, 3.0)
+                    << "Mixed harmonic " << n << " has asymmetric clustering: "
+                    << leftCount << " left vs " << rightCount << " right";
+            }
+        }
+
+        EXPECT_LE(result.numAnchors, config.maxAnchors * 2)
+            << "Mixed harmonic " << n << " exceeded anchor limit!";
+    }
+}
+
+/**
+ * Focused test on problematic high-frequency harmonics (15-20)
+ * These are most likely to trigger clustering bugs
+ */
+TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== High-Frequency Harmonics (Detailed) ===" << std::endl;
+
+    for (int n = 15; n <= 20; ++n) {
+        setHarmonicCurve(*ltf, n);
+
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        std::cout << "\nHarmonic " << n << ":" << std::endl;
+        std::cout << "  Total anchors: " << result.numAnchors << std::endl;
+        std::cout << "  Max error: " << result.maxError << std::endl;
+        std::cout << "  Anchor positions (x coords): ";
+
+        // Print first 10 and last 10 anchor positions to see clustering
+        int printCount = std::min(10, static_cast<int>(result.anchors.size()));
+        for (int i = 0; i < printCount; ++i) {
+            std::cout << std::fixed << std::setprecision(3) << result.anchors[i].x;
+            if (i < printCount - 1) std::cout << ", ";
+        }
+        if (result.anchors.size() > 20) {
+            std::cout << " ... ";
+            for (size_t i = result.anchors.size() - 10; i < result.anchors.size(); ++i) {
+                std::cout << std::fixed << std::setprecision(3) << result.anchors[i].x;
+                if (i < result.anchors.size() - 1) std::cout << ", ";
+            }
+        }
+        std::cout << std::endl;
+
+        // Critical check: For symmetric waveshapers, anchors should be distributed
+        // relatively evenly. A sign of the bug is if most anchors cluster on left.
+        int leftHalf = 0;
+        for (const auto& anchor : result.anchors) {
+            if (anchor.x < 0.0) leftHalf++;
+        }
+
+        double leftRatio = static_cast<double>(leftHalf) / result.numAnchors;
+        std::cout << "  Left-side clustering: " << leftHalf << "/" << result.numAnchors
+                  << " (" << std::fixed << std::setprecision(1) << (leftRatio * 100) << "%)" << std::endl;
+
+        // Expect roughly 50/50 distribution for symmetric curves
+        EXPECT_GE(leftRatio, 0.3) << "Harmonic " << n << " has too few left-side anchors";
+        EXPECT_LE(leftRatio, 0.7) << "Harmonic " << n << " has severe left-side clustering";
+    }
+}
+
 } // namespace dsp_core_test

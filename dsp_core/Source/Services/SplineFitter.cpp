@@ -18,8 +18,10 @@ SplineFitResult SplineFitter::fitCurve(
     SplineFitResult result;
 
     // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3)
-    // Always detect and anchor at geometric features (structural correctness)
-    auto features = CurveFeatureDetector::detectFeatures(ltf);
+    // Detect and anchor at geometric features (structural correctness)
+    // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
+    int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
+    auto features = CurveFeatureDetector::detectFeatures(ltf, maxFeatures);
     std::vector<int> mandatoryIndices = features.mandatoryAnchors;
 
     // Step 1: Sample & sanitize
@@ -93,7 +95,8 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
     }
 
     // Phase 2.1 (Simplified): Add midpoint samples for better coverage
-    // This helps catch errors between the original 256 sample points
+    // CRITICAL: Must sample actual curve, NOT linear interpolation!
+    // Linear interpolation creates false errors for high-frequency curves (e.g., Harmonic 15)
     std::vector<Sample> densified;
     densified.reserve(samples.size() * 2);
 
@@ -103,8 +106,20 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
         // Add midpoint sample between this and next point
         if (i < samples.size() - 1) {
             double midX = (samples[i].x + samples[i+1].x) / 2.0;
-            // Interpolate y value (simple linear interpolation is fine here)
-            double midY = (samples[i].y + samples[i+1].y) / 2.0;
+
+            // Find the table index corresponding to midX and sample the ACTUAL curve
+            // This prevents false errors from linear interpolation on high-frequency curves
+            int tableIdx = 0;
+            double minDist = std::abs(ltf.normalizeIndex(0) - midX);
+            for (int j = 1; j < tableSize; ++j) {
+                double dist = std::abs(ltf.normalizeIndex(j) - midX);
+                if (dist < minDist) {
+                    minDist = dist;
+                    tableIdx = j;
+                }
+            }
+            double midY = ltf.getBaseLayerValue(tableIdx);
+
             densified.push_back({midX, midY});
         }
     }
@@ -688,6 +703,23 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     // Start with mandatory feature anchors (extrema, inflection points)
     std::vector<SplineAnchor> anchors;
 
+    // DEBUG: Log spatial distribution of mandatory anchors
+    if (!mandatoryAnchorIndices.empty() && ltf != nullptr) {
+        int leftCount = 0, midCount = 0, rightCount = 0;
+        for (int idx : mandatoryAnchorIndices) {
+            double x = ltf->normalizeIndex(idx);
+            if (x < -0.33) leftCount++;
+            else if (x > 0.33) rightCount++;
+            else midCount++;
+        }
+        DBG("========== SPLINE FIT DEBUG ==========");
+        DBG("Total mandatory anchors: " + juce::String(static_cast<int>(mandatoryAnchorIndices.size())));
+        DBG("Left (x<-0.33): " + juce::String(leftCount) +
+            " | Mid: " + juce::String(midCount) +
+            " | Right (x>0.33): " + juce::String(rightCount));
+        DBG("maxAnchors: " + juce::String(config.maxAnchors));
+    }
+
     if (mandatoryAnchorIndices.empty() || ltf == nullptr) {
         // Fallback: If no mandatory anchors provided, use endpoints only
         anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
@@ -733,7 +765,8 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     }
 
     // Calculate how many additional anchors we can add
-    int remainingAnchors = config.maxAnchors - static_cast<int>(anchors.size());
+    // CRITICAL: Clamp to 0 to prevent negative iteration count if mandatory anchors exceed maxAnchors
+    int remainingAnchors = std::max(0, config.maxAnchors - static_cast<int>(anchors.size()));
 
     // Iteratively refine with error-driven placement (quality)
     for (int iteration = 0; iteration < remainingAnchors; ++iteration) {

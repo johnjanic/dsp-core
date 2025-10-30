@@ -39,9 +39,11 @@ public:
      * Detect all geometric features requiring spline anchors
      *
      * @param ltf Input transfer function (base layer)
+     * @param maxMandatoryAnchors Maximum number of mandatory feature anchors (0 = unlimited)
+     *                            If limited, keeps most significant features by amplitude/curvature
      * @return Feature indices (table indices, not normalized coordinates)
      */
-    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf);
+    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors = 0);
 
 private:
     CurveFeatureDetector() = delete;  // Pure static service
