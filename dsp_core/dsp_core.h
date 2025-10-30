@@ -35,6 +35,7 @@
 #include "Source/LayeredTransferFunction.h"
 #include "Source/SplineTypes.h"
 #include "Source/TransferFunction.h"
+#include "Source/Services/CurveFeatureDetector.h"
 #include "Source/Services/SplineFitter.h"
 #include "Source/Services/SplineEvaluator.h"
 #include "Source/Services/ZeroCrossingSolver.h"

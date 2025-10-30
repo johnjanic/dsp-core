@@ -31,7 +31,15 @@ public:
     );
 
     // Tangent computation (exposed for manual anchor manipulation)
-    // Recomputes PCHIP tangents for anchors after position changes
+    // Recomputes tangents for anchors after position changes using configured algorithm
+    static void computeTangents(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config = SplineFitConfig::smooth()
+    );
+
+    // Legacy API: compute PCHIP tangents specifically
+    // Deprecated: Use computeTangents() with config.tangentAlgorithm = TangentAlgorithm::PCHIP
+    [[deprecated("Use computeTangents() with config.tangentAlgorithm instead")]]
     static void computePCHIPTangents(
         std::vector<SplineAnchor>& anchors,
         const SplineFitConfig& config = SplineFitConfig::smooth()
@@ -84,13 +92,37 @@ private:
         size_t index
     );
 
-    // Step 3: PCHIP tangent computation helpers
+    // Step 3: Tangent computation algorithms
+    static void computePCHIPTangentsImpl(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config
+    );
+
+    static void computeFritschCarlsonTangents(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config
+    );
+
+    static void computeAkimaTangents(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config
+    );
+
+    static void computeFiniteDifferenceTangents(
+        std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config
+    );
+
+    // Tangent computation helpers
     static double harmonicMean(double a, double b, double wa, double wb);
 
     // Greedy spline fitting (replaces RDP + refinement)
+    // Now uses feature-based anchor placement: starts with mandatory feature anchors
     static std::vector<SplineAnchor> greedySplineFit(
         const std::vector<Sample>& samples,
-        const SplineFitConfig& config
+        const SplineFitConfig& config,
+        const LayeredTransferFunction* ltf = nullptr,
+        const std::vector<int>& mandatoryAnchorIndices = {}
     );
 
     // Find sample with worst fit error

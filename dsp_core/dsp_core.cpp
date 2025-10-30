@@ -13,6 +13,7 @@
 #include "Source/HarmonicLayer.cpp"
 #include "Source/LayeredTransferFunction.cpp"
 #include "Source/TransferFunction.cpp"
+#include "Source/Services/CurveFeatureDetector.cpp"
 #include "Source/Services/SplineFitter.cpp"
 #include "Source/Services/SplineEvaluator.cpp"
 #include "Source/Services/ZeroCrossingSolver.cpp"

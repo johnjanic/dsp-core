@@ -21,6 +21,8 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineTypes.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/CurveFeatureDetector.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/CurveFeatureDetector.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineFitter.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineFitter.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineEvaluator.h"

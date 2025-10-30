@@ -212,3 +212,28 @@ else()
 endif()
 
 add_test(NAME DCOffsetCompensatorTests COMMAND dc_offset_compensator_tests)
+
+# CurveFeatureDetector tests
+add_executable(curve_feature_detector_tests
+    CurveFeatureDetectorTest.cpp
+)
+
+target_include_directories(curve_feature_detector_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(curve_feature_detector_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(curve_feature_detector_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(curve_feature_detector_tests)
+endif()
+
+add_test(NAME CurveFeatureDetectorTests COMMAND curve_feature_detector_tests)

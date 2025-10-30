@@ -4,6 +4,14 @@
 
 namespace dsp_core {
 
+// Tangent computation algorithms for spline fitting
+enum class TangentAlgorithm {
+    PCHIP,              // Piecewise Cubic Hermite Interpolating Polynomial (default)
+    FritschCarlson,     // Monotone-preserving variant
+    Akima,              // Local weighted average
+    FiniteDifference    // Simple baseline (for comparison)
+};
+
 // Control point with optional tangent override
 struct SplineAnchor {
     double x = 0.0;  // Position in [-1, 1]
@@ -47,12 +55,16 @@ struct SplineFitConfig {
     // Endpoint behavior
     bool pinEndpoints = true;             // Force (-1,-1) and (1,1)
 
+    // Tangent computation algorithm
+    TangentAlgorithm tangentAlgorithm = TangentAlgorithm::PCHIP;
+
     // Presets
     static SplineFitConfig tight() {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.002;
         cfg.derivativeTolerance = 0.05;
         cfg.maxAnchors = 128;  // Increased from 64 to allow better convergence for steep curves
+        cfg.tangentAlgorithm = TangentAlgorithm::PCHIP;
         return cfg;
     }
 
@@ -61,6 +73,16 @@ struct SplineFitConfig {
         cfg.positionTolerance = 0.01;
         cfg.derivativeTolerance = 0.02;
         cfg.maxAnchors = 24;
+        cfg.tangentAlgorithm = TangentAlgorithm::Akima;
+        return cfg;
+    }
+
+    static SplineFitConfig monotonePreserving() {
+        SplineFitConfig cfg;
+        cfg.positionTolerance = 0.001;
+        cfg.derivativeTolerance = 0.02;
+        cfg.maxAnchors = 32;
+        cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }
 };

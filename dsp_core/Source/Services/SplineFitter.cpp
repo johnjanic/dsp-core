@@ -1,5 +1,6 @@
 #include "SplineFitter.h"
 #include "SplineEvaluator.h"
+#include "CurveFeatureDetector.h"
 #include <algorithm>
 #include <cmath>
 
@@ -16,6 +17,11 @@ SplineFitResult SplineFitter::fitCurve(
 
     SplineFitResult result;
 
+    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3)
+    // Always detect and anchor at geometric features (structural correctness)
+    auto features = CurveFeatureDetector::detectFeatures(ltf);
+    std::vector<int> mandatoryIndices = features.mandatoryAnchors;
+
     // Step 1: Sample & sanitize
     auto samples = sampleAndSanitize(ltf, config);
 
@@ -31,8 +37,9 @@ SplineFitResult SplineFitter::fitCurve(
         return result;
     }
 
-    // Step 2: Greedy spline fitting (REPLACES RDP + refinement)
-    auto anchors = greedySplineFit(samples, config);
+    // Step 2: Greedy spline fitting with feature-based initialization
+    // Start with mandatory feature anchors, then iteratively refine (error-driven)
+    auto anchors = greedySplineFit(samples, config, &ltf, mandatoryIndices);
 
     if (anchors.empty()) {
         result.success = false;
@@ -59,7 +66,8 @@ SplineFitResult SplineFitter::fitCurve(
     result.numAnchors = static_cast<int>(result.anchors.size());
     result.maxError = maxErr;
     result.averageError = sumErr / static_cast<double>(samples.size());
-    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " +
+    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors (including " +
+                     juce::String(static_cast<int>(mandatoryIndices.size())) + " feature anchors), max error: " +
                      juce::String(maxErr, 4);
 
     return result;
@@ -315,10 +323,45 @@ double SplineFitter::estimateDerivative(
 }
 
 //==============================================================================
-// Step 3: PCHIP Tangent Computation
+// Step 3: Tangent Computation (Dispatcher)
 //==============================================================================
 
+void SplineFitter::computeTangents(
+    std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+
+    switch (config.tangentAlgorithm) {
+        case TangentAlgorithm::PCHIP:
+            computePCHIPTangentsImpl(anchors, config);
+            break;
+        case TangentAlgorithm::FritschCarlson:
+            computeFritschCarlsonTangents(anchors, config);
+            break;
+        case TangentAlgorithm::Akima:
+            computeAkimaTangents(anchors, config);
+            break;
+        case TangentAlgorithm::FiniteDifference:
+            computeFiniteDifferenceTangents(anchors, config);
+            break;
+        default:
+            jassertfalse;
+            computePCHIPTangentsImpl(anchors, config);
+            break;
+    }
+}
+
+// Legacy API (deprecated)
 void SplineFitter::computePCHIPTangents(
+    std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+    computeTangents(anchors, config);
+}
+
+//==============================================================================
+// PCHIP Tangent Computation (Implementation)
+//==============================================================================
+
+void SplineFitter::computePCHIPTangentsImpl(
     std::vector<SplineAnchor>& anchors,
     const SplineFitConfig& config) {
 
@@ -436,6 +479,160 @@ double SplineFitter::harmonicMean(double a, double b, double wa, double wb) {
 }
 
 //==============================================================================
+// Fritsch-Carlson Tangent Computation (Monotone-Preserving)
+//==============================================================================
+
+void SplineFitter::computeFritschCarlsonTangents(
+    std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+
+    const int n = static_cast<int>(anchors.size());
+    if (n < 2) return;
+
+    std::vector<double> tangents(n, 0.0);
+    std::vector<double> deltas(n - 1);
+
+    // 1. Compute segment slopes
+    for (int i = 0; i < n - 1; ++i) {
+        double dx = anchors[i+1].x - anchors[i].x;
+        if (std::abs(dx) < 1e-12) {
+            deltas[i] = 0.0;
+        } else {
+            deltas[i] = (anchors[i+1].y - anchors[i].y) / dx;
+        }
+    }
+
+    // 2. Initial tangent estimates
+    for (int i = 1; i < n - 1; ++i) {
+        if (deltas[i-1] * deltas[i] <= 0.0) {
+            tangents[i] = 0.0;  // Local extremum - force horizontal tangent
+        } else {
+            // Weighted average (harmonic mean variant)
+            double w1 = 2.0 * (anchors[i+1].x - anchors[i].x) + (anchors[i].x - anchors[i-1].x);
+            double w2 = (anchors[i+1].x - anchors[i].x) + 2.0 * (anchors[i].x - anchors[i-1].x);
+            tangents[i] = (w1 * deltas[i-1] + w2 * deltas[i]) / (w1 + w2);
+        }
+    }
+
+    // 3. Enforce Fritsch-Carlson monotonicity constraints
+    for (int i = 0; i < n - 1; ++i) {
+        if (std::abs(deltas[i]) < 1e-9)
+            continue;  // Skip flat segments
+
+        double alpha = tangents[i] / deltas[i];
+        double beta = tangents[i+1] / deltas[i];
+
+        // Constraint: α² + β² ≤ 9 (ensures no overshoot)
+        if (alpha * alpha + beta * beta > 9.0) {
+            double tau = 3.0 / std::sqrt(alpha * alpha + beta * beta);
+            tangents[i] = tau * alpha * deltas[i];
+            tangents[i+1] = tau * beta * deltas[i];
+        }
+    }
+
+    // 4. Boundary tangents (use one-sided slopes)
+    tangents[0] = deltas[0];
+    tangents[n-1] = deltas[n-2];
+
+    // 5. Apply tangents to anchors and enforce slope bounds
+    for (int i = 0; i < n; ++i) {
+        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangents[i]);
+    }
+}
+
+//==============================================================================
+// Akima Tangent Computation (Local Weighted Average)
+//==============================================================================
+
+void SplineFitter::computeAkimaTangents(
+    std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+
+    const int n = static_cast<int>(anchors.size());
+    if (n < 2) return;
+
+    std::vector<double> tangents(n);
+    std::vector<double> slopes(n + 3);  // Extended for boundary handling
+
+    // 1. Compute slopes with extrapolation for boundaries
+    for (int i = 2; i < static_cast<int>(slopes.size()) - 2; ++i) {
+        int anchorIdx = i - 2;
+        double dx = anchors[anchorIdx + 1].x - anchors[anchorIdx].x;
+        if (std::abs(dx) < 1e-12) {
+            slopes[i] = 0.0;
+        } else {
+            slopes[i] = (anchors[anchorIdx + 1].y - anchors[anchorIdx].y) / dx;
+        }
+    }
+
+    // Extrapolate boundary slopes
+    slopes[0] = 2.0 * slopes[2] - slopes[3];
+    slopes[1] = 2.0 * slopes[2] - slopes[3];
+    slopes[slopes.size() - 1] = 2.0 * slopes[slopes.size() - 3] - slopes[slopes.size() - 4];
+    slopes[slopes.size() - 2] = 2.0 * slopes[slopes.size() - 3] - slopes[slopes.size() - 4];
+
+    // 2. Akima weighted formula
+    for (int i = 0; i < n; ++i) {
+        double m1 = slopes[i];
+        double m2 = slopes[i + 1];
+        double m3 = slopes[i + 2];
+        double m4 = slopes[i + 3];
+
+        double w1 = std::abs(m4 - m3);
+        double w2 = std::abs(m2 - m1);
+
+        if (w1 + w2 < 1e-9) {
+            tangents[i] = (m2 + m3) * 0.5;  // Average if weights are zero
+        } else {
+            tangents[i] = (w1 * m2 + w2 * m3) / (w1 + w2);
+        }
+    }
+
+    // 3. Apply tangents to anchors and enforce slope bounds
+    for (int i = 0; i < n; ++i) {
+        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangents[i]);
+    }
+}
+
+//==============================================================================
+// Finite Difference Tangent Computation (Simple Baseline)
+//==============================================================================
+
+void SplineFitter::computeFiniteDifferenceTangents(
+    std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+
+    const int n = static_cast<int>(anchors.size());
+    if (n < 2) return;
+
+    for (int i = 0; i < n; ++i) {
+        double tangent = 0.0;
+
+        if (i == 0) {
+            // Forward difference for first point
+            double dx = anchors[1].x - anchors[0].x;
+            if (std::abs(dx) >= 1e-12) {
+                tangent = (anchors[1].y - anchors[0].y) / dx;
+            }
+        } else if (i == n - 1) {
+            // Backward difference for last point
+            double dx = anchors[i].x - anchors[i-1].x;
+            if (std::abs(dx) >= 1e-12) {
+                tangent = (anchors[i].y - anchors[i-1].y) / dx;
+            }
+        } else {
+            // Central difference for interior points
+            double dx = anchors[i+1].x - anchors[i-1].x;
+            if (std::abs(dx) >= 1e-12) {
+                tangent = (anchors[i+1].y - anchors[i-1].y) / dx;
+            }
+        }
+
+        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangent);
+    }
+}
+
+//==============================================================================
 // Greedy Spline Fitting (Replaces RDP)
 //==============================================================================
 
@@ -480,20 +677,68 @@ SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
 
 std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     const std::vector<Sample>& samples,
-    const SplineFitConfig& config) {
+    const SplineFitConfig& config,
+    const LayeredTransferFunction* ltf,
+    const std::vector<int>& mandatoryAnchorIndices) {
 
     if (samples.size() < 2)
         return {};
 
-    // Start with just endpoints
+    // Phase 3: FEATURE-BASED ANCHOR PLACEMENT
+    // Start with mandatory feature anchors (extrema, inflection points)
     std::vector<SplineAnchor> anchors;
-    anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
-    anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
 
-    // Iteratively insert anchors at worst-error locations
-    for (int iteration = 0; iteration < config.maxAnchors - 2; ++iteration) {
-        // Compute tangents for current anchor set
-        computePCHIPTangents(anchors, config);
+    if (mandatoryAnchorIndices.empty() || ltf == nullptr) {
+        // Fallback: If no mandatory anchors provided, use endpoints only
+        anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
+        anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
+    } else {
+        // Convert mandatory table indices to sample anchors
+        // mandatoryAnchorIndices are table indices from CurveFeatureDetector
+        // We need to convert them to x coordinates, then find the closest samples
+
+        for (int tableIdx : mandatoryAnchorIndices) {
+            // Convert table index to x coordinate using LayeredTransferFunction's mapping
+            double targetX = ltf->normalizeIndex(tableIdx);
+
+            // Find closest sample to this x coordinate
+            // Since samples are sorted by x, we could use binary search,
+            // but linear search is fine for small arrays
+            size_t closestIdx = 0;
+            double minDist = std::abs(samples[0].x - targetX);
+
+            for (size_t i = 1; i < samples.size(); ++i) {
+                double dist = std::abs(samples[i].x - targetX);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestIdx = i;
+                }
+            }
+
+            anchors.push_back({samples[closestIdx].x, samples[closestIdx].y, false, 0.0});
+        }
+
+        // Sort anchors by x (should already be sorted, but ensure)
+        std::sort(anchors.begin(), anchors.end(),
+            [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
+
+        // Remove any duplicates
+        anchors.erase(
+            std::unique(anchors.begin(), anchors.end(),
+                [](const SplineAnchor& a, const SplineAnchor& b) {
+                    return std::abs(a.x - b.x) < 1e-9;
+                }),
+            anchors.end()
+        );
+    }
+
+    // Calculate how many additional anchors we can add
+    int remainingAnchors = config.maxAnchors - static_cast<int>(anchors.size());
+
+    // Iteratively refine with error-driven placement (quality)
+    for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
+        // Compute tangents for current anchor set using configured algorithm
+        computeTangents(anchors, config);
 
         // Find sample with highest error
         auto worst = findWorstFitSample(samples, anchors);
@@ -512,7 +757,6 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         );
 
         // Don't insert duplicate x positions
-        // Check if an anchor already exists at this x position
         bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
             [&worstSample](const SplineAnchor& a) {
                 return std::abs(a.x - worstSample.x) < 1e-9;
@@ -524,8 +768,8 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
     }
 
-    // Final tangent computation
-    computePCHIPTangents(anchors, config);
+    // Final tangent computation using configured algorithm
+    computeTangents(anchors, config);
 
     return anchors;
 }
