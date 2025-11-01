@@ -214,13 +214,10 @@ bool LayeredTransferFunction::isNormalizationEnabled() const {
 
 void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
     if (enabled) {
-        // Entering spline mode: verify harmonics are zeroed
-        // (ModeCoordinator should have called bakeCompositeToBase() first)
-        jassert(!hasNonZeroHarmonics() &&
-                "Must call bakeCompositeToBase() before enabling spline layer");
-
-        // Lock normalization to identity in spline mode
-        // Spline mode: user controls amplitude directly via anchor placement
+        // Entering spline mode:
+        // - Harmonics are kept intact (hidden but present for undo)
+        // - Spline fits to composite (base + harmonics)
+        // - Lock normalization to identity (user controls amplitude via anchors)
         normalizationScalar.store(1.0, std::memory_order_release);
     }
 

@@ -56,7 +56,9 @@ struct SplineFitConfig {
     bool pinEndpoints = true;             // Force (-1,-1) and (1,1)
 
     // Tangent computation algorithm
-    TangentAlgorithm tangentAlgorithm = TangentAlgorithm::PCHIP;
+    // NOTE: Fritsch-Carlson chosen for no-overshoot guarantee (simplifies UI anchor placement)
+    // See docs/architecture/spline-algorithm-decision.md for full analysis
+    TangentAlgorithm tangentAlgorithm = TangentAlgorithm::FritschCarlson;
 
     // Presets
     static SplineFitConfig tight() {
@@ -64,7 +66,7 @@ struct SplineFitConfig {
         cfg.positionTolerance = 0.002;
         cfg.derivativeTolerance = 0.05;
         cfg.maxAnchors = 128;  // Increased from 64 to allow better convergence for steep curves
-        cfg.tangentAlgorithm = TangentAlgorithm::PCHIP;
+        cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }
 
@@ -73,7 +75,7 @@ struct SplineFitConfig {
         cfg.positionTolerance = 0.01;
         cfg.derivativeTolerance = 0.02;
         cfg.maxAnchors = 24;
-        cfg.tangentAlgorithm = TangentAlgorithm::Akima;
+        cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }
 
