@@ -237,3 +237,78 @@ else()
 endif()
 
 add_test(NAME CurveFeatureDetectorTests COMMAND curve_feature_detector_tests)
+
+# SplineLayer tests
+add_executable(spline_layer_tests
+    SplineLayerTest.cpp
+)
+
+target_include_directories(spline_layer_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_layer_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_layer_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_layer_tests)
+endif()
+
+add_test(NAME SplineLayerTests COMMAND spline_layer_tests)
+
+# LayeredTransferFunctionSpline tests
+add_executable(layered_transfer_function_spline_tests
+    LayeredTransferFunctionSplineTest.cpp
+)
+
+target_include_directories(layered_transfer_function_spline_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(layered_transfer_function_spline_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(layered_transfer_function_spline_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(layered_transfer_function_spline_tests)
+endif()
+
+add_test(NAME LayeredTransferFunctionSplineTests COMMAND layered_transfer_function_spline_tests)
+
+# Algorithm Benchmark tests
+add_executable(algorithm_benchmark_tests
+    AlgorithmBenchmarkTest.cpp
+)
+
+target_include_directories(algorithm_benchmark_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(algorithm_benchmark_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(algorithm_benchmark_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(algorithm_benchmark_tests)
+endif()
+
+add_test(NAME AlgorithmBenchmarkTests COMMAND algorithm_benchmark_tests)

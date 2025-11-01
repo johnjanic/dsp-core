@@ -18,6 +18,8 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/HarmonicLayer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/LayeredTransferFunction.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/LayeredTransferFunction.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineLayer.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineLayer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineTypes.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.cpp"

@@ -12,6 +12,7 @@
 #include "Source/ExpressionEvaluator.cpp"
 #include "Source/HarmonicLayer.cpp"
 #include "Source/LayeredTransferFunction.cpp"
+#include "Source/SplineLayer.cpp"
 #include "Source/TransferFunction.cpp"
 #include "Source/Services/CurveFeatureDetector.cpp"
 #include "Source/Services/SplineFitter.cpp"

@@ -87,10 +87,12 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
     std::vector<Sample> samples;
     samples.reserve(tableSize * 2);  // Reserve extra space for densification
 
-    // Raster-to-polyline: sample entire baseLayer
+    // Raster-to-polyline: sample entire composite (what user sees)
+    // CRITICAL: Read from composite, not base layer
+    // This includes base + harmonics + normalization = actual visible curve
     for (int i = 0; i < tableSize; ++i) {
         double x = ltf.normalizeIndex(i);  // Maps to [-1, 1]
-        double y = ltf.getBaseLayerValue(i);
+        double y = ltf.getCompositeValue(i);
         samples.push_back({x, y});
     }
 
@@ -118,7 +120,7 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
                     tableIdx = j;
                 }
             }
-            double midY = ltf.getBaseLayerValue(tableIdx);
+            double midY = ltf.getCompositeValue(tableIdx);
 
             densified.push_back({midX, midY});
         }

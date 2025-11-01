@@ -32,7 +32,7 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
             result.localExtrema.push_back(i);
 
             // Significance = amplitude (how tall the peak/valley is)
-            double y = ltf.getBaseLayerValue(i);
+            double y = ltf.getCompositeValue(i);
             features.push_back({i, std::abs(y), true});
         }
     }
@@ -115,8 +115,8 @@ double CurveFeatureDetector::estimateDerivative(const LayeredTransferFunction& l
 
     double x0 = ltf.normalizeIndex(idx - 1);
     double x1 = ltf.normalizeIndex(idx + 1);
-    double y0 = ltf.getBaseLayerValue(idx - 1);
-    double y1 = ltf.getBaseLayerValue(idx + 1);
+    double y0 = ltf.getCompositeValue(idx - 1);
+    double y1 = ltf.getCompositeValue(idx + 1);
 
     return (y1 - y0) / (x1 - x0);
 }
@@ -126,9 +126,9 @@ double CurveFeatureDetector::estimateSecondDerivative(const LayeredTransferFunct
         return 0.0;
 
     double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0);  // Uniform spacing
-    double y_prev = ltf.getBaseLayerValue(idx - 1);
-    double y = ltf.getBaseLayerValue(idx);
-    double y_next = ltf.getBaseLayerValue(idx + 1);
+    double y_prev = ltf.getCompositeValue(idx - 1);
+    double y = ltf.getCompositeValue(idx);
+    double y_next = ltf.getCompositeValue(idx + 1);
 
     return (y_next - 2.0 * y + y_prev) / (h * h);
 }

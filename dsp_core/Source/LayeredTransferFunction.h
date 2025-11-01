@@ -1,5 +1,6 @@
 #pragma once
 #include "HarmonicLayer.h"
+#include "SplineLayer.h"
 #include <juce_core/juce_core.h>
 #include <vector>
 #include <atomic>
@@ -49,6 +50,10 @@ public:
     // Harmonic layer (for algorithm settings only)
     HarmonicLayer& getHarmonicLayer();
     const HarmonicLayer& getHarmonicLayer() const;
+
+    // Spline layer (NEW: for spline mode)
+    SplineLayer& getSplineLayer();
+    const SplineLayer& getSplineLayer() const;
 
     // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)
     void setCoefficient(int index, double value);
@@ -121,6 +126,48 @@ public:
      */
     bool isNormalizationEnabled() const;
 
+    /**
+     * Enable or disable spline layer (mutually exclusive with harmonic layer)
+     *
+     * When enabled:
+     *   - Audio thread uses direct spline evaluation
+     *   - Normalization is locked to 1.0 (identity)
+     *   - Cache is invalidated
+     *
+     * When disabled:
+     *   - Audio thread uses base + harmonics
+     *   - Normalization resumes normal behavior
+     *
+     * CRITICAL: Call bakeCompositeToBase() before enabling spline layer
+     * to ensure harmonics are zeroed.
+     *
+     * @param enabled If true, enable spline mode; if false, use harmonic mode
+     */
+    void setSplineLayerEnabled(bool enabled);
+
+    /**
+     * Check if spline layer is currently enabled
+     */
+    bool isSplineLayerEnabled() const;
+
+    /**
+     * Invalidate composite cache (forces direct evaluation)
+     *
+     * Called when:
+     *   - Spline anchors change
+     *   - Base layer edited
+     *   - Coefficients changed
+     *   - Layer mode switched
+     */
+    void invalidateCompositeCache();
+
+    /**
+     * Check if composite cache is valid
+     *
+     * @return true if cached path can be used, false if direct evaluation required
+     */
+    bool isCompositeCacheValid() const;
+
     //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
     //==========================================================================
@@ -173,8 +220,9 @@ private:
     int tableSize;
     double minValue, maxValue;
 
-    // Harmonic layer (declare before tables since constructor initializes it first)
+    // Layers (declare before tables since constructor initializes them first)
     std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic basis function evaluator (no data ownership)
+    std::unique_ptr<SplineLayer> splineLayer;        // NEW: Spline evaluator for spline mode
 
     // Coefficient storage (owned by LayeredTransferFunction)
     std::vector<double> coefficients;  // [0] = WT mix, [1..N] = harmonics
@@ -194,6 +242,12 @@ private:
     // Normalization enable/disable (allows bypassing auto-normalization for creative effects)
     bool normalizationEnabled = true;  // Default: enabled (safe behavior)
 
+    // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
+    std::atomic<bool> splineLayerEnabled{false};
+
+    // NEW: Cache validity flag (allows direct evaluation when cache invalid)
+    std::atomic<bool> compositeCacheValid{false};
+
     // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
     mutable std::vector<double> unnormalizedMixBuffer;
 
@@ -208,6 +262,24 @@ private:
     double interpolateLinear(double x) const;
     double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
+
+    // NEW: Direct evaluation (bypasses composite cache)
+    // Used when cache is invalid (during anchor drag, after edits)
+    double evaluateDirect(double x) const;
+
+    // NEW: Interpolate base layer directly (bypasses composite)
+    // Needed for harmonic mode when cache invalid
+    double interpolateBase(double x) const;
+
+    // Mode-specific composite update helpers
+    void updateCompositeSplineMode();
+    void updateCompositeHarmonicMode();
+
+    // Normalization computation (extracted for clarity)
+    double computeNormalizationScalar(double maxAbsValue);
+
+    // Validation helper
+    bool hasNonZeroHarmonics() const;
 };
 
 } // namespace dsp_core
