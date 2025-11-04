@@ -16,7 +16,6 @@ void HarmonicLayer::setAlgorithm(Algorithm algo) {
 double HarmonicLayer::evaluate(double x, const std::vector<double>& coefficients, int tableSize) const {
     // Validate coefficient array size
     if (static_cast<int>(coefficients.size()) < numHarmonics + 1) {
-        DBG("Error: Coefficient array too small. Size: " << coefficients.size() << ", Expected: " << numHarmonics + 1);
         return 0.0;
     }
 
