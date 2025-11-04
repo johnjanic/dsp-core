@@ -494,17 +494,11 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
         }
         baseVT.setProperty("tableData", baseBlob, nullptr);
         vt.addChild(baseVT, -1, nullptr);
-    } else {
-        // Log or handle invalid table size if necessary
-        jassertfalse; // Debug assertion for invalid table size
     }
 
     // Serialize harmonic layer (algorithm settings only, no coefficients)
     if (harmonicLayer) {
         vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
-    } else {
-        // Log or handle null harmonic layer if necessary
-        jassertfalse; // Debug assertion for null harmonic layer
     }
 
     // NEW: Serialize spline layer

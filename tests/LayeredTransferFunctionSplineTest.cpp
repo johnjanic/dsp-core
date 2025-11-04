@@ -162,7 +162,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
     ltf->setCoefficient(1, 0.5);  // Harmonic 1 amplitude
     ltf->updateComposite();
 
-    // Enable spline layer (should trigger warning in debug builds)
+    // Enable spline layer
     ltf->setSplineLayerEnabled(true);
 
     // Audio thread should use spline, ignoring harmonics

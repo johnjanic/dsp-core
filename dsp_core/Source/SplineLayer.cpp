@@ -35,16 +35,11 @@ double SplineLayer::evaluate(double x) const {
 
     // Null check (defensive, should never happen)
     if (!ptr || ptr->empty()) {
-        DBG("[SplineLayer::evaluate] No anchors! Returning 0.0");
         return 0.0;
     }
 
-    DBG("[SplineLayer::evaluate] Have " + juce::String(ptr->size()) + " anchors, evaluating at x=" + juce::String(x));
-
     // Evaluate PCHIP spline (~30-40ns)
-    double result = Services::SplineEvaluator::evaluate(*ptr, x);
-    DBG("[SplineLayer::evaluate] Result: y=" + juce::String(result));
-    return result;
+    return Services::SplineEvaluator::evaluate(*ptr, x);
 }
 
 juce::ValueTree SplineLayer::toValueTree() const {

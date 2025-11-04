@@ -705,23 +705,6 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     // Start with mandatory feature anchors (extrema, inflection points)
     std::vector<SplineAnchor> anchors;
 
-    // DEBUG: Log spatial distribution of mandatory anchors
-    if (!mandatoryAnchorIndices.empty() && ltf != nullptr) {
-        int leftCount = 0, midCount = 0, rightCount = 0;
-        for (int idx : mandatoryAnchorIndices) {
-            double x = ltf->normalizeIndex(idx);
-            if (x < -0.33) leftCount++;
-            else if (x > 0.33) rightCount++;
-            else midCount++;
-        }
-        DBG("========== SPLINE FIT DEBUG ==========");
-        DBG("Total mandatory anchors: " + juce::String(static_cast<int>(mandatoryAnchorIndices.size())));
-        DBG("Left (x<-0.33): " + juce::String(leftCount) +
-            " | Mid: " + juce::String(midCount) +
-            " | Right (x>0.33): " + juce::String(rightCount));
-        DBG("maxAnchors: " + juce::String(config.maxAnchors));
-    }
-
     if (mandatoryAnchorIndices.empty() || ltf == nullptr) {
         // Fallback: If no mandatory anchors provided, use endpoints only
         anchors.push_back({samples.front().x, samples.front().y, false, 0.0});

@@ -27,7 +27,6 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
 
             // Early exit if we found exact zero
             if (absFx < epsilon) {
-                DBG("ZeroCrossingSolver: Found exact zero at x=" + juce::String(x) + ", f(x)=" + juce::String(fx));
                 return {true, bestInputValue, bestOutputValue};
             }
         }
@@ -35,9 +34,6 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
 
     // If we found a value close to zero, refine with bisection
     if (minAbsOutput < kRefinementThreshold) {
-        DBG("ZeroCrossingSolver: Refining solution (initial: x=" + juce::String(bestInputValue) +
-            ", f(x)=" + juce::String(bestOutputValue) + ")");
-
         auto refinedResult = refineBisection(
             ltf,
             bestInputValue,
@@ -46,15 +42,8 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
             10
         );
 
-        DBG("ZeroCrossingSolver: Refined solution: x=" + juce::String(refinedResult.inputValue) +
-            ", f(x)=" + juce::String(refinedResult.outputValue));
-
         return refinedResult;
     }
-
-    // No exact zero found, return best approximation
-    DBG("ZeroCrossingSolver: No exact zero found. Best: x=" + juce::String(bestInputValue) +
-        ", f(x)=" + juce::String(bestOutputValue));
 
     return {false, bestInputValue, bestOutputValue};
 }

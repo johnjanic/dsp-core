@@ -74,8 +74,6 @@ void DynamicOutputBiasing::updateBias() {
 
     // Atomic write (UI thread → audio thread)
     cachedBias_.store(dcOffset, std::memory_order_release);
-
-    DBG("DynamicOutputBiasing: Bias updated to " + juce::String(dcOffset));
 }
 
 } // namespace dsp_core::audio_pipeline
