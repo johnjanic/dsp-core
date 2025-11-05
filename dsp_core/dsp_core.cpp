@@ -14,6 +14,7 @@
 #include "Source/LayeredTransferFunction.cpp"
 #include "Source/SplineLayer.cpp"
 #include "Source/TransferFunction.cpp"
+#include "Source/Services/CoordinateSnapper.cpp"
 #include "Source/Services/CurveFeatureDetector.cpp"
 #include "Source/Services/SplineFitter.cpp"
 #include "Source/Services/SplineEvaluator.cpp"
