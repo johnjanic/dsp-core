@@ -95,12 +95,15 @@ TEST(SplineTypesTest, SplineFitConfig_DefaultValues) {
     dsp_core::SplineFitConfig config;
     EXPECT_DOUBLE_EQ(config.positionTolerance, 0.01);
     EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.02);
-    EXPECT_EQ(config.maxAnchors, 64);
+    EXPECT_EQ(config.maxAnchors, 128);  // Updated from 64 to allow complex curves
     EXPECT_TRUE(config.enableRefinement);
     EXPECT_TRUE(config.enforceMonotonicity);
     EXPECT_DOUBLE_EQ(config.minSlope, -8.0);
     EXPECT_DOUBLE_EQ(config.maxSlope, 8.0);
     EXPECT_TRUE(config.pinEndpoints);
+    // Verify new local density constraint parameters
+    EXPECT_DOUBLE_EQ(config.localDensityWindowSize, 0.10);
+    EXPECT_EQ(config.maxAnchorsPerWindow, 8);
 }
 
 TEST(SplineTypesTest, SplineFitConfig_TightPreset) {
@@ -114,7 +117,10 @@ TEST(SplineTypesTest, SplineFitConfig_SmoothPreset) {
     auto config = dsp_core::SplineFitConfig::smooth();
     EXPECT_DOUBLE_EQ(config.positionTolerance, 0.01);
     EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.02);
-    EXPECT_EQ(config.maxAnchors, 24);
+    EXPECT_EQ(config.maxAnchors, 64);  // Updated from 24 for moderate complexity
+    // Verify local density constraint parameters
+    EXPECT_DOUBLE_EQ(config.localDensityWindowSize, 0.10);
+    EXPECT_EQ(config.maxAnchorsPerWindow, 8);
 }
 
 // ============================================================================

@@ -337,3 +337,28 @@ else()
 endif()
 
 add_test(NAME CoordinateSnapperTests COMMAND coordinate_snapper_tests)
+
+# LocalDensityConstraint tests
+add_executable(local_density_tests
+    LocalDensityConstraintTest.cpp
+)
+
+target_include_directories(local_density_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(local_density_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(local_density_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(local_density_tests)
+endif()
+
+add_test(NAME LocalDensityConstraintTests COMMAND local_density_tests)

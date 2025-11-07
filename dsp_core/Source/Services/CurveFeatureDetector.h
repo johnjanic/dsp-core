@@ -41,9 +41,16 @@ public:
      * @param ltf Input transfer function (base layer)
      * @param maxMandatoryAnchors Maximum number of mandatory feature anchors (0 = unlimited)
      *                            If limited, keeps most significant features by amplitude/curvature
+     * @param localDensityWindowSize Window size as fraction of domain (0.0 = disabled)
+     * @param maxAnchorsPerWindow Max anchors within any window (0 = disabled)
      * @return Feature indices (table indices, not normalized coordinates)
      */
-    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors = 0);
+    static FeatureResult detectFeatures(
+        const LayeredTransferFunction& ltf,
+        int maxMandatoryAnchors = 0,
+        double localDensityWindowSize = 0.0,    // 0.0 = disabled (backward compatible)
+        int maxAnchorsPerWindow = 0             // 0 = disabled
+    );
 
 private:
     CurveFeatureDetector() = delete;  // Pure static service
@@ -63,6 +70,22 @@ private:
      * @return Estimated d²y/dx²
      */
     static double estimateSecondDerivative(const LayeredTransferFunction& ltf, int idx);
+
+    /**
+     * Count anchors within sliding window centered at candidateIdx
+     *
+     * @param candidateIdx Table index of feature being considered
+     * @param existingAnchors Already-selected anchor indices
+     * @param tableSize Total table size (e.g., 256)
+     * @param windowSizeFraction Window width as fraction of domain (e.g., 0.10 = 10%)
+     * @return Number of existing anchors within ±(windowSize/2) of candidate
+     */
+    static int countAnchorsInWindow(
+        int candidateIdx,
+        const std::vector<int>& existingAnchors,
+        int tableSize,
+        double windowSizeFraction
+    );
 };
 
 } // namespace Services

@@ -21,6 +21,7 @@ protected:
             double y = std::tanh(3.0 * x);
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after changing base layer
     }
 
     // Helper: Create sine curve (multiple extrema)
@@ -30,6 +31,7 @@ protected:
             double y = std::sin(numPeriods * M_PI * x);
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after changing base layer
     }
 
     // Helper: Create cubic curve (monotonic with inflection at x=0)
@@ -39,6 +41,7 @@ protected:
             double y = x * x * x;
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after changing base layer
     }
 
     // Helper: Create linear curve (no features)
@@ -47,6 +50,7 @@ protected:
             double x = ltf->normalizeIndex(i);  // [-1, 1]
             ltf->setBaseLayerValue(i, x);
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after changing base layer
     }
 
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;

@@ -21,7 +21,12 @@ SplineFitResult SplineFitter::fitCurve(
     // Detect and anchor at geometric features (structural correctness)
     // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
     int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
-    auto features = CurveFeatureDetector::detectFeatures(ltf, maxFeatures);
+    auto features = CurveFeatureDetector::detectFeatures(
+        ltf,
+        maxFeatures,
+        config.localDensityWindowSize,     // Pass local density window size
+        config.maxAnchorsPerWindow         // Pass max anchors per window
+    );
     std::vector<int> mandatoryIndices = features.mandatoryAnchors;
 
     // Step 1: Sample & sanitize
@@ -754,6 +759,10 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     int remainingAnchors = std::max(0, config.maxAnchors - static_cast<int>(anchors.size()));
 
     // Iteratively refine with error-driven placement (quality)
+    // With density constraints, we may need more iterations to find valid placements
+    int consecutiveFailures = 0;
+    const int maxConsecutiveFailures = 10;  // Give up after 10 failed attempts
+
     for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
         // Compute tangents for current anchor set using configured algorithm
         computeTangents(anchors, config);
@@ -780,9 +789,42 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
                 return std::abs(a.x - worstSample.x) < 1e-9;
             });
 
-        if (isDuplicate)
-            break;  // No progress possible
+        if (isDuplicate) {
+            consecutiveFailures++;
+            if (consecutiveFailures >= maxConsecutiveFailures)
+                break;  // No progress possible
+            continue;   // Try again next iteration
+        }
 
+        // NEW: Check local density constraint (if enabled)
+        bool violatesDensity = false;
+        if (config.localDensityWindowSize > 0.0 && config.maxAnchorsPerWindow > 0) {
+            // Count anchors within window around candidate position
+            // localDensityWindowSize is a fraction of full domain [-1, 1] (width 2.0)
+            // So halfWindow in x-coordinates = localDensityWindowSize
+            double halfWindow = config.localDensityWindowSize;
+            int count = 0;
+            for (const auto& anchor : anchors) {
+                if (std::abs(anchor.x - worstSample.x) <= halfWindow) {
+                    count++;
+                }
+            }
+
+            // If window is already at capacity, skip this anchor
+            if (count >= config.maxAnchorsPerWindow) {
+                violatesDensity = true;
+            }
+        }
+
+        if (violatesDensity) {
+            consecutiveFailures++;
+            if (consecutiveFailures >= maxConsecutiveFailures)
+                break;  // Cannot make progress without violating constraint
+            continue;   // Try to find alternative location next iteration
+        }
+
+        // Successfully added anchor - reset failure counter
+        consecutiveFailures = 0;
         anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
     }
 
