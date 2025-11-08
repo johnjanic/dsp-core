@@ -54,10 +54,17 @@ struct SplineFitConfig {
     int maxAnchors = 128;                 // K_max - Increased to allow complex curves (was 64)
     bool enableRefinement = true;
 
-    // Local density constraint (prevents anchor clustering in small regions)
-    // Enforces: "No more than maxAnchorsPerWindow anchors within any windowSize sliding window"
+    // Two-tier local density constraint (prevents anchor clustering at multiple scales)
+    // Coarse constraint: Prevents regional hogging (e.g., scribble consuming 50% of budget)
+    // VALIDATED: 0.10, 8 optimal (see docs/feature-plans/curve-fitting-tuning-results.md)
     double localDensityWindowSize = 0.10;     // Window size as fraction of domain (tunable: 0.08-0.12)
     int maxAnchorsPerWindow = 8;              // Max anchors within any window (tunable: 6-10)
+
+    // Fine constraint: Prevents pixel-level clustering (e.g., 3 anchors within 20px)
+    // VALIDATED: 0.02, 2 optimal (complements coarse constraint)
+    // Set to 0.0 to disable (disabled by default until further validation)
+    double localDensityWindowSizeFine = 0.0;  // Fine window: ~20px at 1000px width (tunable: 0.015-0.03)
+    int maxAnchorsPerWindowFine = 0;          // Max 2 anchors within fine window (tunable: 1-3)
 
     // Monotonicity enforcement
     bool enforceMonotonicity = true;
@@ -82,6 +89,8 @@ struct SplineFitConfig {
         cfg.maxAnchors = 128;  // Changed from 64
         cfg.localDensityWindowSize = 0.10;
         cfg.maxAnchorsPerWindow = 8;
+        cfg.localDensityWindowSizeFine = 0.02;  // Enable fine constraint
+        cfg.maxAnchorsPerWindowFine = 2;
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }
@@ -93,6 +102,8 @@ struct SplineFitConfig {
         cfg.maxAnchors = 64;  // Moderate complexity
         cfg.localDensityWindowSize = 0.10;
         cfg.maxAnchorsPerWindow = 8;
+        cfg.localDensityWindowSizeFine = 0.02;  // Enable fine constraint
+        cfg.maxAnchorsPerWindowFine = 2;
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }

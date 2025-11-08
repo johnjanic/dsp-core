@@ -29,7 +29,9 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
     const LayeredTransferFunction& ltf,
     int maxMandatoryAnchors,
     double localDensityWindowSize,
-    int maxAnchorsPerWindow) {
+    int maxAnchorsPerWindow,
+    double localDensityWindowSizeFine,
+    int maxAnchorsPerWindowFine) {
     FeatureResult result;
     int tableSize = ltf.getTableSize();
 
@@ -104,56 +106,75 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
     int maxExtrema = needsLimiting ? static_cast<int>((maxMandatoryAnchors - 2) * 0.8) : static_cast<int>(extrema.size());
     int maxInflections = needsLimiting ? ((maxMandatoryAnchors - 2) - maxExtrema) : static_cast<int>(inflections.size());
 
-    // Greedy selection: pick highest-significance features that satisfy density constraint
-    int selectedExtrema = 0;
-    for (int i = 0; i < static_cast<int>(extrema.size()) && selectedExtrema < maxExtrema; ++i) {
-        int candidateIdx = extrema[i].index;
+    if (needsLimiting) {
+        // Greedy selection: pick highest-significance features that satisfy density constraint
+        int selectedExtrema = 0;
+        for (int i = 0; i < static_cast<int>(extrema.size()) && selectedExtrema < maxExtrema; ++i) {
+            int candidateIdx = extrema[i].index;
 
-        // Check local density constraint
-        bool satisfiesConstraint = true;
-        if (constraintEnabled) {
-            int localDensity = countAnchorsInWindow(
-                candidateIdx,
-                result.mandatoryAnchors,
-                tableSize,
-                localDensityWindowSize
-            );
+            // Check local density constraint
+            bool satisfiesConstraint = true;
+            if (constraintEnabled) {
+                int localDensity = countAnchorsInWindow(
+                    candidateIdx,
+                    result.mandatoryAnchors,
+                    tableSize,
+                    localDensityWindowSize
+                );
 
-            if (localDensity >= maxAnchorsPerWindow) {
-                satisfiesConstraint = false;  // Window is full, skip this feature
+                // Use conservative threshold to leave headroom for error-driven refinement phase
+                // Reserve ~30% of window budget for refinement (e.g., 8 -> 5-6 for features)
+                int conservativeThreshold = static_cast<int>(maxAnchorsPerWindow * 0.7);
+                if (localDensity >= conservativeThreshold) {
+                    satisfiesConstraint = false;  // Window approaching limit
+                }
+            }
+
+            if (satisfiesConstraint) {
+                result.mandatoryAnchors.push_back(candidateIdx);
+                selectedExtrema++;
+            }
+            // else: skip this feature, try next highest-significance extremum
+        }
+
+        // Same for inflections
+        int selectedInflections = 0;
+        for (int i = 0; i < static_cast<int>(inflections.size()) && selectedInflections < maxInflections; ++i) {
+            int candidateIdx = inflections[i].index;
+
+            bool satisfiesConstraint = true;
+            if (constraintEnabled) {
+                int localDensity = countAnchorsInWindow(
+                    candidateIdx,
+                    result.mandatoryAnchors,
+                    tableSize,
+                    localDensityWindowSize
+                );
+
+                // Use same conservative threshold for inflections
+                int conservativeThreshold = static_cast<int>(maxAnchorsPerWindow * 0.7);
+                if (localDensity >= conservativeThreshold) {
+                    satisfiesConstraint = false;
+                }
+            }
+
+            if (satisfiesConstraint) {
+                result.mandatoryAnchors.push_back(candidateIdx);
+                selectedInflections++;
             }
         }
-
-        if (satisfiesConstraint) {
-            result.mandatoryAnchors.push_back(candidateIdx);
-            selectedExtrema++;
-        }
-        // else: skip this feature, try next highest-significance extremum
-    }
-
-    // Same for inflections
-    int selectedInflections = 0;
-    for (int i = 0; i < static_cast<int>(inflections.size()) && selectedInflections < maxInflections; ++i) {
-        int candidateIdx = inflections[i].index;
-
-        bool satisfiesConstraint = true;
-        if (constraintEnabled) {
-            int localDensity = countAnchorsInWindow(
-                candidateIdx,
-                result.mandatoryAnchors,
-                tableSize,
-                localDensityWindowSize
-            );
-
-            if (localDensity >= maxAnchorsPerWindow) {
-                satisfiesConstraint = false;
-            }
-        }
-
-        if (satisfiesConstraint) {
-            result.mandatoryAnchors.push_back(candidateIdx);
-            selectedInflections++;
-        }
+    } else {
+        // Not limited - add all features (no density constraint needed)
+        result.mandatoryAnchors.insert(
+            result.mandatoryAnchors.end(),
+            result.localExtrema.begin(),
+            result.localExtrema.end()
+        );
+        result.mandatoryAnchors.insert(
+            result.mandatoryAnchors.end(),
+            result.inflectionPoints.begin(),
+            result.inflectionPoints.end()
+        );
     }
 
     // 4. Sort and deduplicate

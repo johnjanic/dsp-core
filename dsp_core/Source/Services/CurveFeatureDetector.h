@@ -41,15 +41,19 @@ public:
      * @param ltf Input transfer function (base layer)
      * @param maxMandatoryAnchors Maximum number of mandatory feature anchors (0 = unlimited)
      *                            If limited, keeps most significant features by amplitude/curvature
-     * @param localDensityWindowSize Window size as fraction of domain (0.0 = disabled)
-     * @param maxAnchorsPerWindow Max anchors within any window (0 = disabled)
+     * @param localDensityWindowSize Coarse window size as fraction of domain (0.0 = disabled)
+     * @param maxAnchorsPerWindow Max anchors within coarse window (0 = disabled)
+     * @param localDensityWindowSizeFine Fine window size (0.0 = disabled, catches pixel-level clustering)
+     * @param maxAnchorsPerWindowFine Max anchors within fine window (0 = disabled)
      * @return Feature indices (table indices, not normalized coordinates)
      */
     static FeatureResult detectFeatures(
         const LayeredTransferFunction& ltf,
         int maxMandatoryAnchors = 0,
-        double localDensityWindowSize = 0.0,    // 0.0 = disabled (backward compatible)
-        int maxAnchorsPerWindow = 0             // 0 = disabled
+        double localDensityWindowSize = 0.0,        // Coarse: 0.0 = disabled (backward compatible)
+        int maxAnchorsPerWindow = 0,                 // Coarse: 0 = disabled
+        double localDensityWindowSizeFine = 0.0,     // Fine: 0.0 = disabled
+        int maxAnchorsPerWindowFine = 0              // Fine: 0 = disabled
     );
 
 private:

@@ -24,8 +24,10 @@ SplineFitResult SplineFitter::fitCurve(
     auto features = CurveFeatureDetector::detectFeatures(
         ltf,
         maxFeatures,
-        config.localDensityWindowSize,     // Pass local density window size
-        config.maxAnchorsPerWindow         // Pass max anchors per window
+        config.localDensityWindowSize,         // Coarse constraint
+        config.maxAnchorsPerWindow,
+        config.localDensityWindowSizeFine,     // Fine constraint
+        config.maxAnchorsPerWindowFine
     );
     std::vector<int> mandatoryIndices = features.mandatoryAnchors;
 
@@ -796,13 +798,13 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             continue;   // Try again next iteration
         }
 
-        // NEW: Check local density constraint (if enabled)
+        // Two-tier density constraint: Check both coarse and fine windows
         bool violatesDensity = false;
+
+        // Coarse constraint: Regional suppression (e.g., scribble hogging 50% of budget)
         if (config.localDensityWindowSize > 0.0 && config.maxAnchorsPerWindow > 0) {
-            // Count anchors within window around candidate position
-            // localDensityWindowSize is a fraction of full domain [-1, 1] (width 2.0)
-            // So halfWindow in x-coordinates = localDensityWindowSize
-            double halfWindow = config.localDensityWindowSize;
+            // Use a slightly larger window (15% margin) to prevent boundary packing
+            double halfWindow = config.localDensityWindowSize * 1.15;
             int count = 0;
             for (const auto& anchor : anchors) {
                 if (std::abs(anchor.x - worstSample.x) <= halfWindow) {
@@ -810,8 +812,23 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
                 }
             }
 
-            // If window is already at capacity, skip this anchor
             if (count >= config.maxAnchorsPerWindow) {
+                violatesDensity = true;
+            }
+        }
+
+        // Fine constraint: Pixel-level suppression (e.g., 3 anchors within 20px)
+        if (!violatesDensity && config.localDensityWindowSizeFine > 0.0 && config.maxAnchorsPerWindowFine > 0) {
+            // No margin needed for fine constraint - exact window size
+            double fineHalfWindow = config.localDensityWindowSizeFine;
+            int fineCount = 0;
+            for (const auto& anchor : anchors) {
+                if (std::abs(anchor.x - worstSample.x) <= fineHalfWindow) {
+                    fineCount++;
+                }
+            }
+
+            if (fineCount >= config.maxAnchorsPerWindowFine) {
                 violatesDensity = true;
             }
         }
