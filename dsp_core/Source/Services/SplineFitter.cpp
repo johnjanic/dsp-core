@@ -17,10 +17,13 @@ SplineFitResult SplineFitter::fitCurve(
 
     SplineFitResult result;
 
-    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3)
+    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Prominence-based)
     // Detect and anchor at geometric features (structural correctness)
-    // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
-    int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
+    // Tiered selection: Mandatory features always included, Significant features up to budget
+    // REMOVED: 70% threshold - now using prominence-based classification instead
+    // Feature detector classifies by importance (Mandatory/Significant/Minor)
+    // Error-driven refinement will use remaining budget
+    int maxFeatures = config.maxAnchors;  // Use full budget for feature detection
     auto features = CurveFeatureDetector::detectFeatures(
         ltf,
         maxFeatures,

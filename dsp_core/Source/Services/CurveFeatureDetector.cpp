@@ -25,6 +25,138 @@ int CurveFeatureDetector::countAnchorsInWindow(
     return count;
 }
 
+double CurveFeatureDetector::computeProminence(
+    const Feature& feature,
+    const std::vector<Feature>& allFeatures,
+    const LayeredTransferFunction& ltf) {
+
+    if (!feature.isExtremum) {
+        // Inflection points use curvature magnitude as prominence
+        return feature.significance;
+    }
+
+    double featureY = ltf.getCompositeValue(feature.index);
+    bool isPeak = true;  // Assume peak initially
+
+    // Determine if this is a peak or valley by checking neighbors
+    int tableSize = ltf.getTableSize();
+    if (feature.index > 0 && feature.index < tableSize - 1) {
+        double prevY = ltf.getCompositeValue(feature.index - 1);
+        double nextY = ltf.getCompositeValue(feature.index + 1);
+        isPeak = (featureY > prevY && featureY > nextY);
+    }
+
+    // Find nearest valley on left side (for peaks) or peak on left (for valleys)
+    double leftReferenceY = isPeak ? -1.0 : 1.0;  // Worst case: domain boundary
+    for (const auto& other : allFeatures) {
+        if (other.index >= feature.index) break;  // Only look left
+        if (!other.isExtremum) continue;
+
+        double otherY = ltf.getCompositeValue(other.index);
+        bool otherIsPeak = true;
+        if (other.index > 0 && other.index < tableSize - 1) {
+            double prevY = ltf.getCompositeValue(other.index - 1);
+            double nextY = ltf.getCompositeValue(other.index + 1);
+            otherIsPeak = (otherY > prevY && otherY > nextY);
+        }
+
+        // For peaks, find valleys; for valleys, find peaks
+        if (isPeak && !otherIsPeak) {
+            leftReferenceY = std::max(leftReferenceY, otherY);
+        } else if (!isPeak && otherIsPeak) {
+            leftReferenceY = std::min(leftReferenceY, otherY);
+        }
+    }
+
+    // Find nearest valley on right side (for peaks) or peak on right (for valleys)
+    double rightReferenceY = isPeak ? -1.0 : 1.0;  // Worst case: domain boundary
+    for (const auto& other : allFeatures) {
+        if (other.index <= feature.index) continue;  // Only look right
+        if (!other.isExtremum) continue;
+
+        double otherY = ltf.getCompositeValue(other.index);
+        bool otherIsPeak = true;
+        if (other.index > 0 && other.index < tableSize - 1) {
+            double prevY = ltf.getCompositeValue(other.index - 1);
+            double nextY = ltf.getCompositeValue(other.index + 1);
+            otherIsPeak = (otherY > prevY && otherY > nextY);
+        }
+
+        // For peaks, find valleys; for valleys, find peaks
+        if (isPeak && !otherIsPeak) {
+            rightReferenceY = std::max(rightReferenceY, otherY);
+        } else if (!isPeak && otherIsPeak) {
+            rightReferenceY = std::min(rightReferenceY, otherY);
+        }
+    }
+
+    // Prominence = height above higher valley (peaks) or depth below lower peak (valleys)
+    double referenceLevel = isPeak ? std::max(leftReferenceY, rightReferenceY)
+                                    : std::min(leftReferenceY, rightReferenceY);
+    double prominence = std::abs(featureY - referenceLevel);
+
+    return prominence;
+}
+
+CurveFeatureDetector::FeatureTier CurveFeatureDetector::classifyFeature(
+    const Feature& feature,
+    const std::vector<Feature>& allFeatures,
+    const LayeredTransferFunction& ltf,
+    int tableSize) {
+
+    // Endpoints are always mandatory (handled separately)
+    if (feature.index == 0 || feature.index == tableSize - 1) {
+        return FeatureTier::Mandatory;
+    }
+
+    // Global extrema are mandatory (highest peak, lowest valley)
+    if (feature.isExtremum) {
+        double featureY = ltf.getCompositeValue(feature.index);
+
+        // Check if this is a global maximum or minimum
+        bool isGlobalMax = true;
+        bool isGlobalMin = true;
+        for (const auto& other : allFeatures) {
+            if (!other.isExtremum) continue;
+            double otherY = ltf.getCompositeValue(other.index);
+            if (otherY > featureY) isGlobalMax = false;
+            if (otherY < featureY) isGlobalMin = false;
+        }
+
+        if (isGlobalMax || isGlobalMin) {
+            return FeatureTier::Mandatory;
+        }
+    }
+
+    // Sharp inflection points are mandatory (high curvature changes)
+    if (!feature.isExtremum && feature.significance > 0.5) {
+        return FeatureTier::Mandatory;
+    }
+
+    // Features with high prominence are significant
+    if (feature.prominence > 0.2) {  // 20% of range
+        return FeatureTier::Significant;
+    }
+
+    // Features with moderate prominence and isolation are significant
+    if (feature.prominence > 0.1) {  // 10% of range
+        // Check isolation (distance to nearest feature)
+        int minDistance = tableSize;
+        for (const auto& other : allFeatures) {
+            if (other.index == feature.index) continue;
+            minDistance = std::min(minDistance, std::abs(other.index - feature.index));
+        }
+        double isolation = static_cast<double>(minDistance) / tableSize;
+
+        if (isolation > 0.1) {  // > 10% of domain
+            return FeatureTier::Significant;
+        }
+    }
+
+    // Everything else is minor (small wiggles, scribble noise)
+    return FeatureTier::Minor;
+}
+
 CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
     const LayeredTransferFunction& ltf,
     int maxMandatoryAnchors,
@@ -40,11 +172,6 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
     const double secondDerivativeThreshold = 1e-4;
 
     // 1. Find local extrema (dy/dx sign changes) with significance scores
-    struct Feature {
-        int index;
-        double significance;  // For extrema: |y|, for inflection: |d²y/dx²|
-        bool isExtremum;      // true = extremum, false = inflection point
-    };
     std::vector<Feature> features;
 
     for (int i = 1; i < tableSize - 1; ++i) {
@@ -59,7 +186,7 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
 
             // Significance = amplitude (how tall the peak/valley is)
             double y = ltf.getCompositeValue(i);
-            features.push_back({i, std::abs(y), true});
+            features.push_back({i, std::abs(y), 0.0, true});  // prominence computed later
         }
     }
 
@@ -75,107 +202,95 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(
             result.inflectionPoints.push_back(i);
 
             // Significance = curvature magnitude
-            features.push_back({i, std::abs(d2y), false});
+            features.push_back({i, std::abs(d2y), 0.0, false});  // prominence computed later
         }
     }
 
-    // 3. Prioritize and limit features if maxMandatoryAnchors is set
-    result.mandatoryAnchors.push_back(0);  // Always include endpoints
-    result.mandatoryAnchors.push_back(tableSize - 1);
-
-    // Separate extrema and inflections
-    std::vector<Feature> extrema, inflections;
-    for (const auto& f : features) {
-        if (f.isExtremum) extrema.push_back(f);
-        else inflections.push_back(f);
+    // 2.5. Compute prominence for all features
+    for (auto& feature : features) {
+        feature.prominence = computeProminence(feature, features, ltf);
     }
 
-    // Sort by significance (descending)
-    auto bySignificance = [](const Feature& a, const Feature& b) {
-        return a.significance > b.significance;
-    };
-    std::sort(extrema.begin(), extrema.end(), bySignificance);
-    std::sort(inflections.begin(), inflections.end(), bySignificance);
+    // 3. Prioritize and limit features using tiered selection
+    result.mandatoryAnchors.push_back(0);  // Always include endpoints
+    result.mandatoryAnchors.push_back(tableSize - 1);
 
     // Apply local density constraint if enabled (localDensityWindowSize > 0)
     const bool constraintEnabled = (localDensityWindowSize > 0.0 && maxAnchorsPerWindow > 0);
 
-    // Determine limits: if maxMandatoryAnchors is set and we need to limit, use it
-    // Otherwise, allow all features (but still apply density constraint if enabled)
-    bool needsLimiting = (maxMandatoryAnchors > 0 && static_cast<int>(features.size()) + 2 > maxMandatoryAnchors);
-    int maxExtrema = needsLimiting ? static_cast<int>((maxMandatoryAnchors - 2) * 0.8) : static_cast<int>(extrema.size());
-    int maxInflections = needsLimiting ? ((maxMandatoryAnchors - 2) - maxExtrema) : static_cast<int>(inflections.size());
-
-    if (needsLimiting) {
-        // Greedy selection: pick highest-significance features that satisfy density constraint
-        int selectedExtrema = 0;
-        for (int i = 0; i < static_cast<int>(extrema.size()) && selectedExtrema < maxExtrema; ++i) {
-            int candidateIdx = extrema[i].index;
-
-            // Check local density constraint
-            bool satisfiesConstraint = true;
-            if (constraintEnabled) {
-                int localDensity = countAnchorsInWindow(
-                    candidateIdx,
-                    result.mandatoryAnchors,
-                    tableSize,
-                    localDensityWindowSize
-                );
-
-                // Use conservative threshold to leave headroom for error-driven refinement phase
-                // Reserve ~30% of window budget for refinement (e.g., 8 -> 5-6 for features)
-                int conservativeThreshold = static_cast<int>(maxAnchorsPerWindow * 0.7);
-                if (localDensity >= conservativeThreshold) {
-                    satisfiesConstraint = false;  // Window approaching limit
-                }
-            }
-
-            if (satisfiesConstraint) {
-                result.mandatoryAnchors.push_back(candidateIdx);
-                selectedExtrema++;
-            }
-            // else: skip this feature, try next highest-significance extremum
+    // Classify all features by tier
+    std::vector<Feature> mandatoryFeatures, significantFeatures, minorFeatures;
+    for (auto& feature : features) {
+        FeatureTier tier = classifyFeature(feature, features, ltf, tableSize);
+        if (tier == FeatureTier::Mandatory) {
+            mandatoryFeatures.push_back(feature);
+        } else if (tier == FeatureTier::Significant) {
+            significantFeatures.push_back(feature);
+        } else {
+            minorFeatures.push_back(feature);
         }
+    }
 
-        // Same for inflections
-        int selectedInflections = 0;
-        for (int i = 0; i < static_cast<int>(inflections.size()) && selectedInflections < maxInflections; ++i) {
-            int candidateIdx = inflections[i].index;
+    // Sort significant features by prominence (descending)
+    auto byProminence = [](const Feature& a, const Feature& b) {
+        return a.prominence > b.prominence;
+    };
+    std::sort(significantFeatures.begin(), significantFeatures.end(), byProminence);
 
-            bool satisfiesConstraint = true;
-            if (constraintEnabled) {
-                int localDensity = countAnchorsInWindow(
+    // Step 3a: Add all mandatory features (no limit, always include)
+    for (const auto& feature : mandatoryFeatures) {
+        result.mandatoryAnchors.push_back(feature.index);
+    }
+
+    // Step 3b: Add significant features up to budget
+    // Calculate remaining budget after mandatory features
+    int remainingBudget = maxMandatoryAnchors > 0
+        ? maxMandatoryAnchors - static_cast<int>(result.mandatoryAnchors.size())
+        : static_cast<int>(significantFeatures.size());  // No limit
+
+    for (const auto& feature : significantFeatures) {
+        if (remainingBudget <= 0) break;
+
+        int candidateIdx = feature.index;
+
+        // Check density constraints
+        bool satisfiesConstraint = true;
+        if (constraintEnabled) {
+            // Coarse window constraint
+            int localDensity = countAnchorsInWindow(
+                candidateIdx,
+                result.mandatoryAnchors,
+                tableSize,
+                localDensityWindowSize
+            );
+
+            // REMOVED: 70% conservative threshold
+            // Use full window budget since error-driven refinement is separate phase
+            if (localDensity >= maxAnchorsPerWindow) {
+                satisfiesConstraint = false;
+            }
+
+            // Fine window constraint (pixel-level clustering prevention)
+            if (satisfiesConstraint && localDensityWindowSizeFine > 0.0 && maxAnchorsPerWindowFine > 0) {
+                int fineDensity = countAnchorsInWindow(
                     candidateIdx,
                     result.mandatoryAnchors,
                     tableSize,
-                    localDensityWindowSize
+                    localDensityWindowSizeFine
                 );
-
-                // Use same conservative threshold for inflections
-                int conservativeThreshold = static_cast<int>(maxAnchorsPerWindow * 0.7);
-                if (localDensity >= conservativeThreshold) {
+                if (fineDensity >= maxAnchorsPerWindowFine) {
                     satisfiesConstraint = false;
                 }
             }
-
-            if (satisfiesConstraint) {
-                result.mandatoryAnchors.push_back(candidateIdx);
-                selectedInflections++;
-            }
         }
-    } else {
-        // Not limited - add all features (no density constraint needed)
-        result.mandatoryAnchors.insert(
-            result.mandatoryAnchors.end(),
-            result.localExtrema.begin(),
-            result.localExtrema.end()
-        );
-        result.mandatoryAnchors.insert(
-            result.mandatoryAnchors.end(),
-            result.inflectionPoints.begin(),
-            result.inflectionPoints.end()
-        );
+
+        if (satisfiesConstraint) {
+            result.mandatoryAnchors.push_back(candidateIdx);
+            remainingBudget--;
+        }
     }
+
+    // Step 3c: Minor features are intentionally skipped for sparseness
 
     // 4. Sort and deduplicate
     std::sort(result.mandatoryAnchors.begin(), result.mandatoryAnchors.end());

@@ -28,6 +28,7 @@ protected:
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, x);
         }
+        ltf->updateComposite();
     }
 
     // Helper: Set base layer to S-curve (cubic)
@@ -38,6 +39,7 @@ protected:
             double y = x * x * x;
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();
     }
 
     // Helper: Set base layer to step function
@@ -46,6 +48,7 @@ protected:
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, x < 0.0 ? -0.5 : 0.5);
         }
+        ltf->updateComposite();
     }
 
     // Helper: Set base layer to sine wave
@@ -56,6 +59,7 @@ protected:
             double y = std::sin(x * M_PI);
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();
     }
 
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
@@ -259,6 +263,7 @@ TEST_F(SplineFitterTest, FitCurve_FlatCurve) {
     for (int i = 0; i < 256; ++i) {
         ltf->setBaseLayerValue(i, 0.0);
     }
+    ltf->updateComposite();  // CRITICAL: Must update composite after changing base layer
 
     auto config = dsp_core::SplineFitConfig::smooth();
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -505,6 +510,7 @@ TEST_F(SplineFitterTest, TanhCurves_VariousSteepness) {
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::tanh(n * x));
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after setting curve
 
         // Fit with tight tolerance for accuracy
         auto config = dsp_core::SplineFitConfig::tight();
@@ -561,6 +567,7 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
 
             ltf->setBaseLayerValue(i, y);
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after setting harmonic
 
         // Use balanced config (good quality, reasonable anchor count)
         auto config = dsp_core::SplineFitConfig::tight();
@@ -638,6 +645,7 @@ TEST_F(SplineFitterTest, Performance_ComplexCurves) {
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, testFunctions[idx](x));
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after setting curve
 
         auto config = dsp_core::SplineFitConfig::tight();
 
@@ -804,6 +812,7 @@ protected:
             double x = ltf->normalizeIndex(i);  // [-1, 1]
             ltf->setBaseLayerValue(i, func(x));
         }
+        ltf->updateComposite();  // CRITICAL: Update composite after setting curve
     }
 
     /**

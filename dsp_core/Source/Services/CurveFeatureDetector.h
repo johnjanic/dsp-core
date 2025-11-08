@@ -59,6 +59,55 @@ public:
 private:
     CurveFeatureDetector() = delete;  // Pure static service
 
+    // Internal feature representation for prioritization
+    struct Feature {
+        int index;
+        double significance;  // Global significance (amplitude or curvature)
+        double prominence;    // Prominence-based significance (local context)
+        bool isExtremum;      // true = extremum, false = inflection point
+    };
+
+    /**
+     * Compute topographic prominence for a peak/valley
+     *
+     * Prominence = height above the higher of the two nearest valleys (for peaks)
+     *            = depth below the lower of the two nearest peaks (for valleys)
+     *
+     * This measures how much a feature "stands out" from its surroundings,
+     * independent of global amplitude. A small peak in a quiet region can have
+     * high prominence, while a large peak in a loud region may have low prominence.
+     *
+     * @param feature The feature to evaluate
+     * @param allFeatures All detected features (for finding reference points)
+     * @param ltf Transfer function (for y-values)
+     * @return Prominence value [0.0, 2.0] (normalized to range)
+     */
+    static double computeProminence(
+        const Feature& feature,
+        const std::vector<Feature>& allFeatures,
+        const LayeredTransferFunction& ltf
+    );
+
+    /**
+     * Classify feature as Mandatory, Significant, or Minor
+     *
+     * - Mandatory: Always include (endpoints, global extrema, sharp inflections)
+     * - Significant: Include if budget allows (prominent local features)
+     * - Minor: Skip for sparseness (small wiggles, scribble noise)
+     */
+    enum class FeatureTier {
+        Mandatory,   // Must include for correctness
+        Significant, // Include if budget allows
+        Minor        // Skip for sparseness
+    };
+
+    static FeatureTier classifyFeature(
+        const Feature& feature,
+        const std::vector<Feature>& allFeatures,
+        const LayeredTransferFunction& ltf,
+        int tableSize
+    );
+
     /**
      * Estimate first derivative at index using central difference
      * @param ltf Input transfer function
