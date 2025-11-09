@@ -36,6 +36,23 @@ struct SplineFitResult {
 };
 
 /**
+ * Configuration for spline fitting algorithm.
+ *
+ * ADAPTIVE TOLERANCE SYSTEM (Phase 1 - Nov 2025):
+ * - enableAdaptiveTolerance: Scales tolerance based on curve complexity
+ * - toleranceScaleFactor: Multiplier for simple curves (8.0 = 8x relaxation)
+ * - minRelativeImprovement: Stop if improvement < threshold (prevents noise chasing)
+ *
+ * MODE-AWARE PRESETS:
+ * - forExploration(): Aggressive sparsity (scale=10.0, improvement=10%)
+ * - forRefinement(): Balanced default (scale=8.0, improvement=5%)
+ * - forConversion(): Preserve complexity (scale=5.0, improvement=3%)
+ *
+ * BACKWARD COMPATIBILITY:
+ * - enableAdaptiveTolerance defaults to FALSE
+ * - Existing presets (tight/smooth/monotonePreserving) unchanged
+ * - Opt-in via forRefinement() or enableAdaptiveTolerance=true
+ *
  * Local Density Constraint:
  *   Prevents anchor clustering in small regions (e.g., scribbles consuming entire budget)
  *   while allowing high total anchor counts for globally complex curves (e.g., Harmonic 40).
@@ -44,7 +61,6 @@ struct SplineFitResult {
  *     - 10 windows × 8 anchors/window = 80 anchors max (globally distributed)
  *     - Scribble in 12% region = 1.2 windows × 8 = ~10 anchors (locally limited)
  */
-// Configuration for fitting algorithm
 struct SplineFitConfig {
     // RDP tolerance (hybrid error metric)
     double positionTolerance = 0.01;      // α in professor's notation (0.002-0.01)
@@ -81,6 +97,28 @@ struct SplineFitConfig {
     // See docs/architecture/spline-algorithm-decision.md for full analysis
     TangentAlgorithm tangentAlgorithm = TangentAlgorithm::FritschCarlson;
 
+    // ===== NEW: Adaptive Tolerance System (Phase 1 - Nov 2025) =====
+
+    // Enable/disable adaptive tolerance (opt-in for backward compatibility)
+    bool enableAdaptiveTolerance = false;
+
+    // Tolerance scaling factor (multiplier for simple curves)
+    // Simple curves: tolerance = base × scaleFactor^(1-complexity)
+    // Complex curves: tolerance = base × 1.0
+    double toleranceScaleFactor = 8.0;
+
+    // Diminishing returns detection
+    bool enableRelativeImprovementCheck = false;
+
+    // Minimum relative improvement per iteration (5% default)
+    // relativeImprovement = (prevError - curError) / prevError
+    double minRelativeImprovement = 0.05;
+
+    // Max consecutive iterations below improvement threshold
+    int maxSlowProgressIterations = 3;
+
+    // ===== END NEW =====
+
     // Presets
     static SplineFitConfig tight() {
         SplineFitConfig cfg;
@@ -115,6 +153,68 @@ struct SplineFitConfig {
         cfg.maxAnchors = 32;
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
+    }
+
+    // ===== NEW: Mode-Aware Presets (Phase 1 - Nov 2025) =====
+
+    // Exploration mode: Aggressive sparsity for quick iteration
+    static SplineFitConfig forExploration() {
+        auto cfg = tight();  // Start with tight base
+        cfg.enableAdaptiveTolerance = true;
+        cfg.enableRelativeImprovementCheck = true;
+        cfg.toleranceScaleFactor = 10.0;  // Very aggressive
+        cfg.minRelativeImprovement = 0.10;  // Stop early (10%)
+        cfg.maxSlowProgressIterations = 3;
+        return cfg;
+    }
+
+    // Refinement mode: Balanced for user editing (DEFAULT)
+    static SplineFitConfig forRefinement() {
+        auto cfg = tight();
+        cfg.enableAdaptiveTolerance = true;
+        cfg.enableRelativeImprovementCheck = true;
+        cfg.toleranceScaleFactor = 8.0;  // Balanced
+        cfg.minRelativeImprovement = 0.05;  // Standard (5%)
+        cfg.maxSlowProgressIterations = 3;
+        return cfg;
+    }
+
+    // Conversion mode: Preserve complexity when baking harmonics
+    static SplineFitConfig forConversion() {
+        auto cfg = tight();
+        cfg.enableAdaptiveTolerance = true;
+        cfg.enableRelativeImprovementCheck = true;
+        cfg.toleranceScaleFactor = 5.0;  // Conservative
+        cfg.minRelativeImprovement = 0.03;  // Tight convergence (3%)
+        cfg.maxSlowProgressIterations = 5;  // More patient
+        return cfg;
+    }
+
+    // Alias: Default adaptive preset (maps to forRefinement)
+    static SplineFitConfig adaptiveTight() {
+        return forRefinement();
+    }
+
+    // ===== END NEW =====
+
+    // Optional: Validation method
+    bool validate() const {
+        if (toleranceScaleFactor < 1.0 || toleranceScaleFactor > 20.0) {
+            DBG("Invalid toleranceScaleFactor: " << toleranceScaleFactor
+                << " (must be 1.0-20.0)");
+            return false;
+        }
+        if (minRelativeImprovement < 0.0 || minRelativeImprovement > 1.0) {
+            DBG("Invalid minRelativeImprovement: " << minRelativeImprovement
+                << " (must be 0.0-1.0)");
+            return false;
+        }
+        if (maxSlowProgressIterations < 1 || maxSlowProgressIterations > 20) {
+            DBG("Invalid maxSlowProgressIterations: " << maxSlowProgressIterations
+                << " (must be 1-20)");
+            return false;
+        }
+        return true;
     }
 };
 

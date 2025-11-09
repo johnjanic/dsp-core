@@ -51,7 +51,7 @@ SplineFitResult SplineFitter::fitCurve(
 
     // Step 2: Greedy spline fitting with feature-based initialization
     // Start with mandatory feature anchors, then iteratively refine (error-driven)
-    auto anchors = greedySplineFit(samples, config, &ltf, mandatoryIndices);
+    auto anchors = greedySplineFit(samples, config, &ltf, mandatoryIndices, &features);
 
     if (anchors.empty()) {
         result.success = false;
@@ -702,11 +702,113 @@ SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
     return result;
 }
 
+//==============================================================================
+// Adaptive Tolerance Helpers (Phase 1 - Nov 2025)
+//==============================================================================
+
+namespace {
+
+/**
+ * Computes total variation (wiggliness) of the curve.
+ *
+ * Formula: TV = Σ|d²y/dx²| (sum of absolute second derivatives)
+ *
+ * Uses central difference approximation:
+ *   d²y/dx² ≈ (y[i+1] - 2*y[i] + y[i-1]) / h²
+ *
+ * Normalizes by table size for defensive programming (algorithm works at any table size).
+ * Thresholds in computeComplexityScore are tuned for production (16384 points).
+ * Tests use production table size to verify behavior.
+ *
+ * Returns: Total variation normalized to 16384-point baseline
+ */
+double computeTotalVariation(const LayeredTransferFunction& ltf) {
+    const int tableSize = ltf.getTableSize();
+
+    if (tableSize < 3) {
+        return 0.0;  // Need at least 3 points for second derivative
+    }
+
+    double totalVariation = 0.0;
+    const double h = 1.0;  // Uniform spacing (normalized coordinates)
+
+    // Use composite value (base + active layers)
+    for (int i = 1; i < tableSize - 1; ++i) {
+        double yPrev = ltf.getCompositeValue(i - 1);
+        double yCurr = ltf.getCompositeValue(i);
+        double yNext = ltf.getCompositeValue(i + 1);
+
+        // Central difference second derivative
+        double secondDerivative = (yNext - 2.0 * yCurr + yPrev) / (h * h);
+
+        totalVariation += std::abs(secondDerivative);
+    }
+
+    // Normalize to production baseline (16384 points)
+    // This ensures algorithm works at any table size (defensive programming)
+    const double referenceTableSize = 16384.0;
+    double normalizedTV = totalVariation * (referenceTableSize / tableSize);
+
+    return normalizedTV;
+}
+
+/**
+ * Computes global complexity score [0, 1] for adaptive tolerance.
+ *
+ * Uses three metrics (all reuse existing infrastructure):
+ * 1. Feature count (from CurveFeatureDetector)
+ * 2. Total variation (wiggliness)
+ * 3. Extrema count (oscillation frequency)
+ *
+ * Returns:
+ *   0.0 = Simple (smooth S-curve, few features)
+ *   1.0 = Complex (harmonic 40, many oscillations)
+ */
+double computeComplexityScore(const LayeredTransferFunction& ltf,
+                               const CurveFeatureDetector::FeatureResult& features) {
+    double score = 0.0;
+
+    // Weight 1: Mandatory feature count (excluding endpoints)
+    // Count non-endpoint mandatory anchors
+    int numMandatory = 0;
+    for (int idx : features.mandatoryAnchors) {
+        // Endpoints are at indices 0 and (tableSize-1)
+        if (idx != 0 && idx != ltf.getTableSize() - 1) {
+            numMandatory++;
+        }
+    }
+
+    if (numMandatory <= 2)       score += 0.0;  // Very simple
+    else if (numMandatory <= 5)  score += 0.3;  // Moderate
+    else if (numMandatory <= 10) score += 0.6;  // Complex
+    else                         score += 1.0;  // Very complex
+
+    // Weight 2: Total variation (sum of absolute second derivatives)
+    double tv = computeTotalVariation(ltf);
+    if (tv < 2.0)       score += 0.0;  // Very smooth
+    else if (tv < 5.0)  score += 0.3;  // Moderate
+    else if (tv < 10.0) score += 0.6;  // Complex
+    else                score += 1.0;  // Very wiggly
+
+    // Weight 3: Extrema count (oscillation frequency proxy)
+    int extremaCount = static_cast<int>(features.localExtrema.size());
+    if (extremaCount <= 1)       score += 0.0;  // Monotonic
+    else if (extremaCount <= 4)  score += 0.3;  // Few oscillations
+    else if (extremaCount <= 10) score += 0.6;  // Moderate frequency
+    else                         score += 1.0;  // High frequency
+
+    // Normalize to [0, 1] (average of 3 weights)
+    return score / 3.0;
+}
+
+} // anonymous namespace
+
 std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     const std::vector<Sample>& samples,
     const SplineFitConfig& config,
     const LayeredTransferFunction* ltf,
-    const std::vector<int>& mandatoryAnchorIndices) {
+    const std::vector<int>& mandatoryAnchorIndices,
+    const CurveFeatureDetector::FeatureResult* features) {
 
     if (samples.size() < 2)
         return {};
@@ -759,9 +861,34 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         );
     }
 
+    // ===== NEW: Compute adaptive tolerance (Phase 1 - Nov 2025) =====
+    double effectiveTolerance = config.positionTolerance;  // Default to base
+
+    if (config.enableAdaptiveTolerance && ltf != nullptr && features != nullptr) {
+        // Compute complexity score [0, 1]
+        double complexityScore = computeComplexityScore(*ltf, *features);
+
+        // Scale tolerance: simple curves get relaxed, complex get tight
+        // Formula: tolerance = base × scaleFactor^(1 - complexity)
+        //   complexity=0.0 → scale^1.0 = 8.0x (relaxed)
+        //   complexity=1.0 → scale^0.0 = 1.0x (tight)
+        double exponent = 1.0 - complexityScore;
+        effectiveTolerance = config.positionTolerance * std::pow(config.toleranceScaleFactor, exponent);
+
+        DBG("Adaptive tolerance: complexity=" << complexityScore
+            << ", effective=" << effectiveTolerance
+            << " (base=" << config.positionTolerance << ")");
+    }
+    // ===== END NEW =====
+
     // Calculate how many additional anchors we can add
     // CRITICAL: Clamp to 0 to prevent negative iteration count if mandatory anchors exceed maxAnchors
     int remainingAnchors = std::max(0, config.maxAnchors - static_cast<int>(anchors.size()));
+
+    // ===== NEW: Diminishing returns tracking (Phase 1 - Nov 2025) =====
+    double previousError = std::numeric_limits<double>::max();
+    int consecutiveSlowProgress = 0;
+    // ===== END NEW =====
 
     // Iteratively refine with error-driven placement (quality)
     // With density constraints, we may need more iterations to find valid placements
@@ -775,9 +902,33 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         // Find sample with highest error
         auto worst = findWorstFitSample(samples, anchors);
 
-        // Converged?
-        if (worst.maxError <= config.positionTolerance)
+        // PRIMARY FIX: Adaptive threshold (Phase 1 - Nov 2025)
+        if (worst.maxError <= effectiveTolerance)
             break;
+
+        // ===== NEW: SECONDARY FIX - Diminishing returns (Phase 1 - Nov 2025) =====
+        if (config.enableRelativeImprovementCheck && iteration > 0) {
+            double relativeImprovement = (previousError - worst.maxError) / previousError;
+
+            if (relativeImprovement < config.minRelativeImprovement) {
+                consecutiveSlowProgress++;
+
+                DBG("Slow progress iteration " << consecutiveSlowProgress
+                    << ": improvement=" << (relativeImprovement * 100.0) << "%"
+                    << " (threshold=" << (config.minRelativeImprovement * 100.0) << "%)");
+
+                if (consecutiveSlowProgress >= config.maxSlowProgressIterations) {
+                    DBG("Stopping: " << config.maxSlowProgressIterations
+                        << " consecutive iterations below improvement threshold");
+                    break;
+                }
+            } else {
+                consecutiveSlowProgress = 0;  // Reset counter on good progress
+            }
+        }
+
+        previousError = worst.maxError;
+        // ===== END NEW =====
 
         // Insert anchor at worst-fit location
         const auto& worstSample = samples[worst.sampleIndex];

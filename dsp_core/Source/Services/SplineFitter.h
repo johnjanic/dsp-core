@@ -1,6 +1,7 @@
 #pragma once
 #include "../SplineTypes.h"
 #include "../LayeredTransferFunction.h"
+#include "CurveFeatureDetector.h"
 
 namespace dsp_core {
 namespace Services {
@@ -122,7 +123,8 @@ private:
         const std::vector<Sample>& samples,
         const SplineFitConfig& config,
         const LayeredTransferFunction* ltf = nullptr,
-        const std::vector<int>& mandatoryAnchorIndices = {}
+        const std::vector<int>& mandatoryAnchorIndices = {},
+        const CurveFeatureDetector::FeatureResult* features = nullptr
     );
 
     // Find sample with worst fit error
