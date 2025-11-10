@@ -1,6 +1,7 @@
 #include "SplineFitter.h"
 #include "SplineEvaluator.h"
 #include "CurveFeatureDetector.h"
+#include "AdaptiveToleranceCalculator.h"
 #include <algorithm>
 #include <cmath>
 
@@ -612,6 +613,24 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     // CRITICAL: Clamp to 0 to prevent negative iteration count if mandatory anchors exceed maxAnchors
     int remainingAnchors = std::max(0, config.maxAnchors - static_cast<int>(anchors.size()));
 
+    // Compute vertical range for adaptive tolerance calculation
+    double minY = samples.front().y;
+    double maxY = samples.front().y;
+    for (const auto& sample : samples) {
+        minY = std::min(minY, sample.y);
+        maxY = std::max(maxY, sample.y);
+    }
+    double verticalRange = maxY - minY;
+
+    // Configure adaptive tolerance to respect config.positionTolerance
+    // Derive relativeErrorTarget from positionTolerance and verticalRange
+    AdaptiveToleranceCalculator::Config adaptiveConfig;
+    if (verticalRange > 1e-9) {
+        adaptiveConfig.relativeErrorTarget = config.positionTolerance / verticalRange;
+    } else {
+        adaptiveConfig.relativeErrorTarget = 0.01;  // Fallback for flat curves
+    }
+
     // Iteratively refine with error-driven placement (quality)
     for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
         // Compute tangents for current anchor set using configured algorithm
@@ -620,8 +639,19 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         // Find sample with highest error
         auto worst = findWorstFitSample(samples, anchors);
 
+        // Compute adaptive tolerance (increases with anchor density to prevent over-fitting)
+        double adaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
+            verticalRange,
+            static_cast<int>(anchors.size()),
+            config.maxAnchors,
+            adaptiveConfig
+        );
+
+        // Use config.positionTolerance as minimum floor
+        adaptiveTolerance = std::max(adaptiveTolerance, config.positionTolerance);
+
         // Converged?
-        if (worst.maxError <= config.positionTolerance)
+        if (worst.maxError <= adaptiveTolerance)
             break;
 
         // Insert anchor at worst-fit location
