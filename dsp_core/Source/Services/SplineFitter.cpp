@@ -1,8 +1,8 @@
 #include "SplineFitter.h"
 #include "SplineEvaluator.h"
-#include "CurveFeatureDetector.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace dsp_core {
 namespace Services {
@@ -17,24 +17,7 @@ SplineFitResult SplineFitter::fitCurve(
 
     SplineFitResult result;
 
-    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Prominence-based)
-    // Detect and anchor at geometric features (structural correctness)
-    // Tiered selection: Mandatory features always included, Significant features up to budget
-    // REMOVED: 70% threshold - now using prominence-based classification instead
-    // Feature detector classifies by importance (Mandatory/Significant/Minor)
-    // Error-driven refinement will use remaining budget
-    int maxFeatures = config.maxAnchors;  // Use full budget for feature detection
-    auto features = CurveFeatureDetector::detectFeatures(
-        ltf,
-        maxFeatures,
-        config.localDensityWindowSize,         // Coarse constraint
-        config.maxAnchorsPerWindow,
-        config.localDensityWindowSizeFine,     // Fine constraint
-        config.maxAnchorsPerWindowFine
-    );
-    std::vector<int> mandatoryIndices = features.mandatoryAnchors;
-
-    // Step 1: Sample & sanitize
+    // Step 1: Sample the curve
     auto samples = sampleAndSanitize(ltf, config);
 
     if (samples.empty()) {
@@ -49,21 +32,16 @@ SplineFitResult SplineFitter::fitCurve(
         return result;
     }
 
-    // Step 2: Greedy spline fitting with feature-based initialization
-    // Start with mandatory feature anchors, then iteratively refine (error-driven)
-    auto anchors = greedySplineFit(samples, config, &ltf, mandatoryIndices, &features);
+    // Step 2: Simple uniform anchor placement
+    auto anchors = greedySplineFit(samples, config, &ltf, {}, nullptr);
 
     if (anchors.empty()) {
         result.success = false;
-        result.message = "Greedy fit failed to produce anchors";
+        result.message = "Failed to produce anchors";
         return result;
     }
 
-    // Note: No need for endpoint truncation fix - greedy algorithm
-    // naturally respects maxAnchors limit during iteration
-
     // Step 3: Error analysis
-    // Compute error statistics by comparing original samples to fitted spline
     double maxErr = 0.0;
     double sumErr = 0.0;
     for (const auto& s : samples) {
@@ -78,8 +56,7 @@ SplineFitResult SplineFitter::fitCurve(
     result.numAnchors = static_cast<int>(result.anchors.size());
     result.maxError = maxErr;
     result.averageError = sumErr / static_cast<double>(samples.size());
-    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors (including " +
-                     juce::String(static_cast<int>(mandatoryIndices.size())) + " feature anchors), max error: " +
+    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " +
                      juce::String(maxErr, 4);
 
     return result;
@@ -95,259 +72,18 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
 
     const int tableSize = ltf.getTableSize();
     std::vector<Sample> samples;
-    samples.reserve(tableSize * 2);  // Reserve extra space for densification
+    samples.reserve(tableSize);
 
-    // Raster-to-polyline: sample entire composite (what user sees)
-    // CRITICAL: Read from composite, not base layer
-    // This includes base + harmonics + normalization = actual visible curve
+    // Sample entire composite curve (what user sees)
     for (int i = 0; i < tableSize; ++i) {
         double x = ltf.normalizeIndex(i);  // Maps to [-1, 1]
         double y = ltf.getCompositeValue(i);
         samples.push_back({x, y});
     }
 
-    // Phase 2.1 (Simplified): Add midpoint samples for better coverage
-    // CRITICAL: Must sample actual curve, NOT linear interpolation!
-    // Linear interpolation creates false errors for high-frequency curves (e.g., Harmonic 15)
-    std::vector<Sample> densified;
-    densified.reserve(samples.size() * 2);
-
-    for (size_t i = 0; i < samples.size(); ++i) {
-        densified.push_back(samples[i]);
-
-        // Add midpoint sample between this and next point
-        if (i < samples.size() - 1) {
-            double midX = (samples[i].x + samples[i+1].x) / 2.0;
-
-            // Find the table index corresponding to midX and sample the ACTUAL curve
-            // This prevents false errors from linear interpolation on high-frequency curves
-            int tableIdx = 0;
-            double minDist = std::abs(ltf.normalizeIndex(0) - midX);
-            for (int j = 1; j < tableSize; ++j) {
-                double dist = std::abs(ltf.normalizeIndex(j) - midX);
-                if (dist < minDist) {
-                    minDist = dist;
-                    tableIdx = j;
-                }
-            }
-            double midY = ltf.getCompositeValue(tableIdx);
-
-            densified.push_back({midX, midY});
-        }
-    }
-
-    samples = std::move(densified);
-
-    // Sort by x (should already be sorted, but ensure)
-    sortByX(samples);
-
-    // Deduplicate near-verticals
-    deduplicateNearVerticals(samples);
-
-    // Enforce strict monotonicity (if enabled)
-    if (config.enforceMonotonicity) {
-        enforceMonotonicity(samples);
-    }
-
-    // Clamp to [-1, 1] range
-    clampToRange(samples);
-
     return samples;
 }
 
-void SplineFitter::sortByX(std::vector<Sample>& samples) {
-    std::sort(samples.begin(), samples.end(),
-        [](const Sample& a, const Sample& b) { return a.x < b.x; });
-}
-
-void SplineFitter::deduplicateNearVerticals(std::vector<Sample>& samples) {
-    // Average y values for samples with nearly identical x
-    constexpr double kXEpsilon = 1e-6;
-
-    std::vector<Sample> deduped;
-    deduped.reserve(samples.size());
-
-    for (size_t i = 0; i < samples.size(); ) {
-        double xSum = samples[i].x;
-        double ySum = samples[i].y;
-        int count = 1;
-
-        // Group samples with similar x
-        while (i + count < samples.size() &&
-               std::abs(samples[i + count].x - samples[i].x) < kXEpsilon) {
-            xSum += samples[i + count].x;
-            ySum += samples[i + count].y;
-            ++count;
-        }
-
-        // Average the group
-        deduped.push_back({xSum / count, ySum / count});
-        i += count;
-    }
-
-    samples = std::move(deduped);
-}
-
-void SplineFitter::enforceMonotonicity(std::vector<Sample>& samples) {
-    // Light isotonic regression: ensure y is strictly increasing with x
-    // Use Pool Adjacent Violators Algorithm (PAVA) with minimal deviation
-
-    if (samples.size() < 2) return;
-
-    // Forward pass: ensure y[i+1] >= y[i]
-    for (size_t i = 1; i < samples.size(); ++i) {
-        if (samples[i].y < samples[i-1].y) {
-            // Average violating pairs (minimal deviation)
-            double avgY = (samples[i].y + samples[i-1].y) / 2.0;
-            samples[i].y = avgY;
-            samples[i-1].y = avgY;
-        }
-    }
-
-    // TODO: More sophisticated isotonic regression if needed
-    // For now, simple pairwise averaging is sufficient
-}
-
-void SplineFitter::clampToRange(std::vector<Sample>& samples) {
-    for (auto& s : samples) {
-        s.x = juce::jlimit(-1.0, 1.0, s.x);
-        s.y = juce::jlimit(-1.0, 1.0, s.y);
-    }
-}
-
-//==============================================================================
-// DEPRECATED RDP IMPLEMENTATION (Kept for reference)
-// Issue: RDP measures error against straight lines, but PCHIP uses cubic curves
-// This objective function mismatch caused "bowing artifacts" in straight regions
-// Replaced by greedy spline-aware fitting (see greedySplineFit)
-//==============================================================================
-
-std::vector<SplineAnchor> SplineFitter::ramerDouglasPeucker(
-    const std::vector<Sample>& samples,
-    const SplineFitConfig& config) {
-
-    if (samples.size() < 3) {
-        // Too few points - return all as anchors
-        std::vector<SplineAnchor> anchors;
-        for (const auto& s : samples) {
-            anchors.push_back({s.x, s.y, false, 0.0});
-        }
-        return anchors;
-    }
-
-    // RDP with hybrid error metric
-    std::vector<bool> keep(samples.size(), false);
-    keep[0] = true;  // Always keep endpoints
-    keep[samples.size() - 1] = true;
-
-    rdpRecursive(samples, 0, samples.size() - 1, config, keep);
-
-    // Convert kept samples to anchors
-    std::vector<SplineAnchor> anchors;
-    for (size_t i = 0; i < samples.size(); ++i) {
-        if (keep[i]) {
-            anchors.push_back({samples[i].x, samples[i].y, false, 0.0});
-        }
-    }
-
-    return anchors;
-}
-
-void SplineFitter::rdpRecursive(
-    const std::vector<Sample>& samples,
-    size_t startIdx,
-    size_t endIdx,
-    const SplineFitConfig& config,
-    std::vector<bool>& keep) {
-
-    if (endIdx - startIdx < 2) return;
-
-    // Find point with maximum hybrid error
-    double maxError = 0.0;
-    size_t maxIdx = startIdx;
-
-    for (size_t i = startIdx + 1; i < endIdx; ++i) {
-        double error = computeHybridError(
-            samples[i],
-            samples[startIdx],
-            samples[endIdx],
-            config.positionTolerance,
-            config.derivativeTolerance
-        );
-
-        if (error > maxError) {
-            maxError = error;
-            maxIdx = i;
-        }
-    }
-
-    // If max error exceeds tolerance, split at that point
-    if (maxError > config.positionTolerance) {
-        keep[maxIdx] = true;
-        rdpRecursive(samples, startIdx, maxIdx, config, keep);
-        rdpRecursive(samples, maxIdx, endIdx, config, keep);
-    }
-}
-
-double SplineFitter::computeHybridError(
-    const Sample& point,
-    const Sample& lineStart,
-    const Sample& lineEnd,
-    double alpha,
-    double beta) {
-
-    // Compute perpendicular distance to line (position error)
-    double dx = lineEnd.x - lineStart.x;
-    double dy = lineEnd.y - lineStart.y;
-    double lineLenSq = dx*dx + dy*dy;
-
-    if (lineLenSq < 1e-12) {
-        // Degenerate line - just return distance to start
-        return std::abs(point.y - lineStart.y);
-    }
-
-    double t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lineLenSq;
-    t = juce::jlimit(0.0, 1.0, t);
-
-    double projX = lineStart.x + t * dx;
-    double projY = lineStart.y + t * dy;
-
-    double positionError = std::sqrt((point.x - projX)*(point.x - projX) +
-                                      (point.y - projY)*(point.y - projY));
-
-    // TODO: Add derivative error component (beta * |y' - ŷ'|)
-    // For now, just use position error
-
-    return positionError;
-}
-
-double SplineFitter::estimateDerivative(
-    const std::vector<Sample>& samples,
-    size_t index) {
-
-    // Central difference for interior points
-    if (index > 0 && index < samples.size() - 1) {
-        double dx = samples[index + 1].x - samples[index - 1].x;
-        if (std::abs(dx) < 1e-12) return 0.0;
-        return (samples[index + 1].y - samples[index - 1].y) / dx;
-    }
-
-    // Forward difference for first point
-    if (index == 0 && samples.size() > 1) {
-        double dx = samples[1].x - samples[0].x;
-        if (std::abs(dx) < 1e-12) return 0.0;
-        return (samples[1].y - samples[0].y) / dx;
-    }
-
-    // Backward difference for last point
-    if (index == samples.size() - 1 && samples.size() > 1) {
-        double dx = samples[index].x - samples[index - 1].x;
-        if (std::abs(dx) < 1e-12) return 0.0;
-        return (samples[index].y - samples[index - 1].y) / dx;
-    }
-
-    return 0.0;
-}
 
 //==============================================================================
 // Step 3: Tangent Computation (Dispatcher)
@@ -660,148 +396,41 @@ void SplineFitter::computeFiniteDifferenceTangents(
 }
 
 //==============================================================================
-// Greedy Spline Fitting (Replaces RDP)
+// Uniform Sampling Fallback (Legacy)
 //==============================================================================
 
-SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
+std::vector<SplineAnchor> SplineFitter::greedySplineFitUniform(
     const std::vector<Sample>& samples,
-    const std::vector<SplineAnchor>& anchors) {
+    const SplineFitConfig& config) {
 
-    WorstFitResult result{0, 0.0};
+    if (samples.size() < 2)
+        return {};
 
-    if (anchors.size() < 2) {
-        return result;
-    }
+    std::vector<SplineAnchor> anchors;
 
-    // Scan all samples, find worst error
-    for (size_t i = 0; i < samples.size(); ++i) {
-        const auto& sample = samples[i];
+    int numAnchors = juce::jmin(config.maxAnchors, static_cast<int>(samples.size()));
 
-        // Skip samples that already have anchors at their x position
-        bool hasAnchor = std::any_of(anchors.begin(), anchors.end(),
-            [&sample](const SplineAnchor& a) {
-                return std::abs(a.x - sample.x) < 1e-9;
-            });
-
-        if (hasAnchor) {
-            continue;  // Skip this sample
-        }
-
-        // Evaluate PCHIP spline at this x position
-        double splineY = SplineEvaluator::evaluate(anchors, sample.x);
-
-        // Compute absolute error
-        double error = std::abs(sample.y - splineY);
-
-        if (error > result.maxError) {
-            result.maxError = error;
-            result.sampleIndex = i;
+    if (numAnchors <= 2) {
+        anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
+        anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
+    } else {
+        // Uniform sampling: spread anchors evenly across the curve
+        for (int i = 0; i < numAnchors; ++i) {
+            int sampleIdx = (i * static_cast<int>(samples.size())) / numAnchors;
+            sampleIdx = juce::jmin(sampleIdx, static_cast<int>(samples.size()) - 1);
+            anchors.push_back({samples[sampleIdx].x, samples[sampleIdx].y, false, 0.0});
         }
     }
 
-    return result;
+    // Compute tangents using configured algorithm (PCHIP/Fritsch-Carlson/Akima)
+    computeTangents(anchors, config);
+
+    return anchors;
 }
 
 //==============================================================================
-// Adaptive Tolerance Helpers (Phase 1 - Nov 2025)
+// Feature-Based Anchor Placement (Hybrid Algorithm)
 //==============================================================================
-
-namespace {
-
-/**
- * Computes total variation (wiggliness) of the curve.
- *
- * Formula: TV = Σ|d²y/dx²| (sum of absolute second derivatives)
- *
- * Uses central difference approximation:
- *   d²y/dx² ≈ (y[i+1] - 2*y[i] + y[i-1]) / h²
- *
- * Normalizes by table size for defensive programming (algorithm works at any table size).
- * Thresholds in computeComplexityScore are tuned for production (16384 points).
- * Tests use production table size to verify behavior.
- *
- * Returns: Total variation normalized to 16384-point baseline
- */
-double computeTotalVariation(const LayeredTransferFunction& ltf) {
-    const int tableSize = ltf.getTableSize();
-
-    if (tableSize < 3) {
-        return 0.0;  // Need at least 3 points for second derivative
-    }
-
-    double totalVariation = 0.0;
-    const double h = 1.0;  // Uniform spacing (normalized coordinates)
-
-    // Use composite value (base + active layers)
-    for (int i = 1; i < tableSize - 1; ++i) {
-        double yPrev = ltf.getCompositeValue(i - 1);
-        double yCurr = ltf.getCompositeValue(i);
-        double yNext = ltf.getCompositeValue(i + 1);
-
-        // Central difference second derivative
-        double secondDerivative = (yNext - 2.0 * yCurr + yPrev) / (h * h);
-
-        totalVariation += std::abs(secondDerivative);
-    }
-
-    // Normalize to production baseline (16384 points)
-    // This ensures algorithm works at any table size (defensive programming)
-    const double referenceTableSize = 16384.0;
-    double normalizedTV = totalVariation * (referenceTableSize / tableSize);
-
-    return normalizedTV;
-}
-
-/**
- * Computes global complexity score [0, 1] for adaptive tolerance.
- *
- * Uses three metrics (all reuse existing infrastructure):
- * 1. Feature count (from CurveFeatureDetector)
- * 2. Total variation (wiggliness)
- * 3. Extrema count (oscillation frequency)
- *
- * Returns:
- *   0.0 = Simple (smooth S-curve, few features)
- *   1.0 = Complex (harmonic 40, many oscillations)
- */
-double computeComplexityScore(const LayeredTransferFunction& ltf,
-                               const CurveFeatureDetector::FeatureResult& features) {
-    double score = 0.0;
-
-    // Weight 1: Mandatory feature count (excluding endpoints)
-    // Count non-endpoint mandatory anchors
-    int numMandatory = 0;
-    for (int idx : features.mandatoryAnchors) {
-        // Endpoints are at indices 0 and (tableSize-1)
-        if (idx != 0 && idx != ltf.getTableSize() - 1) {
-            numMandatory++;
-        }
-    }
-
-    if (numMandatory <= 2)       score += 0.0;  // Very simple
-    else if (numMandatory <= 5)  score += 0.3;  // Moderate
-    else if (numMandatory <= 10) score += 0.6;  // Complex
-    else                         score += 1.0;  // Very complex
-
-    // Weight 2: Total variation (sum of absolute second derivatives)
-    double tv = computeTotalVariation(ltf);
-    if (tv < 2.0)       score += 0.0;  // Very smooth
-    else if (tv < 5.0)  score += 0.3;  // Moderate
-    else if (tv < 10.0) score += 0.6;  // Complex
-    else                score += 1.0;  // Very wiggly
-
-    // Weight 3: Extrema count (oscillation frequency proxy)
-    int extremaCount = static_cast<int>(features.localExtrema.size());
-    if (extremaCount <= 1)       score += 0.0;  // Monotonic
-    else if (extremaCount <= 4)  score += 0.3;  // Few oscillations
-    else if (extremaCount <= 10) score += 0.6;  // Moderate frequency
-    else                         score += 1.0;  // High frequency
-
-    // Normalize to [0, 1] (average of 3 weights)
-    return score / 3.0;
-}
-
-} // anonymous namespace
 
 std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     const std::vector<Sample>& samples,
@@ -813,193 +442,68 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     if (samples.size() < 2)
         return {};
 
-    // Phase 3: FEATURE-BASED ANCHOR PLACEMENT
-    // Start with mandatory feature anchors (extrema, inflection points)
     std::vector<SplineAnchor> anchors;
 
-    if (mandatoryAnchorIndices.empty() || ltf == nullptr) {
-        // Fallback: If no mandatory anchors provided, use endpoints only
-        anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
-        anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
-    } else {
-        // Convert mandatory table indices to sample anchors
-        // mandatoryAnchorIndices are table indices from CurveFeatureDetector
-        // We need to convert them to x coordinates, then find the closest samples
+    // STRATEGY: Use feature-based placement if LTF available, otherwise uniform
+    if (ltf != nullptr) {
+        // === FEATURE-BASED ANCHOR PLACEMENT ===
+        // Detect geometric features (extrema, inflection points) and place anchors there
+        // This ensures round-trip consistency: same features → same anchor count
 
-        for (int tableIdx : mandatoryAnchorIndices) {
-            // Convert table index to x coordinate using LayeredTransferFunction's mapping
-            double targetX = ltf->normalizeIndex(tableIdx);
+        std::cerr << "DEBUG: greedySplineFit using feature-based placement" << std::endl;
 
-            // Find closest sample to this x coordinate
-            // Since samples are sorted by x, we could use binary search,
-            // but linear search is fine for small arrays
-            size_t closestIdx = 0;
-            double minDist = std::abs(samples[0].x - targetX);
+        CurveFeatureDetector::FeatureResult detectedFeatures;
 
-            for (size_t i = 1; i < samples.size(); ++i) {
-                double dist = std::abs(samples[i].x - targetX);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closestIdx = i;
-                }
-            }
-
-            anchors.push_back({samples[closestIdx].x, samples[closestIdx].y, false, 0.0});
+        if (features != nullptr) {
+            // Features provided externally (for testing or caching)
+            detectedFeatures = *features;
+        } else {
+            // Detect features from LTF
+            detectedFeatures = CurveFeatureDetector::detectFeatures(
+                *ltf,
+                config.maxAnchors,                      // Budget limit
+                config.localDensityWindowSize,          // Prevent clustering (coarse)
+                config.maxAnchorsPerWindow,
+                config.localDensityWindowSizeFine,      // Prevent clustering (fine)
+                config.maxAnchorsPerWindowFine
+            );
         }
 
-        // Sort anchors by x (should already be sorted, but ensure)
-        std::sort(anchors.begin(), anchors.end(),
-            [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
+        // Convert feature indices to spline anchors
+        for (int idx : detectedFeatures.mandatoryAnchors) {
+            // Map table index to sample index
+            // Features are in table indices [0, tableSize-1]
+            // Samples are in order, so we can map directly
+            if (idx >= 0 && idx < static_cast<int>(samples.size())) {
+                anchors.push_back({
+                    samples[idx].x,
+                    samples[idx].y,
+                    false,  // No custom tangent
+                    0.0
+                });
+            }
+        }
 
-        // Remove any duplicates
-        anchors.erase(
-            std::unique(anchors.begin(), anchors.end(),
-                [](const SplineAnchor& a, const SplineAnchor& b) {
-                    return std::abs(a.x - b.x) < 1e-9;
-                }),
-            anchors.end()
-        );
-    }
-
-    // ===== NEW: Compute adaptive tolerance (Phase 1 - Nov 2025) =====
-    double effectiveTolerance = config.positionTolerance;  // Default to base
-
-    if (config.enableAdaptiveTolerance && ltf != nullptr && features != nullptr) {
-        // Compute complexity score [0, 1]
-        double complexityScore = computeComplexityScore(*ltf, *features);
-
-        // Scale tolerance: simple curves get relaxed, complex get tight
-        // Formula: tolerance = base × scaleFactor^(1 - complexity)
-        //   complexity=0.0 → scale^1.0 = 8.0x (relaxed)
-        //   complexity=1.0 → scale^0.0 = 1.0x (tight)
-        double exponent = 1.0 - complexityScore;
-        effectiveTolerance = config.positionTolerance * std::pow(config.toleranceScaleFactor, exponent);
-
-        DBG("Adaptive tolerance: complexity=" << complexityScore
-            << ", effective=" << effectiveTolerance
-            << " (base=" << config.positionTolerance << ")");
-    }
-    // ===== END NEW =====
-
-    // Calculate how many additional anchors we can add
-    // CRITICAL: Clamp to 0 to prevent negative iteration count if mandatory anchors exceed maxAnchors
-    int remainingAnchors = std::max(0, config.maxAnchors - static_cast<int>(anchors.size()));
-
-    // ===== NEW: Diminishing returns tracking (Phase 1 - Nov 2025) =====
-    double previousError = std::numeric_limits<double>::max();
-    int consecutiveSlowProgress = 0;
-    // ===== END NEW =====
-
-    // Iteratively refine with error-driven placement (quality)
-    // With density constraints, we may need more iterations to find valid placements
-    int consecutiveFailures = 0;
-    const int maxConsecutiveFailures = 10;  // Give up after 10 failed attempts
-
-    for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
-        // Compute tangents for current anchor set using configured algorithm
-        computeTangents(anchors, config);
-
-        // Find sample with highest error
-        auto worst = findWorstFitSample(samples, anchors);
-
-        // PRIMARY FIX: Adaptive threshold (Phase 1 - Nov 2025)
-        if (worst.maxError <= effectiveTolerance)
-            break;
-
-        // ===== NEW: SECONDARY FIX - Diminishing returns (Phase 1 - Nov 2025) =====
-        if (config.enableRelativeImprovementCheck && iteration > 0) {
-            double relativeImprovement = (previousError - worst.maxError) / previousError;
-
-            if (relativeImprovement < config.minRelativeImprovement) {
-                consecutiveSlowProgress++;
-
-                DBG("Slow progress iteration " << consecutiveSlowProgress
-                    << ": improvement=" << (relativeImprovement * 100.0) << "%"
-                    << " (threshold=" << (config.minRelativeImprovement * 100.0) << "%)");
-
-                if (consecutiveSlowProgress >= config.maxSlowProgressIterations) {
-                    DBG("Stopping: " << config.maxSlowProgressIterations
-                        << " consecutive iterations below improvement threshold");
-                    break;
-                }
+        // Ensure we have at least endpoints (defensive programming)
+        if (anchors.empty()) {
+            anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
+            anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
+        } else if (anchors.size() == 1) {
+            // Only one anchor - add the other endpoint
+            if (anchors.front().x > 0.0) {
+                anchors.insert(anchors.begin(), {samples.front().x, samples.front().y, false, 0.0});
             } else {
-                consecutiveSlowProgress = 0;  // Reset counter on good progress
+                anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
             }
         }
 
-        previousError = worst.maxError;
-        // ===== END NEW =====
-
-        // Insert anchor at worst-fit location
-        const auto& worstSample = samples[worst.sampleIndex];
-
-        // Find insertion point (maintain sorted order by x)
-        auto insertPos = std::lower_bound(
-            anchors.begin(), anchors.end(), worstSample.x,
-            [](const SplineAnchor& a, double x) { return a.x < x; }
-        );
-
-        // Don't insert duplicate x positions
-        bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
-            [&worstSample](const SplineAnchor& a) {
-                return std::abs(a.x - worstSample.x) < 1e-9;
-            });
-
-        if (isDuplicate) {
-            consecutiveFailures++;
-            if (consecutiveFailures >= maxConsecutiveFailures)
-                break;  // No progress possible
-            continue;   // Try again next iteration
-        }
-
-        // Two-tier density constraint: Check both coarse and fine windows
-        bool violatesDensity = false;
-
-        // Coarse constraint: Regional suppression (e.g., scribble hogging 50% of budget)
-        if (config.localDensityWindowSize > 0.0 && config.maxAnchorsPerWindow > 0) {
-            // Use a slightly larger window (15% margin) to prevent boundary packing
-            double halfWindow = config.localDensityWindowSize * 1.15;
-            int count = 0;
-            for (const auto& anchor : anchors) {
-                if (std::abs(anchor.x - worstSample.x) <= halfWindow) {
-                    count++;
-                }
-            }
-
-            if (count >= config.maxAnchorsPerWindow) {
-                violatesDensity = true;
-            }
-        }
-
-        // Fine constraint: Pixel-level suppression (e.g., 3 anchors within 20px)
-        if (!violatesDensity && config.localDensityWindowSizeFine > 0.0 && config.maxAnchorsPerWindowFine > 0) {
-            // No margin needed for fine constraint - exact window size
-            double fineHalfWindow = config.localDensityWindowSizeFine;
-            int fineCount = 0;
-            for (const auto& anchor : anchors) {
-                if (std::abs(anchor.x - worstSample.x) <= fineHalfWindow) {
-                    fineCount++;
-                }
-            }
-
-            if (fineCount >= config.maxAnchorsPerWindowFine) {
-                violatesDensity = true;
-            }
-        }
-
-        if (violatesDensity) {
-            consecutiveFailures++;
-            if (consecutiveFailures >= maxConsecutiveFailures)
-                break;  // Cannot make progress without violating constraint
-            continue;   // Try to find alternative location next iteration
-        }
-
-        // Successfully added anchor - reset failure counter
-        consecutiveFailures = 0;
-        anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+    } else {
+        // === FALLBACK: UNIFORM SAMPLING ===
+        // Used when LTF not available (e.g., direct sample fitting)
+        return greedySplineFitUniform(samples, config);
     }
 
-    // Final tangent computation using configured algorithm
+    // Compute tangents using configured algorithm (PCHIP/Fritsch-Carlson/Akima)
     computeTangents(anchors, config);
 
     return anchors;

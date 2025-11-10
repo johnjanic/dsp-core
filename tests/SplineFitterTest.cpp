@@ -4,6 +4,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <set>
 
 namespace dsp_core_test {
@@ -1275,6 +1276,500 @@ TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
         EXPECT_GE(leftRatio, 0.3) << "Harmonic " << n << " has too few left-side anchors";
         EXPECT_LE(leftRatio, 0.7) << "Harmonic " << n << " has severe left-side clustering";
     }
+}
+
+//==============================================================================
+// Round-Trip Tests (No Anchor Creeping)
+// These tests verify that spline → paint → spline preserves anchor count
+//==============================================================================
+
+/**
+ * Test fixture for round-trip consistency tests
+ * Critical for "no anchor creeping" requirement
+ */
+class RoundTripTest : public ::testing::Test {
+protected:
+    std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
+
+    void SetUp() override {
+        ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
+    }
+
+    /**
+     * Bake spline anchors to LTF samples (simulates "paint mode")
+     */
+    void bakeSplineToSamples(const std::vector<dsp_core::SplineAnchor>& anchors) {
+        for (int i = 0; i < ltf->getTableSize(); ++i) {
+            double x = ltf->normalizeIndex(i);
+            double y = dsp_core::Services::SplineEvaluator::evaluate(anchors, x);
+            ltf->setBaseLayerValue(i, y);
+        }
+        ltf->updateComposite();
+    }
+
+    /**
+     * Count extrema in a set of anchors (for verification)
+     */
+    int countExtrema(const std::vector<dsp_core::SplineAnchor>& anchors) {
+        if (anchors.size() < 3) return 0;
+
+        int count = 0;
+        for (size_t i = 1; i < anchors.size() - 1; ++i) {
+            double prevY = anchors[i-1].y;
+            double curY = anchors[i].y;
+            double nextY = anchors[i+1].y;
+
+            // Check if local max or min
+            if ((curY > prevY && curY > nextY) || (curY < prevY && curY < nextY)) {
+                count++;
+            }
+        }
+        return count;
+    }
+};
+
+/**
+ * CRITICAL TEST: Parabola with 1 extremum → round-trip → should preserve anchor count
+ * This tests the CEO's primary concern about anchor creeping
+ */
+TEST_F(RoundTripTest, ParabolaWith1Extremum_PreservesAnchors) {
+    // Step 1: Create parabola y = 1 - x² (clear extremum at x=0, y=1)
+    for (int i = 0; i < ltf->getTableSize(); ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = 1.0 - x * x;  // Parabola with peak at (0, 1)
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+
+    // Step 2: First fit (should find the extremum)
+    auto result1 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result1.success);
+
+    int anchors1 = result1.numAnchors;
+    std::cout << "\nParabola first fit: " << anchors1 << " anchors" << std::endl;
+
+    // Step 3: Bake to samples (simulate "paint mode")
+    bakeSplineToSamples(result1.anchors);
+
+    // Step 4: Refit (round-trip - simulate back to "spline mode")
+    auto result2 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result2.success);
+
+    int anchors2 = result2.numAnchors;
+    std::cout << "Parabola round-trip: " << anchors2 << " anchors" << std::endl;
+
+    // CRITICAL: Round-trip should not explode anchor count
+    EXPECT_LE(anchors2, anchors1 * 1.5)
+        << "Round-trip should not increase anchors significantly";
+    EXPECT_GE(anchors2, 2)
+        << "Should preserve at least endpoints";
+
+    // Should detect extremum at peak
+    bool hasPeak = false;
+    for (const auto& anchor : result2.anchors) {
+        if (std::abs(anchor.x) < 0.15 && anchor.y > 0.8) {
+            hasPeak = true;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(hasPeak)
+        << "Should detect peak extremum near x=0";
+}
+
+/**
+ * Round-trip test with 2 internal extrema
+ */
+TEST_F(RoundTripTest, CurveWith2Extrema_Remains5Anchors) {
+    // Create parabola-like curve with 2 extrema
+    // y = sin(πx) has extrema at x = ±0.5
+    std::vector<dsp_core::SplineAnchor> original = {
+        {-1.0, 0.0, false, 0.0},    // Endpoint
+        {-0.5, -1.0, false, 0.0},   // Valley
+        {0.0, 0.0, false, 0.0},     // Zero crossing
+        {0.5, 1.0, false, 0.0},     // Peak
+        {1.0, 0.0, false, 0.0}      // Endpoint
+    };
+
+    auto config = dsp_core::SplineFitConfig::tight();
+    dsp_core::Services::SplineFitter::computeTangents(original, config);
+
+    // Bake to samples
+    bakeSplineToSamples(original);
+
+    // Refit
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    ASSERT_TRUE(result.success);
+
+    // Should get 5 anchors ±2 (2 endpoints + 2 extrema + maybe inflection)
+    EXPECT_LE(result.numAnchors, 8)
+        << "Round-trip with 2 extrema should not explode anchor count";
+    EXPECT_GE(result.numAnchors, 4)
+        << "Should capture both extrema";
+
+    // Verify extrema count
+    int extremaCount = countExtrema(result.anchors);
+    EXPECT_GE(extremaCount, 2)
+        << "Should detect both peak and valley";
+}
+
+/**
+ * Round-trip test with multiple extrema (sine wave)
+ */
+TEST_F(RoundTripTest, SineWave_PreservesExtremaCount) {
+    // sin(2πx) has 4 extrema in [-1, 1]
+    for (int i = 0; i < ltf->getTableSize(); ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(2.0 * M_PI * x);
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+
+    // First fit
+    auto result1 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result1.success);
+
+    int anchors1 = result1.numAnchors;
+
+    // Bake first fit
+    bakeSplineToSamples(result1.anchors);
+
+    // Second fit (round-trip)
+    auto result2 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result2.success);
+
+    int anchors2 = result2.numAnchors;
+
+    // Round-trip should not significantly increase anchor count
+    EXPECT_LE(anchors2, anchors1 * 1.5)
+        << "Round-trip should not increase anchors by more than 50%";
+    EXPECT_GE(anchors2, anchors1 * 0.7)
+        << "Round-trip should not lose significant features";
+}
+
+/**
+ * Round-trip test with cubic (inflection point)
+ */
+TEST_F(RoundTripTest, Cubic_PreservesInflectionPoint) {
+    // y = x³ has inflection at x=0, no extrema
+    for (int i = 0; i < ltf->getTableSize(); ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = x * x * x;
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+
+    // First fit
+    auto result1 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result1.success);
+
+    // Bake and refit
+    bakeSplineToSamples(result1.anchors);
+    auto result2 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result2.success);
+
+    // Should remain minimal (2-4 anchors: endpoints + maybe inflection)
+    EXPECT_LE(result2.numAnchors, 6)
+        << "Cubic round-trip should not create excessive anchors";
+
+    // Should have anchor near inflection point (x≈0)
+    bool hasInflection = false;
+    for (const auto& anchor : result2.anchors) {
+        if (std::abs(anchor.x) < 0.15) {
+            hasInflection = true;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(hasInflection)
+        << "Should detect inflection point near x=0";
+}
+
+/**
+ * Stress test: Multiple round-trips should stabilize
+ */
+TEST_F(RoundTripTest, MultipleRoundTrips_Stabilize) {
+    // Start with smooth curve
+    for (int i = 0; i < ltf->getTableSize(); ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::tanh(3.0 * x);
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+
+    std::vector<int> anchorCounts;
+
+    // Perform 5 round-trips
+    for (int round = 0; round < 5; ++round) {
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+        ASSERT_TRUE(result.success) << "Round " << round << " failed";
+
+        anchorCounts.push_back(result.numAnchors);
+
+        // Bake for next round
+        bakeSplineToSamples(result.anchors);
+    }
+
+    // Check for stability (later rounds should not diverge)
+    int maxCount = *std::max_element(anchorCounts.begin(), anchorCounts.end());
+    int minCount = *std::min_element(anchorCounts.begin(), anchorCounts.end());
+
+    EXPECT_LE(maxCount - minCount, 3)
+        << "Anchor count should stabilize across multiple round-trips\n"
+        << "Counts: " << anchorCounts[0] << ", " << anchorCounts[1] << ", "
+        << anchorCounts[2] << ", " << anchorCounts[3] << ", " << anchorCounts[4];
+}
+
+//==============================================================================
+// Curve Fitting Algorithm Tests (Tasks 1-5)
+// Testing feature-based anchor placement for round-trip stability
+//==============================================================================
+
+/**
+ * Task 1: Round-Trip Test - Linear Curve with 1 Anchor
+ * Goal: Verify that a simple linear curve with one manually added anchor
+ * preserves anchor count through bake→refit cycle.
+ */
+TEST_F(SplineFitterTest, RoundTrip_LinearWith1Anchor_Remains3Anchors) {
+    // Setup: Create y = x base curve
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        ltf->setBaseLayerValue(i, x);
+    }
+
+    // Original spline: 2 endpoints + 1 mid-point creating slight dip
+    std::vector<dsp_core::SplineAnchor> original = {
+        {-1.0, -1.0, false, 0.0},   // Left endpoint
+        {0.0, -0.25, false, 0.0},   // Mid-point dip (extremum)
+        {1.0, 1.0, false, 0.0}      // Right endpoint
+    };
+
+    auto config = dsp_core::SplineFitConfig::tight();
+    dsp_core::Services::SplineFitter::computeTangents(original, config);
+
+    // Bake spline evaluation to base layer (256 samples)
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = dsp_core::Services::SplineEvaluator::evaluate(original, x);
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();  // CRITICAL: Update composite after baking
+
+    // Refit: Should detect the same extremum and return 3 anchors
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    EXPECT_EQ(3, result.numAnchors)
+        << "Round-trip should preserve anchor count (2 endpoints + 1 extremum)";
+
+    // Verify we captured the extremum near x=0, y=-0.25
+    auto hasExtremum = std::any_of(
+        result.anchors.begin(),
+        result.anchors.end(),
+        [](const auto& a) {
+            return std::abs(a.x) < 0.1 && std::abs(a.y + 0.25) < 0.1;
+        }
+    );
+    EXPECT_TRUE(hasExtremum)
+        << "Should detect extremum at x≈0, y≈-0.25";
+}
+
+/**
+ * Task 2: Round-Trip Test - Cubic Curve with Inflection
+ * Goal: Verify that y=x³ preserves its inflection point through bake→refit cycle.
+ */
+TEST_F(SplineFitterTest, RoundTrip_CubicCurve_PreservesInflection) {
+    // Setup: Create y = x³ curve
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::pow(x, 3.0);
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+    auto firstFit = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    // Cubic has 0 extrema, 1 inflection point at x=0
+    // Expected: 2 endpoints + 1 inflection = 3 anchors
+    EXPECT_LE(firstFit.numAnchors, 5)
+        << "Cubic should need minimal anchors (ideally 2-3)";
+
+    // Bake first fit
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = dsp_core::Services::SplineEvaluator::evaluate(firstFit.anchors, x);
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    // Refit
+    auto secondFit = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    // Should not gain more than 2 anchors on round-trip
+    EXPECT_LE(secondFit.numAnchors, firstFit.numAnchors + 2)
+        << "Round-trip should not add excessive anchors";
+
+    // Verify inflection point captured (near x=0)
+    auto hasInflection = std::any_of(
+        secondFit.anchors.begin(),
+        secondFit.anchors.end(),
+        [](const auto& a) { return std::abs(a.x) < 0.15; }
+    );
+    EXPECT_TRUE(hasInflection)
+        << "Should detect inflection point near x=0";
+}
+
+/**
+ * Task 3: Harmonic Test - Cos(40×acos(x))
+ * Goal: Verify that high-frequency harmonic content is captured efficiently.
+ */
+TEST_F(SplineFitterTest, Harmonic_CapturesAllExtrema_Cos40) {
+    // Setup: cos(40 × acos(x)) has ~40 extrema
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        x = std::clamp(x, -1.0, 1.0);  // Ensure valid domain for acos
+        double y = std::cos(40.0 * std::acos(x));
+        ltf->setBaseLayerValue(i, y);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+
+    // First, detect what features exist
+    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(
+        *ltf,
+        config.maxAnchors,
+        config.localDensityWindowSize,
+        config.maxAnchorsPerWindow,
+        config.localDensityWindowSizeFine,
+        config.maxAnchorsPerWindowFine
+    );
+
+    int detectedExtrema = static_cast<int>(features.localExtrema.size());
+
+    // Fit curve
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    // Should place anchors at extrema (within budget)
+    int expectedAnchors = std::min(
+        detectedExtrema + 2,  // +2 for endpoints
+        config.maxAnchors
+    );
+
+    // Allow some tolerance (prominence filtering may reduce count)
+    EXPECT_NEAR(result.numAnchors, expectedAnchors, 10)
+        << "Should place anchors at most detected extrema (within budget)";
+
+    // Compute max error
+    double maxError = 0.0;
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double actual = ltf->getCompositeValue(i);
+        double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, x);
+        maxError = std::max(maxError, std::abs(actual - fitted));
+    }
+
+    // Relaxed tolerance for high-frequency content
+    EXPECT_LT(maxError, 0.15)
+        << "Should capture general shape even if imperfect";
+}
+
+/**
+ * Task 4: Harmonic Test Suite - Varying Frequencies
+ * Goal: Verify feature detection scales correctly across different harmonic frequencies.
+ */
+class HarmonicFitTest : public SplineFitterTest {
+protected:
+    void testHarmonic(int N, int expectedExtrema) {
+        // Create cos(N×π×x) curve
+        for (int i = 0; i < 256; ++i) {
+            double x = ltf->normalizeIndex(i);
+            double y = std::cos(N * M_PI * x);
+            ltf->setBaseLayerValue(i, y);
+        }
+        ltf->updateComposite();
+
+        auto config = dsp_core::SplineFitConfig::tight();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        // Expected: extrema + 2 endpoints (capped by maxAnchors)
+        int expectedAnchors = std::min(
+            expectedExtrema + 2,
+            config.maxAnchors
+        );
+
+        EXPECT_NEAR(result.numAnchors, expectedAnchors, 3)
+            << "N=" << N << " should produce ~" << expectedAnchors << " anchors";
+    }
+};
+
+TEST_F(HarmonicFitTest, Harmonic_N2_Captures2Extrema) {
+    testHarmonic(2, 2);  // cos(2πx) has 2 extrema in [-1,1]
+}
+
+TEST_F(HarmonicFitTest, Harmonic_N5_Captures5Extrema) {
+    testHarmonic(5, 5);  // cos(5πx) has 5 extrema
+}
+
+TEST_F(HarmonicFitTest, Harmonic_N10_Captures10Extrema) {
+    testHarmonic(10, 10);
+}
+
+TEST_F(HarmonicFitTest, Harmonic_N20_Captures20Extrema) {
+    testHarmonic(20, 20);
+}
+
+/**
+ * Task 5: Scribble Test - Noise Filtering
+ * Goal: Verify that high-frequency noise is filtered out, capturing only the underlying trend.
+ */
+TEST_F(SplineFitterTest, Scribble_FiltersNoise_CapturesIntent) {
+    // Base trend: y = x (monotonic)
+    // Noise: 100 small random perturbations
+    std::mt19937 rng(12345);  // Fixed seed for reproducibility
+    std::uniform_real_distribution<> dist(-0.02, 0.02);
+
+    for (int i = 0; i < 256; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double noise = dist(rng);
+        ltf->setBaseLayerValue(i, x + noise);
+    }
+    ltf->updateComposite();
+
+    auto config = dsp_core::SplineFitConfig::tight();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    // Should ignore noise bumps, use minimal anchors
+    EXPECT_LT(result.numAnchors, 10)
+        << "Scribble noise should be filtered, not fitted";
+
+    // Should still approximate the linear trend
+    double midError = std::abs(
+        dsp_core::Services::SplineEvaluator::evaluate(result.anchors, 0.0) - 0.0
+    );
+    EXPECT_LT(midError, 0.1)
+        << "Should capture underlying linear trend";
+
+    // Check overall error is reasonable
+    double maxError = 0.0;
+    for (int i = 0; i < 256; i += 10) {  // Sample every 10th point
+        double x = ltf->normalizeIndex(i);
+        double expected = x;  // Base trend
+        double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, x);
+        maxError = std::max(maxError, std::abs(fitted - expected));
+    }
+
+    EXPECT_LT(maxError, 0.15)
+        << "Should approximate base trend within tolerance";
 }
 
 } // namespace dsp_core_test
