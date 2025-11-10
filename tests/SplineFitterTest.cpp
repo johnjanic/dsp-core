@@ -1483,4 +1483,154 @@ TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
                                << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
 }
 
+/**
+ * Progressive Complexity Test 1: Anchor Count Scaling
+ *
+ * Validates that the algorithm scales anchor count appropriately with curve complexity.
+ * Harmonics are Chebyshev polynomials cos(n*acos(x)) which have (n-1) extrema.
+ *
+ * Expected behavior (with adaptive tolerance):
+ * - Harmonic 1: 2-3 anchors (0 extrema - linear)
+ * - Harmonic 2: 2-5 anchors (1 extremum)
+ * - Harmonic 3: 3-7 anchors (2 extrema)
+ * - Harmonic 5: 5-10 anchors (4 extrema)
+ * - Harmonic 10: 10-18 anchors (9 extrema)
+ */
+TEST_F(BacktranslationTest, ProgressiveComplexity_AnchorCountScaling) {
+    auto config = dsp_core::SplineFitConfig::smooth();  // maxAnchors = 24
+
+    std::cout << "\n=== Progressive Complexity: Anchor Count Scaling ===" << std::endl;
+    std::cout << "Harmonic | Extrema | Anchors | Status" << std::endl;
+    std::cout << "---------|---------|---------|--------" << std::endl;
+
+    std::vector<int> harmonics = {1, 2, 3, 5, 10};
+    std::vector<int> anchorCounts;
+
+    for (int n : harmonics) {
+        setHarmonicCurve(*ltf, n);
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        ASSERT_TRUE(result.success) << "Harmonic " << n << " fit failed";
+
+        int extremaCount = n - 1;
+        anchorCounts.push_back(result.numAnchors);
+
+        std::string status = "OK";
+
+        std::cout << std::setw(8) << n << " | "
+                  << std::setw(7) << extremaCount << " | "
+                  << std::setw(7) << result.numAnchors << " | "
+                  << status << std::endl;
+    }
+
+    // Verify expected anchor ranges for key harmonics
+    ASSERT_EQ(harmonics.size(), anchorCounts.size());
+
+    // Harmonic 1: 2-3 anchors (0 extrema - linear)
+    EXPECT_GE(anchorCounts[0], 2) << "H1 needs at least 2 anchors";
+    EXPECT_LE(anchorCounts[0], 3) << "H1 should use 2-3 anchors (linear)";
+
+    // Harmonic 2: 2-5 anchors (1 extremum)
+    EXPECT_GE(anchorCounts[1], 2) << "H2 needs at least 2 anchors";
+    EXPECT_LE(anchorCounts[1], 5) << "H2 should use 2-5 anchors";
+
+    // Harmonic 3: 3-7 anchors (2 extrema)
+    EXPECT_GE(anchorCounts[2], 3) << "H3 needs at least 3 anchors";
+    EXPECT_LE(anchorCounts[2], 7) << "H3 should use 3-7 anchors";
+
+    // Harmonic 5: 5-10 anchors (4 extrema)
+    EXPECT_GE(anchorCounts[3], 5) << "H5 needs at least 5 anchors";
+    EXPECT_LE(anchorCounts[3], 10) << "H5 should use 5-10 anchors";
+
+    // Harmonic 10: 10-18 anchors (9 extrema)
+    EXPECT_GE(anchorCounts[4], 10) << "H10 needs at least 10 anchors";
+    EXPECT_LE(anchorCounts[4], 18) << "H10 should use 10-18 anchors";
+
+    // Verify monotonic increase or plateau (allowing small variations)
+    for (size_t i = 1; i < anchorCounts.size(); ++i) {
+        EXPECT_GE(anchorCounts[i], anchorCounts[i-1] - 2)
+            << "Anchor count should generally increase or plateau with complexity";
+    }
+}
+
+/**
+ * Progressive Complexity Test 2: Error Quality
+ *
+ * Validates that fit quality remains acceptable across different complexity levels.
+ * Error thresholds are relaxed for more complex curves.
+ */
+TEST_F(BacktranslationTest, ProgressiveComplexity_ErrorQuality) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== Progressive Complexity: Error Quality ===" << std::endl;
+    std::cout << "Harmonic | MaxError | Threshold | Status" << std::endl;
+    std::cout << "---------|----------|-----------|--------" << std::endl;
+
+    // Test harmonics across complexity spectrum
+    std::vector<std::pair<int, double>> testCases = {
+        {1, 0.01},   // Low complexity: very tight error
+        {2, 0.01},
+        {3, 0.01},
+        {5, 0.05},   // Medium complexity: moderate error
+        {7, 0.05},
+        {9, 0.10},   // High complexity: relaxed error
+        {10, 0.10}
+    };
+
+    for (const auto& [harmonic, threshold] : testCases) {
+        setHarmonicCurve(*ltf, harmonic);
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        ASSERT_TRUE(result.success) << "Harmonic " << harmonic << " fit failed";
+
+        std::string status = result.maxError < threshold ? "PASS" : "FAIL";
+
+        std::cout << std::setw(8) << harmonic << " | "
+                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
+                  << std::setw(9) << threshold << " | "
+                  << status << std::endl;
+
+        EXPECT_LT(result.maxError, threshold)
+            << "Harmonic " << harmonic << " exceeds error threshold";
+    }
+}
+
+/**
+ * Progressive Complexity Test 3: Harmonic Comparison
+ *
+ * Direct comparison of low-order vs high-order harmonics.
+ * Validates that H10 uses more anchors than H3 due to higher complexity.
+ */
+TEST_F(BacktranslationTest, HarmonicComparison_LowVsHighOrder) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    // Fit Harmonic 3 (2 extrema)
+    setHarmonicCurve(*ltf, 3);
+    auto result3 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result3.success) << "Harmonic 3 fit failed";
+
+    // Fit Harmonic 10 (9 extrema)
+    setHarmonicCurve(*ltf, 10);
+    auto result10 = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(result10.success) << "Harmonic 10 fit failed";
+
+    std::cout << "\n=== Harmonic Comparison: H3 vs H10 ===" << std::endl;
+    std::cout << "Harmonic 3:  " << result3.numAnchors << " anchors, "
+              << "max error: " << result3.maxError << std::endl;
+    std::cout << "Harmonic 10: " << result10.numAnchors << " anchors, "
+              << "max error: " << result10.maxError << std::endl;
+
+    // H10 should use more anchors than H3 (more complex)
+    EXPECT_GT(result10.numAnchors, result3.numAnchors)
+        << "H10 should need more anchors than H3 due to higher complexity";
+
+    // Both should have reasonable quality
+    EXPECT_LT(result3.maxError, 0.01) << "H3 should have tight fit";
+    EXPECT_LT(result10.maxError, 0.10) << "H10 should have acceptable fit";
+
+    // Both should be within reasonable anchor budgets
+    EXPECT_LE(result3.numAnchors, 10) << "H3 shouldn't need excessive anchors";
+    EXPECT_LE(result10.numAnchors, 20) << "H10 shouldn't need excessive anchors";
+}
+
 } // namespace dsp_core_test
