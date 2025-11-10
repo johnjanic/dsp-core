@@ -6,16 +6,17 @@ namespace dsp_core {
 namespace Services {
 
 /**
- * SplineFitter - Pure service for PCHIP spline curve fitting
+ * SplineFitter - Pure service for spline curve fitting
  *
- * Converts painted baseLayer curve to control points + PCHIP spline
- * using Ramer-Douglas-Peucker simplification and Fritsch-Carlson tangents.
+ * Converts painted baseLayer curve to control points + cubic Hermite spline
+ * using feature-based initialization and greedy error-driven refinement.
  *
- * Algorithm (4 steps):
- *   1. Sample & Sanitize: baseLayer → clean polyline
- *   2. RDP Simplification: polyline → control points
- *   3. PCHIP Tangents: compute Fritsch-Carlson monotone tangents
- *   4. Error Analysis: compute fit quality metrics
+ * Algorithm (5 stages):
+ *   1. Feature Detection: identify extrema and inflection points
+ *   2. Sample & Sanitize: baseLayer → clean polyline
+ *   3. Greedy Fitting: feature anchors + error-driven refinement
+ *   4. Tangent Computation: compute Fritsch-Carlson monotone tangents
+ *   5. Error Analysis: compute fit quality metrics
  *
  * Service Pattern (5/5 score):
  *   - Pure static methods (no state)
@@ -37,14 +38,6 @@ public:
         const SplineFitConfig& config = SplineFitConfig::smooth()
     );
 
-    // Legacy API: compute PCHIP tangents specifically
-    // Deprecated: Use computeTangents() with config.tangentAlgorithm = TangentAlgorithm::PCHIP
-    [[deprecated("Use computeTangents() with config.tangentAlgorithm instead")]]
-    static void computePCHIPTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config = SplineFitConfig::smooth()
-    );
-
 private:
     // Step 1: Sample & sanitize
     struct Sample { double x, y; };
@@ -59,40 +52,7 @@ private:
     static void enforceMonotonicity(std::vector<Sample>& samples);
     static void clampToRange(std::vector<Sample>& samples);
 
-    // Step 2: Ramer-Douglas-Peucker simplification
-    // DEPRECATED: RDP-based approach (replaced by greedy algorithm)
-    // Kept for reference only - not called by fitCurve()
-    [[deprecated("Use greedySplineFit() instead")]]
-    static std::vector<SplineAnchor> ramerDouglasPeucker(
-        const std::vector<Sample>& samples,
-        const SplineFitConfig& config
-    );
-
-    [[deprecated("Use greedySplineFit() instead")]]
-    static void rdpRecursive(
-        const std::vector<Sample>& samples,
-        size_t startIdx,
-        size_t endIdx,
-        const SplineFitConfig& config,
-        std::vector<bool>& keep
-    );
-
-    [[deprecated("Use greedySplineFit() instead")]]
-    static double computeHybridError(
-        const Sample& point,
-        const Sample& lineStart,
-        const Sample& lineEnd,
-        double alpha,
-        double beta
-    );
-
-    [[deprecated("Use greedySplineFit() instead")]]
-    static double estimateDerivative(
-        const std::vector<Sample>& samples,
-        size_t index
-    );
-
-    // Step 3: Tangent computation algorithms
+    // Tangent computation algorithms
     static void computePCHIPTangentsImpl(
         std::vector<SplineAnchor>& anchors,
         const SplineFitConfig& config
