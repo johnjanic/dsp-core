@@ -362,3 +362,28 @@ else()
 endif()
 
 add_test(NAME AdaptiveToleranceTests COMMAND adaptive_tolerance_tests)
+
+# SplineFitterIntegration tests
+add_executable(spline_fitter_integration_tests
+    SplineFitterIntegrationTest.cpp
+)
+
+target_include_directories(spline_fitter_integration_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_fitter_integration_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_fitter_integration_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_fitter_integration_tests)
+endif()
+
+add_test(NAME SplineFitterIntegrationTests COMMAND spline_fitter_integration_tests)
