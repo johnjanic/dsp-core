@@ -29,6 +29,31 @@ namespace Services {
  */
 class CurveFeatureDetector {
 public:
+    /**
+     * Configuration for feature detection and significance filtering
+     */
+    struct FeatureDetectionConfig {
+        /**
+         * Significance threshold as percentage of vertical range (0.0-1.0)
+         * Extrema with local amplitude change less than this threshold are discarded
+         * Default: 0.05 (5% of vertical range)
+         */
+        double significanceThreshold;
+
+        /**
+         * Maximum number of features to detect (0 = unlimited)
+         * If limited, keeps most significant features by amplitude/curvature
+         */
+        int maxFeatures;
+
+        /**
+         * Default constructor - uses sensible defaults
+         * Note: Very low significance threshold (0.1%) to preserve all real features
+         * Increase threshold (e.g., 2-5%) for noise filtering
+         */
+        FeatureDetectionConfig() : significanceThreshold(0.001), maxFeatures(100) {}
+    };
+
     struct FeatureResult {
         std::vector<int> localExtrema;       // peaks and valleys (dy/dx sign changes)
         std::vector<int> inflectionPoints;   // d²y/dx² sign changes
@@ -39,11 +64,17 @@ public:
      * Detect all geometric features requiring spline anchors
      *
      * @param ltf Input transfer function (base layer)
-     * @param maxMandatoryAnchors Maximum number of mandatory feature anchors (0 = unlimited)
-     *                            If limited, keeps most significant features by amplitude/curvature
+     * @param config Configuration for detection and filtering (optional)
      * @return Feature indices (table indices, not normalized coordinates)
      */
-    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors = 0);
+    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf,
+                                       const FeatureDetectionConfig& config = FeatureDetectionConfig{});
+
+    /**
+     * Legacy overload for backward compatibility
+     * @deprecated Use version with FeatureDetectionConfig instead
+     */
+    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors);
 
 private:
     CurveFeatureDetector() = delete;  // Pure static service

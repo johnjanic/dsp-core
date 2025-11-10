@@ -1262,4 +1262,225 @@ TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
     }
 }
 
+//==============================================================================
+// Task 1: Backtranslation Test Infrastructure
+// Objective: Validate "no anchor creeping" behavior
+//
+// Backtranslation Test:
+//   1. Start with N anchors representing a curve
+//   2. Evaluate anchors to high-resolution samples (16k points)
+//   3. Refit samples back to anchors
+//   4. Verify anchor count remains stable (no "creeping")
+//
+// Expected Behavior: Fitting a curve that was already fitted should produce
+// roughly the same number of anchors (±small tolerance for numeric error).
+//
+// Current Behavior (BUG): Anchor count explodes on each refit cycle.
+// Example: 3 anchors → 20 anchors → 60+ anchors (exponential creeping)
+//
+// These tests are EXPECTED TO FAIL initially - they demonstrate the problem.
+//==============================================================================
+
+/**
+ * Test fixture for backtranslation tests (anchor creeping detection)
+ * Uses high-resolution LayeredTransferFunction (16384 samples) to minimize
+ * information loss during bake/refit cycles
+ */
+class BacktranslationTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // High resolution: 16384 samples to minimize quantization error
+        ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
+    }
+
+    /**
+     * Backtranslation helper: Fit → Bake → Refit
+     *
+     * This simulates the user workflow:
+     *   1. User creates curve in spline mode (anchors)
+     *   2. User switches to paint mode (bake to samples)
+     *   3. User switches back to spline mode (refit from samples)
+     *
+     * @param originalAnchors  Initial anchor set
+     * @param config           SplineFitConfig to use for refitting
+     * @return Number of anchors after backtranslation
+     */
+    int backtranslateAnchors(const std::vector<dsp_core::SplineAnchor>& originalAnchors,
+                             const dsp_core::SplineFitConfig& config) {
+        // Step 1: Evaluate original anchors to high-resolution samples
+        for (int i = 0; i < ltf->getTableSize(); ++i) {
+            double x = ltf->normalizeIndex(i);
+            double y = dsp_core::Services::SplineEvaluator::evaluate(originalAnchors, x);
+            ltf->setBaseLayerValue(i, y);
+        }
+
+        // Step 2: Refit samples back to anchors
+        auto refitResult = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+        if (!refitResult.success) {
+            return -1;  // Indicate failure
+        }
+
+        return refitResult.numAnchors;
+    }
+
+    std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
+};
+
+/**
+ * Test: Linear curve (2 anchors) should refit to 2 anchors
+ *
+ * Simplest case: y = x (identity line)
+ * Expected: 2 anchors (endpoints only)
+ * Current (BUG): 15-20 anchors (massive over-fitting)
+ */
+TEST_F(BacktranslationTest, LinearCurve_TwoAnchors_RefitsToTwo) {
+    // Original curve: Simple identity line (2 anchors)
+    std::vector<dsp_core::SplineAnchor> originalAnchors = {
+        {-1.0, -1.0, false, 1.0},  // Left endpoint, slope = 1
+        {1.0, 1.0, false, 1.0}     // Right endpoint, slope = 1
+    };
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    int refitCount = backtranslateAnchors(originalAnchors, config);
+
+    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+
+    // Expected: 2-3 anchors (allowing small numeric tolerance)
+    // Actual (BUG): 15-20 anchors
+    EXPECT_GE(refitCount, 2) << "Should have at least endpoint anchors";
+    EXPECT_LE(refitCount, 3) << "Linear curve should not need more than 3 anchors. "
+                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+}
+
+/**
+ * Test: Single extremum (3 anchors) should refit to 3-5 anchors
+ *
+ * Simple parabola: 3 anchors (left, peak, right)
+ * Expected: 3-5 anchors (peak + endpoints + maybe 1-2 for curvature)
+ * Current (BUG): 15-25 anchors
+ */
+TEST_F(BacktranslationTest, SingleExtremum_ThreeAnchors_RefitsToThree) {
+    // Original curve: Parabola with peak at x=0
+    // y = 1 - x^2 (peak at (0, 1))
+    std::vector<dsp_core::SplineAnchor> originalAnchors = {
+        {-1.0, 0.0, false, 0.0},   // Left endpoint
+        {0.0, 1.0, false, 0.0},    // Peak (zero tangent)
+        {1.0, 0.0, false, 0.0}     // Right endpoint
+    };
+
+    // Compute PCHIP tangents for the anchors
+    auto config = dsp_core::SplineFitConfig::smooth();
+    dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
+
+    int refitCount = backtranslateAnchors(originalAnchors, config);
+
+    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+
+    // Expected: 3-5 anchors (peak + endpoints + small tolerance)
+    // Actual (BUG): 15-25 anchors
+    EXPECT_GE(refitCount, 3) << "Should have at least 3 anchors (peak + endpoints)";
+    EXPECT_LE(refitCount, 5) << "Simple parabola should need 3-5 anchors. "
+                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+}
+
+/**
+ * Test: Two extrema (4 anchors) should refit to 4-7 anchors
+ *
+ * Wave with one peak and one valley
+ * Expected: 4-7 anchors (2 extrema + endpoints + small tolerance)
+ * Current (BUG): 20-30 anchors
+ */
+TEST_F(BacktranslationTest, TwoExtrema_FourAnchors_RefitsToFour) {
+    // Original curve: Sine-like wave with one peak and one valley
+    // 4 anchors: left, valley, peak, right
+    std::vector<dsp_core::SplineAnchor> originalAnchors = {
+        {-1.0, 0.0, false, 1.0},    // Left endpoint
+        {-0.5, -0.8, false, 0.0},   // Valley
+        {0.5, 0.8, false, 0.0},     // Peak
+        {1.0, 0.0, false, -1.0}     // Right endpoint
+    };
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
+
+    int refitCount = backtranslateAnchors(originalAnchors, config);
+
+    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+
+    // Expected: 4-7 anchors (2 extrema + endpoints + small tolerance)
+    // Actual (BUG): 20-30 anchors
+    EXPECT_GE(refitCount, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
+    EXPECT_LE(refitCount, 7) << "Curve with 2 extrema should need 4-7 anchors. "
+                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+}
+
+/**
+ * Test: Five extrema (6 anchors) should refit to 6-10 anchors
+ *
+ * More complex wave with multiple oscillations
+ * Expected: 6-10 anchors (5 extrema + endpoints + small tolerance)
+ * Current (BUG): 30-50 anchors
+ */
+TEST_F(BacktranslationTest, FiveExtrema_SixAnchors_RefitsToSix) {
+    // Original curve: Multiple oscillations (5 extrema)
+    std::vector<dsp_core::SplineAnchor> originalAnchors = {
+        {-1.0, 0.0, false, 0.0},    // Left endpoint
+        {-0.6, 0.5, false, 0.0},    // Peak 1
+        {-0.2, -0.5, false, 0.0},   // Valley 1
+        {0.2, 0.5, false, 0.0},     // Peak 2
+        {0.6, -0.5, false, 0.0},    // Valley 2
+        {1.0, 0.0, false, 0.0}      // Right endpoint
+    };
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
+
+    int refitCount = backtranslateAnchors(originalAnchors, config);
+
+    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+
+    // Expected: 6-10 anchors (5 extrema + endpoints + small tolerance)
+    // Actual (BUG): 30-50 anchors
+    EXPECT_GE(refitCount, 6) << "Should have at least 6 anchors (5 extrema + endpoints)";
+    EXPECT_LE(refitCount, 10) << "Curve with 5 extrema should need 6-10 anchors. "
+                               << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+}
+
+/**
+ * Test: Sine wave (7 anchors) should refit to 7-12 anchors
+ *
+ * Full sine wave: sin(πx) over [-1, 1]
+ * Expected: 7-12 anchors (smooth oscillation + endpoints)
+ * Current (BUG): 25-40 anchors
+ */
+TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
+    // Original curve: Sine wave sin(πx) over [-1, 1]
+    // This creates ~1 full period with peak at x=0.5 and valley at x=-0.5
+    std::vector<dsp_core::SplineAnchor> originalAnchors = {
+        {-1.0, 0.0, false, 0.0},      // Left endpoint
+        {-0.75, -0.707, false, 0.0},  // Descending
+        {-0.5, -1.0, false, 0.0},     // Valley
+        {-0.25, -0.707, false, 0.0},  // Ascending
+        {0.0, 0.0, false, 1.0},       // Zero crossing
+        {0.25, 0.707, false, 0.0},    // Ascending
+        {0.5, 1.0, false, 0.0},       // Peak
+        {0.75, 0.707, false, 0.0},    // Descending
+        {1.0, 0.0, false, -1.0}       // Right endpoint
+    };
+
+    auto config = dsp_core::SplineFitConfig::smooth();
+    dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
+
+    int refitCount = backtranslateAnchors(originalAnchors, config);
+
+    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+
+    // Expected: 7-12 anchors (smooth sine needs moderate anchor count)
+    // Actual (BUG): 25-40 anchors
+    EXPECT_GE(refitCount, 7) << "Should have at least 7 anchors for sine wave";
+    EXPECT_LE(refitCount, 12) << "Sine wave should need 7-12 anchors. "
+                               << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+}
+
 } // namespace dsp_core_test

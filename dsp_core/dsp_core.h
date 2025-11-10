@@ -36,6 +36,7 @@
 #include "Source/SplineLayer.h"
 #include "Source/SplineTypes.h"
 #include "Source/TransferFunction.h"
+#include "Source/Services/AdaptiveToleranceCalculator.h"
 #include "Source/Services/CoordinateSnapper.h"
 #include "Source/Services/CurveFeatureDetector.h"
 #include "Source/Services/SplineFitter.h"
