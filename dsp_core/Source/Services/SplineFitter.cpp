@@ -675,10 +675,67 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
     }
 
+    // Optional: Prune redundant anchors after fitting
+    if (config.enableAnchorPruning && anchors.size() > 2) {
+        // Use the final adaptive tolerance with multiplier for pruning
+        double finalAdaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
+            verticalRange,
+            static_cast<int>(anchors.size()),
+            config.maxAnchors,
+            adaptiveConfig
+        );
+        finalAdaptiveTolerance = std::max(finalAdaptiveTolerance, config.positionTolerance);
+        double pruningTolerance = finalAdaptiveTolerance * config.pruningToleranceMultiplier;
+
+        pruneRedundantAnchors(anchors, samples, pruningTolerance, config);
+    }
+
     // Final tangent computation using configured algorithm
     computeTangents(anchors, config);
 
     return anchors;
+}
+
+//==============================================================================
+// Anchor Pruning (Optional Post-Processing)
+//==============================================================================
+
+void SplineFitter::pruneRedundantAnchors(
+    std::vector<SplineAnchor>& anchors,
+    const std::vector<Sample>& samples,
+    double pruningTolerance,
+    const SplineFitConfig& config) {
+
+    if (anchors.size() <= 2) {
+        return;  // Cannot prune endpoints
+    }
+
+    // Iteratively test removing each non-endpoint anchor
+    // If removal doesn't increase error beyond tolerance, keep it removed
+    for (int i = 1; i < static_cast<int>(anchors.size()) - 1; ) {
+        // 1. Temporarily remove anchor
+        auto removed = anchors[i];
+        anchors.erase(anchors.begin() + i);
+
+        // 2. Recompute tangents with reduced anchor set
+        computeTangents(anchors, config);
+
+        // 3. Measure max error across ALL samples
+        // (We need to check all samples because tangent changes can affect the entire curve)
+        double maxError = 0.0;
+        for (const auto& sample : samples) {
+            double splineY = SplineEvaluator::evaluate(anchors, sample.x);
+            double error = std::abs(sample.y - splineY);
+            maxError = std::max(maxError, error);
+        }
+
+        // 4. If error exceeds tolerance, restore anchor
+        if (maxError > pruningTolerance) {
+            anchors.insert(anchors.begin() + i, removed);
+            ++i;  // Move to next anchor
+        }
+        // else: anchor was successfully removed, check same index again (array shifted)
+    }
 }
 
 } // namespace Services

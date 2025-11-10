@@ -60,6 +60,10 @@ struct SplineFitConfig {
     // See docs/architecture/spline-algorithm-decision.md for full analysis
     TangentAlgorithm tangentAlgorithm = TangentAlgorithm::FritschCarlson;
 
+    // Anchor pruning (optional post-processing)
+    bool enableAnchorPruning = false;             // Remove redundant anchors after fitting
+    double pruningToleranceMultiplier = 1.5;      // Multiplier for pruning tolerance (relative to fit tolerance)
+
     // Presets
     static SplineFitConfig tight() {
         SplineFitConfig cfg;

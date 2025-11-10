@@ -96,6 +96,14 @@ private:
         const std::vector<SplineAnchor>& anchors
     );
 
+    // Anchor pruning (optional post-processing)
+    static void pruneRedundantAnchors(
+        std::vector<SplineAnchor>& anchors,
+        const std::vector<Sample>& samples,
+        double pruningTolerance,
+        const SplineFitConfig& config
+    );
+
     SplineFitter() = delete;  // Pure static utility
 };
 
