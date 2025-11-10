@@ -2103,4 +2103,229 @@ TEST_F(BacktranslationTest, Scribble_LocalizedNoise_DoesNotAffectStraightRegions
         << "Localized noise fit should complete in <500ms";
 }
 
+// ============================================================================
+// Task 9: Performance Benchmarking Tests
+// ============================================================================
+
+/**
+ * Performance Test 1: Adaptive Algorithm Performance Baseline
+ *
+ * Tests that the adaptive tolerance algorithm performs efficiently across
+ * a variety of curve types. Since adaptive tolerance is now the default,
+ * this establishes the performance baseline.
+ *
+ * Tests 10 diverse curves to ensure consistent performance:
+ * - Simple curves (linear, parabola)
+ * - Medium complexity (sine, tanh)
+ * - High complexity (harmonics 5, 10, 15, 20, 25, 30)
+ *
+ * Expected: Each curve completes in reasonable time, no pathological cases
+ */
+TEST_F(SplineFitterTest, Performance_AdaptiveAlgorithm_Baseline) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== Adaptive Algorithm Performance Baseline ===" << std::endl;
+    std::cout << "Curve Type           | Time (ms) | Anchors | Status" << std::endl;
+    std::cout << "---------------------|-----------|---------|--------" << std::endl;
+
+    struct TestCase {
+        std::string name;
+        std::function<void(dsp_core::LayeredTransferFunction&)> setupFunc;
+        int maxTimeMs;
+    };
+
+    std::vector<TestCase> testCases = {
+        {"Linear (y=x)", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
+            }
+        }, 50},
+        {"Parabola", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                double x = ltf.normalizeIndex(i);
+                ltf.setBaseLayerValue(i, x * x);
+            }
+        }, 50},
+        {"Sine Wave", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                double x = ltf.normalizeIndex(i);
+                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
+            }
+        }, 100},
+        {"Tanh (steep)", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                double x = ltf.normalizeIndex(i);
+                ltf.setBaseLayerValue(i, std::tanh(10.0 * x));
+            }
+        }, 100},
+        {"Harmonic 5", [](auto& ltf) {
+            setHarmonicCurve(ltf, 5);
+        }, 100},
+        {"Harmonic 10", [](auto& ltf) {
+            setHarmonicCurve(ltf, 10);
+        }, 100},
+        {"Harmonic 15", [](auto& ltf) {
+            setHarmonicCurve(ltf, 15);
+        }, 100},
+        {"Harmonic 20", [](auto& ltf) {
+            setHarmonicCurve(ltf, 20);
+        }, 100},
+        {"Harmonic 25", [](auto& ltf) {
+            setHarmonicCurve(ltf, 25);
+        }, 150},
+        {"Harmonic 30", [](auto& ltf) {
+            setHarmonicCurve(ltf, 30);
+        }, 150}
+    };
+
+    long long totalTime = 0;
+    int passCount = 0;
+
+    for (const auto& test : testCases) {
+        test.setupFunc(*ltf);
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+        ASSERT_TRUE(result.success) << test.name << " fit failed";
+
+        bool passed = duration.count() <= test.maxTimeMs;
+        totalTime += duration.count();
+        if (passed) passCount++;
+
+        std::cout << std::setw(20) << std::left << test.name << " | "
+                  << std::setw(9) << std::right << duration.count() << " | "
+                  << std::setw(7) << result.numAnchors << " | "
+                  << (passed ? "PASS" : "FAIL") << std::endl;
+
+        EXPECT_LE(duration.count(), test.maxTimeMs)
+            << test.name << " took " << duration.count() << "ms (expected <" << test.maxTimeMs << "ms)";
+    }
+
+    std::cout << "\nTotal time: " << totalTime << "ms" << std::endl;
+    std::cout << "Passed: " << passCount << "/" << testCases.size() << std::endl;
+
+    // Overall average should be reasonable
+    double avgTime = static_cast<double>(totalTime) / testCases.size();
+    EXPECT_LT(avgTime, 100.0)
+        << "Average time per curve should be <100ms, got " << avgTime << "ms";
+}
+
+/**
+ * Performance Test 2: Large Dataset (16k samples)
+ *
+ * Tests performance on high-resolution data (16384 samples).
+ * This is the realistic production scenario when users switch from
+ * paint mode (16k samples) back to spline mode (refit).
+ *
+ * Tests several curve types at 16k resolution:
+ * - Simple curve (linear)
+ * - Medium complexity (sine)
+ * - High complexity (Harmonic 10)
+ *
+ * Expected: All complete in <300ms (16k samples require more processing)
+ */
+TEST_F(SplineFitterTest, Performance_LargeDataset_16kSamples) {
+    // Use high-resolution transfer function (16k samples)
+    auto ltfHiRes = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== Large Dataset Performance (16k samples) ===" << std::endl;
+    std::cout << "Curve Type     | Time (ms) | Anchors | Status" << std::endl;
+    std::cout << "---------------|-----------|---------|--------" << std::endl;
+
+    const int maxTimeMs = 300;  // 16k samples need more time than 256 samples
+
+    struct TestCase {
+        std::string name;
+        std::function<void(dsp_core::LayeredTransferFunction&)> setupFunc;
+    };
+
+    std::vector<TestCase> testCases = {
+        {"Linear", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
+            }
+        }},
+        {"Sine Wave", [](auto& ltf) {
+            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                double x = ltf.normalizeIndex(i);
+                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
+            }
+        }},
+        {"Harmonic 10", [](auto& ltf) {
+            setHarmonicCurve(ltf, 10);
+        }}
+    };
+
+    for (const auto& test : testCases) {
+        test.setupFunc(*ltfHiRes);
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltfHiRes, config);
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+        ASSERT_TRUE(result.success) << test.name << " fit failed";
+
+        bool passed = duration.count() < maxTimeMs;
+
+        std::cout << std::setw(14) << std::left << test.name << " | "
+                  << std::setw(9) << std::right << duration.count() << " | "
+                  << std::setw(7) << result.numAnchors << " | "
+                  << (passed ? "PASS" : "FAIL") << std::endl;
+
+        EXPECT_LT(duration.count(), maxTimeMs)
+            << test.name << " with 16k samples took " << duration.count() << "ms (expected <" << maxTimeMs << "ms)";
+    }
+}
+
+/**
+ * Performance Test 3: Worst Case - Complex Harmonic
+ *
+ * Tests performance on the most challenging scenario: Harmonic 25.
+ * This represents a worst-case for complexity while still being realistic
+ * (users can mix harmonics up to 40).
+ *
+ * Uses standard 256-sample resolution (typical user interaction).
+ *
+ * Expected: Completes in <500ms even for this challenging case
+ */
+TEST_F(SplineFitterTest, Performance_WorstCase_ComplexHarmonic) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+
+    std::cout << "\n=== Worst Case Performance: Harmonic 25 ===" << std::endl;
+
+    // Set up Harmonic 25 (very high complexity)
+    setHarmonicCurve(*ltf, 25);
+
+    // Measure performance
+    auto startTime = std::chrono::high_resolution_clock::now();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+    ASSERT_TRUE(result.success) << "Harmonic 25 fit failed";
+
+    std::cout << "Harmonic 25 results:" << std::endl;
+    std::cout << "  Time: " << duration.count() << " ms (expected <500ms)" << std::endl;
+    std::cout << "  Anchors: " << result.numAnchors << std::endl;
+    std::cout << "  Max error: " << std::fixed << std::setprecision(6) << result.maxError << std::endl;
+    std::cout << "  Status: " << (duration.count() < 500 ? "PASS" : "FAIL") << std::endl;
+
+    // Worst case should still complete in reasonable time
+    EXPECT_LT(duration.count(), 500)
+        << "Harmonic 25 worst-case took " << duration.count() << "ms (expected <500ms)";
+
+    // Should still produce reasonable anchor count
+    EXPECT_LE(result.numAnchors, 24)
+        << "Harmonic 25 should fit within maxAnchors budget";
+
+    // Should have acceptable error
+    EXPECT_LT(result.maxError, 0.01)
+        << "Harmonic 25 should have acceptable error";
+}
+
 } // namespace dsp_core_test
