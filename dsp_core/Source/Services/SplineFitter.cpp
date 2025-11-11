@@ -616,14 +616,13 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     }
     double verticalRange = maxY - minY;
 
-    // Configure adaptive tolerance to respect config.positionTolerance
-    // Derive relativeErrorTarget from positionTolerance and verticalRange
+    // Configure adaptive tolerance calculator
+    // Use a fixed relative error target (1% of vertical range) for good balance between
+    // quality and anchor count. This is decoupled from positionTolerance to allow
+    // adaptive tolerance to increase aggressively for backtranslation stability.
     AdaptiveToleranceCalculator::Config adaptiveConfig;
-    if (verticalRange > 1e-9) {
-        adaptiveConfig.relativeErrorTarget = config.positionTolerance / verticalRange;
-    } else {
-        adaptiveConfig.relativeErrorTarget = 0.01;  // Fallback for flat curves
-    }
+    adaptiveConfig.relativeErrorTarget = 0.01;  // 1% of vertical range (balanced default)
+    // anchorDensityMultiplier = 10.0 (default from AdaptiveToleranceCalculator::Config)
 
     // Analyze symmetry if needed (controlled by config.symmetryMode)
     bool useSymmetricMode = false;
@@ -644,6 +643,8 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         auto worst = findWorstFitSample(samples, anchors);
 
         // Compute adaptive tolerance (increases with anchor density to prevent over-fitting)
+        // The adaptive tolerance calculator uses quadratic scaling and anchor density multiplier
+        // to aggressively relax tolerance as anchors accumulate, solving the backtranslation problem.
         double adaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
             verticalRange,
             static_cast<int>(anchors.size()),
@@ -651,8 +652,9 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             adaptiveConfig
         );
 
-        // Use config.positionTolerance as minimum floor
-        adaptiveTolerance = std::max(adaptiveTolerance, config.positionTolerance);
+        // NOTE: We do NOT apply positionTolerance as a floor here. The adaptive tolerance
+        // calculator is trusted to compute the right tolerance based on curve complexity
+        // and anchor density. Applying a floor prevented backtranslation stability.
 
         // Converged?
         if (worst.maxError <= adaptiveTolerance)

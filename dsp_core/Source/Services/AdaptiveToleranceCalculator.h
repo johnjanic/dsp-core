@@ -45,14 +45,14 @@ public:
         /**
          * Multiplier for anchor density scaling
          * Higher values increase tolerance more aggressively as anchors accumulate
-         * Default: 2.0 (tolerance triples at 100% anchor capacity)
+         * Default: 10.0 (tolerance 11x at 100% capacity - optimal backtranslation)
          */
         double anchorDensityMultiplier;
 
         /**
          * Default constructor - uses recommended defaults
          */
-        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(2.0) {}
+        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(10.0) {}
     };
 
     /**
