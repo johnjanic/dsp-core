@@ -483,7 +483,8 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     double wtCoeff = coefficients[0];
     double result = wtCoeff * baseValue + harmonicValue;
 
-    // Apply normalization scalar (only in harmonic mode)
+    // Apply normalization scalar (always, to match composite output)
+    // CRITICAL: SplineFitter must fit to the NORMALIZED composite when normalization is on
     double normScalar = normalizationScalar.load(std::memory_order_acquire);
     return normScalar * result;
 }

@@ -199,6 +199,8 @@ struct SplineFitConfig {
     /**
      * Enable zero-crossing drift detection (defensive DC blocking).
      *
+     * ⚠️ EXPERIMENTAL FEATURE - Disabled by default pending further validation
+     *
      * After greedy fitting completes, checks if fitted spline introduced
      * DC drift at x=0 compared to original curve. Only adds corrective
      * anchor if drift exceeds tolerance.
@@ -207,9 +209,10 @@ struct SplineFitConfig {
      * - If base curve crosses zero at x≈0 AND fitted spline drifts → add anchor
      * - If fitted spline naturally preserves zero-crossing → no intervention
      *
-     * Recommended: true (defensive protection with zero overhead when not needed)
+     * Recommendation: false (default) - needs validation that it doesn't break backtranslation
+     * Only enable if you need guaranteed zero-crossing preservation
      */
-    bool enableZeroCrossingCheck = true;
+    bool enableZeroCrossingCheck = false;
 
     /**
      * Zero-crossing tolerance (vertical distance from base curve at x=0).
@@ -253,6 +256,25 @@ struct SplineFitConfig {
      * Recommended: 0.90 (90% symmetric or better)
      */
     double symmetryThreshold = 0.90;
+
+    /**
+     * Enable feature-based anchor placement (Phase 3 enhancement).
+     *
+     * ⚠️ EXPERIMENTAL FEATURE - Disabled by default due to backtranslation regressions
+     *
+     * When true: CurveFeatureDetector places mandatory anchors at geometric features
+     *            (local extrema, inflection points) before greedy refinement
+     * When false: Pure greedy algorithm without mandatory feature anchors (default)
+     *
+     * Known Issues:
+     * - Breaks backtranslation stability (3 anchors → 7 anchors on simple parabola)
+     * - Forces anchors at detected features even when not needed for error tolerance
+     * - Can over-constrain the greedy algorithm
+     *
+     * Recommendation: false (default) - preserves backtranslation stability
+     * Only enable for experimentation or if you need guaranteed feature preservation
+     */
+    bool enableFeatureDetection = false;
 
     // Presets
     static SplineFitConfig tight() {

@@ -19,12 +19,15 @@ SplineFitResult SplineFitter::fitCurve(
 
     SplineFitResult result;
 
-    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3)
+    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3 - optional)
     // Detect and anchor at geometric features (structural correctness)
     // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
-    int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
-    auto features = CurveFeatureDetector::detectFeatures(ltf, maxFeatures);
-    std::vector<int> mandatoryIndices = features.mandatoryAnchors;
+    std::vector<int> mandatoryIndices;
+    if (config.enableFeatureDetection) {
+        int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
+        auto features = CurveFeatureDetector::detectFeatures(ltf, maxFeatures);
+        mandatoryIndices = features.mandatoryAnchors;
+    }
 
     // Step 1: Sample & sanitize
     auto samples = sampleAndSanitize(ltf, config);
@@ -70,8 +73,7 @@ SplineFitResult SplineFitter::fitCurve(
     result.numAnchors = static_cast<int>(result.anchors.size());
     result.maxError = maxErr;
     result.averageError = sumErr / static_cast<double>(samples.size());
-    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors (including " +
-                     juce::String(static_cast<int>(mandatoryIndices.size())) + " feature anchors), max error: " +
+    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " +
                      juce::String(maxErr, 4);
 
     return result;
@@ -623,7 +625,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         adaptiveConfig.relativeErrorTarget = 0.01;  // Fallback for flat curves
     }
 
-    // Analyze symmetry if needed
+    // Analyze symmetry if needed (controlled by config.symmetryMode)
     bool useSymmetricMode = false;
     if (config.symmetryMode == SymmetryMode::Always) {
         useSymmetricMode = true;
@@ -777,6 +779,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     }
 
     // Zero-crossing drift verification (defensive DC blocking)
+    // Controlled by config.enableZeroCrossingCheck (default: false)
     if (config.enableZeroCrossingCheck && ltf != nullptr) {
         auto zcInfo = analyzeZeroCrossing(*ltf, anchors, config);
 

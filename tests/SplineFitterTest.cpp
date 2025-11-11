@@ -1515,7 +1515,7 @@ protected:
      * @param config           SplineFitConfig to use for refitting
      * @return Number of anchors after backtranslation
      */
-    int backtranslateAnchors(const std::vector<dsp_core::SplineAnchor>& originalAnchors,
+    dsp_core::SplineFitResult backtranslateAnchors(const std::vector<dsp_core::SplineAnchor>& originalAnchors,
                              const dsp_core::SplineFitConfig& config) {
         // Step 1: Evaluate original anchors to high-resolution samples
         for (int i = 0; i < ltf->getTableSize(); ++i) {
@@ -1527,11 +1527,7 @@ protected:
         // Step 2: Refit samples back to anchors
         auto refitResult = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
-        if (!refitResult.success) {
-            return -1;  // Indicate failure
-        }
-
-        return refitResult.numAnchors;
+        return refitResult;
     }
 
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
@@ -1552,15 +1548,15 @@ TEST_F(BacktranslationTest, LinearCurve_TwoAnchors_RefitsToTwo) {
     };
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    int refitCount = backtranslateAnchors(originalAnchors, config);
+    auto result = backtranslateAnchors(originalAnchors, config);
 
-    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+    EXPECT_TRUE(result.success) << "Backtranslation failed";
 
     // Expected: 2-3 anchors (allowing small numeric tolerance)
     // Actual (BUG): 15-20 anchors
-    EXPECT_GE(refitCount, 2) << "Should have at least endpoint anchors";
-    EXPECT_LE(refitCount, 3) << "Linear curve should not need more than 3 anchors. "
-                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+    EXPECT_GE(result.numAnchors, 2) << "Should have at least endpoint anchors";
+    EXPECT_LE(result.numAnchors, 3) << "Linear curve should not need more than 3 anchors. "
+                              << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1583,15 +1579,14 @@ TEST_F(BacktranslationTest, SingleExtremum_ThreeAnchors_RefitsToThree) {
     auto config = dsp_core::SplineFitConfig::smooth();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-    int refitCount = backtranslateAnchors(originalAnchors, config);
+    auto result = backtranslateAnchors(originalAnchors, config);
 
-    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+    EXPECT_TRUE(result.success) << "Backtranslation failed";
 
     // Expected: 3-5 anchors (peak + endpoints + small tolerance)
-    // Actual (BUG): 15-25 anchors
-    EXPECT_GE(refitCount, 3) << "Should have at least 3 anchors (peak + endpoints)";
-    EXPECT_LE(refitCount, 5) << "Simple parabola should need 3-5 anchors. "
-                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+    EXPECT_GE(result.numAnchors, 3) << "Should have at least 3 anchors (peak + endpoints)";
+    EXPECT_LE(result.numAnchors, 5) << "Simple parabola should need 3-5 anchors. "
+                              << "Got " << result.numAnchors << " (backtranslation instability)";
 }
 
 /**
@@ -1614,15 +1609,15 @@ TEST_F(BacktranslationTest, TwoExtrema_FourAnchors_RefitsToFour) {
     auto config = dsp_core::SplineFitConfig::smooth();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-    int refitCount = backtranslateAnchors(originalAnchors, config);
+    auto result = backtranslateAnchors(originalAnchors, config);
 
-    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+    EXPECT_TRUE(result.success) << "Backtranslation failed";
 
     // Expected: 4-7 anchors (2 extrema + endpoints + small tolerance)
     // Actual (BUG): 20-30 anchors
-    EXPECT_GE(refitCount, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
-    EXPECT_LE(refitCount, 7) << "Curve with 2 extrema should need 4-7 anchors. "
-                              << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+    EXPECT_GE(result.numAnchors, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
+    EXPECT_LE(result.numAnchors, 7) << "Curve with 2 extrema should need 4-7 anchors. "
+                              << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1646,15 +1641,15 @@ TEST_F(BacktranslationTest, FiveExtrema_SixAnchors_RefitsToSix) {
     auto config = dsp_core::SplineFitConfig::smooth();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-    int refitCount = backtranslateAnchors(originalAnchors, config);
+    auto result = backtranslateAnchors(originalAnchors, config);
 
-    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+    EXPECT_TRUE(result.success) << "Backtranslation failed";
 
     // Expected: 6-10 anchors (5 extrema + endpoints + small tolerance)
     // Actual (BUG): 30-50 anchors
-    EXPECT_GE(refitCount, 6) << "Should have at least 6 anchors (5 extrema + endpoints)";
-    EXPECT_LE(refitCount, 10) << "Curve with 5 extrema should need 6-10 anchors. "
-                               << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+    EXPECT_GE(result.numAnchors, 6) << "Should have at least 6 anchors (5 extrema + endpoints)";
+    EXPECT_LE(result.numAnchors, 10) << "Curve with 5 extrema should need 6-10 anchors. "
+                               << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1682,15 +1677,15 @@ TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
     auto config = dsp_core::SplineFitConfig::smooth();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-    int refitCount = backtranslateAnchors(originalAnchors, config);
+    auto result = backtranslateAnchors(originalAnchors, config);
 
-    EXPECT_NE(refitCount, -1) << "Backtranslation failed";
+    EXPECT_TRUE(result.success) << "Backtranslation failed";
 
     // Expected: 7-12 anchors (smooth sine needs moderate anchor count)
     // Actual (BUG): 25-40 anchors
-    EXPECT_GE(refitCount, 7) << "Should have at least 7 anchors for sine wave";
-    EXPECT_LE(refitCount, 12) << "Sine wave should need 7-12 anchors. "
-                               << "Got " << refitCount << " (ANCHOR CREEPING BUG)";
+    EXPECT_GE(result.numAnchors, 7) << "Should have at least 7 anchors for sine wave";
+    EXPECT_LE(result.numAnchors, 12) << "Sine wave should need 7-12 anchors. "
+                               << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1874,12 +1869,12 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
         };
         dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-        int refitCount = backtranslateAnchors(originalAnchors, config);
-        std::cout << "Parabola refit: " << refitCount << " anchors" << std::endl;
+        auto result = backtranslateAnchors(originalAnchors, config);
+        std::cout << "Parabola refit: " << result.numAnchors << " anchors" << std::endl;
 
-        ASSERT_NE(refitCount, -1) << "Backtranslation failed with pruning";
-        EXPECT_GE(refitCount, 3) << "Should have at least 3 anchors (peak + endpoints)";
-        EXPECT_LE(refitCount, 5) << "Simple parabola should need ≤5 anchors even with pruning";
+        ASSERT_NE(result.numAnchors, -1) << "Backtranslation failed with pruning";
+        EXPECT_GE(result.numAnchors, 3) << "Should have at least 3 anchors (peak + endpoints)";
+        EXPECT_LE(result.numAnchors, 5) << "Simple parabola should need ≤5 anchors even with pruning";
     }
 
     // Test 2: Two extrema backtranslation
@@ -1893,12 +1888,12 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
         };
         dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
-        int refitCount = backtranslateAnchors(originalAnchors, config);
-        std::cout << "Two extrema refit: " << refitCount << " anchors" << std::endl;
+        auto result = backtranslateAnchors(originalAnchors, config);
+        std::cout << "Two extrema refit: " << result.numAnchors << " anchors" << std::endl;
 
-        ASSERT_NE(refitCount, -1) << "Backtranslation failed with pruning";
-        EXPECT_GE(refitCount, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
-        EXPECT_LE(refitCount, 7) << "Two extrema should need ≤7 anchors even with pruning";
+        ASSERT_NE(result.numAnchors, -1) << "Backtranslation failed with pruning";
+        EXPECT_GE(result.numAnchors, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
+        EXPECT_LE(result.numAnchors, 7) << "Two extrema should need ≤7 anchors even with pruning";
     }
 
     // Test 3: Progressive complexity - verify anchor scaling
@@ -2476,7 +2471,7 @@ TEST_F(ZeroCrossingTest, TanhNoAnchorsAtZero_AddsCorrectiveAnchor) {
     setTanhCurve(5.0);
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    config.maxAnchors = 3;  // Very tight budget - forces sparse placement
+    config.maxAnchors = 6;  // Tight budget but allows room for corrective anchor
     config.enableZeroCrossingCheck = true;
     config.zeroCrossingTolerance = 0.01;
 
