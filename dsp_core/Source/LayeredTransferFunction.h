@@ -192,6 +192,17 @@ public:
     double applyTransferFunction(double x) const;
 
     /**
+     * Evaluate base layer + harmonics explicitly (ignores spline layer)
+     *
+     * Used by SplineFitter to read the baked base curve when re-entering spline mode.
+     * This ensures we fit the correct curve, not the stale spline layer.
+     *
+     * @param x Input value in [minValue, maxValue]
+     * @return base + harmonics (with normalization if enabled)
+     */
+    double evaluateBaseAndHarmonics(double x) const;
+
+    /**
      * Process block of samples in-place
      */
     void processBlock(double* samples, int numSamples);

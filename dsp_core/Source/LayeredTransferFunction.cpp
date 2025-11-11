@@ -474,6 +474,20 @@ double LayeredTransferFunction::interpolateBase(double x) const {
     return y0 + t * (y1 - y0);
 }
 
+double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
+    // CRITICAL: Always evaluate base + harmonics, ignoring spline layer state
+    // This is used by SplineFitter to read the baked base curve when re-entering spline mode
+
+    double baseValue = interpolateBase(x);
+    double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+    double wtCoeff = coefficients[0];
+    double result = wtCoeff * baseValue + harmonicValue;
+
+    // Apply normalization scalar (only in harmonic mode)
+    double normScalar = normalizationScalar.load(std::memory_order_acquire);
+    return normScalar * result;
+}
+
 juce::ValueTree LayeredTransferFunction::toValueTree() const {
     juce::ValueTree vt("LayeredTransferFunction");
 

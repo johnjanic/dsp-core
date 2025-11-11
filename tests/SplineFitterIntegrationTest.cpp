@@ -1145,3 +1145,122 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
                   ? "demonstrates better stability" : "tested successfully")
               << "\n";
 }
+
+/**
+ * REGRESSION TEST: Re-entering spline mode fits correct curve (not stale spline)
+ *
+ * Bug report scenario:
+ *   A) Initialize to y=x (identity)
+ *   B) Enter spline mode → fits 2 endpoints at (-1,-1), (1,1)
+ *   C) User drags anchor to (0.1, -0.5) → asymmetric curve drooping downward
+ *   D) Exit spline mode → bake spline to base layer
+ *   E) Re-enter spline mode → SHOULD fit the asymmetric curve from D
+ *
+ * BUG: Before fix, when re-entering spline mode, SplineFitter read from the
+ *      old spline layer (still had anchors from C), not the baked base curve.
+ *      This caused spurious zero-crossing anchors and wrong curve shape.
+ *
+ * FIX: SplineFitter now uses evaluateBaseAndHarmonics() to always read from
+ *      base layer, ignoring stale spline layer state.
+ *
+ * Test verifies:
+ *   1. After re-entering spline mode, fitted curve matches baked asymmetric curve
+ *   2. No spurious zero-crossing anchor at (0,0)
+ *   3. Curve shape preserved (drooping asymmetric, NOT straight line)
+ */
+TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrectCurve) {
+    auto config = SplineFitConfig::smooth();
+    config.maxAnchors = 24;
+    config.positionTolerance = 0.01;
+
+    std::cout << "\n=== Regression Test: Re-entering Spline Mode ===\n";
+
+    // Step A: Initialize to identity (y = x)
+    std::cout << "Step A: Initialize to identity curve\n";
+    setIdentityCurve();
+
+    // Step B: Enter spline mode → fit endpoints
+    std::cout << "Step B: Enter spline mode → fit endpoints\n";
+    ltf->setSplineLayerEnabled(true);
+    auto fitResult1 = SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(fitResult1.success) << "Initial fit should succeed";
+    EXPECT_EQ(fitResult1.anchors.size(), 2) << "Identity should fit to 2 endpoints";
+
+    // Step C: Simulate user dragging anchor to create asymmetric curve
+    std::cout << "Step C: User drags anchor to (0.1, -0.5) → asymmetric curve\n";
+    std::vector<SplineAnchor> userEditedAnchors = {
+        {-1.0, -1.0, false, 0.0},
+        {0.1, -0.5, false, 0.0},   // Asymmetric anchor (drooping downward)
+        {1.0, 1.0, false, 0.0}
+    };
+    SplineFitter::computeTangents(userEditedAnchors, config);
+    ltf->getSplineLayer().setAnchors(userEditedAnchors);
+    ltf->invalidateCompositeCache();
+
+    // Verify the spline layer has the user's curve
+    double yAtOrigin = ltf->getSplineLayer().evaluate(0.0);
+    std::cout << "  Spline y(0.0) = " << yAtOrigin << " (should be negative)\n";
+    EXPECT_LT(yAtOrigin, 0.0) << "Asymmetric curve should droop below zero at x=0";
+
+    // Step D: Exit spline mode → bake to base layer
+    std::cout << "Step D: Exit spline mode → bake spline to base layer\n";
+    bakeSplineToBase();
+    ltf->setSplineLayerEnabled(false);
+    ltf->updateComposite();
+
+    // Verify base layer has the baked asymmetric curve
+    double bakedYAtOriginIdx = ltf->getBaseLayerValue(ltf->getTableSize() / 2);
+    std::cout << "  Base layer y(centerIdx) = " << bakedYAtOriginIdx << " (should match spline)\n";
+
+    // Also verify via evaluateBaseAndHarmonics (what SplineFitter will use)
+    double bakedYViaEval = ltf->evaluateBaseAndHarmonics(0.0);
+    std::cout << "  evaluateBaseAndHarmonics(0.0) = " << bakedYViaEval << "\n";
+    EXPECT_NEAR(bakedYViaEval, yAtOrigin, 0.05)
+        << "Base layer should preserve asymmetric curve shape";
+
+    // Step E: Re-enter spline mode → CRITICAL TEST
+    std::cout << "Step E: Re-enter spline mode → fit should match baked curve\n";
+    ltf->setSplineLayerEnabled(true);
+    auto fitResult2 = SplineFitter::fitCurve(*ltf, config);
+    ASSERT_TRUE(fitResult2.success) << "Refit should succeed";
+
+    std::cout << "  Refit produced " << fitResult2.anchors.size() << " anchors\n";
+
+    // Print anchors for debugging
+    std::cout << "  Fitted anchors:\n";
+    for (size_t i = 0; i < fitResult2.anchors.size(); ++i) {
+        std::cout << "    [" << i << "] x=" << std::fixed << std::setprecision(3)
+                  << fitResult2.anchors[i].x << ", y=" << fitResult2.anchors[i].y << "\n";
+    }
+
+    // CRITICAL: Check that we DON'T have a spurious zero-crossing anchor at (0,0)
+    bool hasSpuriousZeroCrossingAnchor = false;
+    for (const auto& anchor : fitResult2.anchors) {
+        if (std::abs(anchor.x) < 0.01 && std::abs(anchor.y) < 0.01) {
+            hasSpuriousZeroCrossingAnchor = true;
+            break;
+        }
+    }
+
+    EXPECT_FALSE(hasSpuriousZeroCrossingAnchor)
+        << "BUG: Spurious zero-crossing anchor at (0,0) detected - "
+        << "SplineFitter is reading from old spline layer instead of baked base curve!";
+
+    // Verify fitted spline preserves asymmetric shape
+    SplineFitter::computeTangents(fitResult2.anchors, config);
+    double refittedYAtOrigin = SplineEvaluator::evaluate(fitResult2.anchors, 0.0);
+    std::cout << "  Refitted spline y(0.0) = " << refittedYAtOrigin << "\n";
+
+    EXPECT_NEAR(refittedYAtOrigin, yAtOrigin, 0.1)
+        << "Refitted curve should match original asymmetric shape, not collapse to straight line";
+
+    EXPECT_LT(refittedYAtOrigin, 0.0)
+        << "Refitted curve should preserve drooping asymmetric characteristic";
+
+    // Verify we have more than 2 anchors (asymmetric curve needs more detail)
+    EXPECT_GE(fitResult2.anchors.size(), 3)
+        << "Asymmetric curve should require 3+ anchors, not just 2 endpoints";
+
+    std::cout << "  ✓ Refit correctly preserved asymmetric curve shape\n";
+    std::cout << "  ✓ No spurious zero-crossing anchor detected\n";
+}

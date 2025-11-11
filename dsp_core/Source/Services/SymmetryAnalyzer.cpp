@@ -29,15 +29,28 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(
         int positiveIdx = centerIdx + static_cast<int>(t * (tableSize - centerIdx - 1));
         int negativeIdx = centerIdx - static_cast<int>(t * centerIdx);
 
-        // Clamp to valid range
-        positiveIdx = std::max(centerIdx, std::min(tableSize - 1, positiveIdx));
-        negativeIdx = std::max(0, std::min(centerIdx, negativeIdx));
+        // Evaluate at the x positions (includes base + harmonics, ignores spline)
+        double xPositive = ltf.normalizeIndex(positiveIdx);
+        double xNegative = ltf.normalizeIndex(negativeIdx);
 
-        double yPositive = ltf.getBaseLayerValue(positiveIdx);
-        double yNegative = ltf.getBaseLayerValue(negativeIdx);
+        double yPositive = ltf.evaluateBaseAndHarmonics(xPositive);
+        double yNegative = ltf.evaluateBaseAndHarmonics(xNegative);
 
         fPositive.push_back(yPositive);
         fNegative.push_back(yNegative);
+    }
+
+    // CRITICAL: Check zero-crossing at origin for odd symmetry
+    // For odd symmetry f(-x) = -f(x), we must have f(0) = 0
+    // If |f(0)| > tolerance, the curve cannot be odd-symmetric
+    double yAtZero = ltf.evaluateBaseAndHarmonics(0.0);
+    const double zeroCrossingTolerance = 0.1;  // 10% tolerance
+
+    if (std::abs(yAtZero) > zeroCrossingTolerance) {
+        // Curve doesn't cross zero → NOT odd-symmetric
+        result.score = 0.0;
+        result.classification = Result::Classification::Asymmetric;
+        return result;
     }
 
     // Compute symmetry score (correlation between f(x) and -f(-x))

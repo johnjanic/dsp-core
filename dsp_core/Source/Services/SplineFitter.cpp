@@ -90,11 +90,11 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
     samples.reserve(tableSize * 2);  // Reserve extra space for densification
 
     // Raster-to-polyline: sample entire composite (what user sees)
-    // CRITICAL: Read from composite, not base layer
-    // This includes base + harmonics + normalization = actual visible curve
+    // CRITICAL: Always read base + harmonics, ignoring spline layer state
+    // When re-entering spline mode, we must fit the baked base curve, not the old spline
     for (int i = 0; i < tableSize; ++i) {
         double x = ltf.normalizeIndex(i);  // Maps to [-1, 1]
-        double y = ltf.getCompositeValue(i);
+        double y = ltf.evaluateBaseAndHarmonics(x);  // FIX: Always read base+harmonics
         samples.push_back({x, y});
     }
 
@@ -111,18 +111,9 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
         if (i < samples.size() - 1) {
             double midX = (samples[i].x + samples[i+1].x) / 2.0;
 
-            // Find the table index corresponding to midX and sample the ACTUAL curve
+            // Sample the ACTUAL base+harmonics curve at midpoint
             // This prevents false errors from linear interpolation on high-frequency curves
-            int tableIdx = 0;
-            double minDist = std::abs(ltf.normalizeIndex(0) - midX);
-            for (int j = 1; j < tableSize; ++j) {
-                double dist = std::abs(ltf.normalizeIndex(j) - midX);
-                if (dist < minDist) {
-                    minDist = dist;
-                    tableIdx = j;
-                }
-            }
-            double midY = ltf.getCompositeValue(tableIdx);
+            double midY = ltf.evaluateBaseAndHarmonics(midX);  // FIX: Always read base+harmonics
 
             densified.push_back({midX, midY});
         }
@@ -869,23 +860,11 @@ SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(
     const SplineFitConfig& config) {
 
     ZeroCrossingInfo info;
-    const int tableSize = ltf.getTableSize();
 
-    // With even table size (e.g., 16384), no sample exists at exactly x=0
-    // We interpolate between the two samples closest to zero
-
-    // Find indices bracketing x=0
-    int centerIdx = tableSize / 2;
-    double xRight = ltf.normalizeIndex(centerIdx);       // x ≈ +ε
-    double xLeft = ltf.normalizeIndex(centerIdx - 1);    // x ≈ -ε
-
-    // Linear interpolation to get y at exactly x=0
-    double yLeft = ltf.getBaseLayerValue(centerIdx - 1);
-    double yRight = ltf.getBaseLayerValue(centerIdx);
-
-    // Interpolate: y(0) = yLeft + (yRight - yLeft) * (0 - xLeft) / (xRight - xLeft)
-    double t = (0.0 - xLeft) / (xRight - xLeft);
-    info.baseYAtZero = yLeft + t * (yRight - yLeft);
+    // Evaluate base + harmonics at exactly x=0 (matches what we're fitting)
+    // CRITICAL: Must use evaluateBaseAndHarmonics, not raw base layer
+    // This ensures we're checking zero-crossing of the actual curve being fitted
+    info.baseYAtZero = ltf.evaluateBaseAndHarmonics(0.0);
 
     // Check if base curve crosses zero (within tolerance)
     if (std::abs(info.baseYAtZero) < config.zeroCrossingTolerance) {
