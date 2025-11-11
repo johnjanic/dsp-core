@@ -52,7 +52,7 @@ public:
         /**
          * Default constructor - uses recommended defaults
          */
-        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(10.0) {}
+        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(6.0) {}
     };
 
     /**

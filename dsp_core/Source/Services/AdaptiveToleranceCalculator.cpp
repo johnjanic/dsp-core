@@ -26,17 +26,18 @@ double AdaptiveToleranceCalculator::computeTolerance(double verticalRange,
     anchorRatio = std::min(1.0, anchorRatio);  // Clamp to [0, 1]
 
     // Apply adaptive scaling
-    // Formula: tolerance = baseline × (1 + anchorRatio^2 × multiplier)
-    // Using quadratic scaling for more aggressive tolerance increase
+    // Formula: tolerance = baseline × (1 + anchorRatio × multiplier)
+    // Using LINEAR scaling for better backtranslation stability at low anchor counts
+    // With multiplier=10.0:
     // - At 0% capacity:   tolerance = baseline × 1.0
-    // - At 25% capacity:  tolerance = baseline × 1.125 (with multiplier=2.0)
-    // - At 50% capacity:  tolerance = baseline × 1.5 (with multiplier=2.0)
-    // - At 75% capacity:  tolerance = baseline × 2.125 (with multiplier=2.0)
-    // - At 100% capacity: tolerance = baseline × 3.0 (with multiplier=2.0)
+    // - At 10% capacity:  tolerance = baseline × 2.0   (early relaxation for backtranslation)
+    // - At 25% capacity:  tolerance = baseline × 3.5
+    // - At 50% capacity:  tolerance = baseline × 6.0
+    // - At 100% capacity: tolerance = baseline × 11.0
     //
-    // For backtranslation stability, use higher multiplier (4.0-6.0) in config
-    double anchorRatioSquared = anchorRatio * anchorRatio;
-    double adaptiveTolerance = baselineTolerance * (1.0 + anchorRatioSquared * config.anchorDensityMultiplier);
+    // This is MORE aggressive at low anchor counts (good for backtranslation)
+    // while still allowing complex curves to use their full anchor budget.
+    double adaptiveTolerance = baselineTolerance * (1.0 + anchorRatio * config.anchorDensityMultiplier);
 
     return adaptiveTolerance;
 }
