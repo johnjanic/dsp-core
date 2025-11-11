@@ -194,11 +194,14 @@ public:
     /**
      * Evaluate base layer + harmonics explicitly (ignores spline layer)
      *
-     * Used by SplineFitter to read the baked base curve when re-entering spline mode.
-     * This ensures we fit the correct curve, not the stale spline layer.
+     * Used by SplineFitter to read the normalized composite when entering spline mode.
+     * This ensures we fit the correct normalized curve, not the stale spline layer.
+     *
+     * CRITICAL: normalizationScalar is NOT reset when entering spline mode, so this
+     * returns the properly normalized values that the user sees on screen.
      *
      * @param x Input value in [minValue, maxValue]
-     * @return base + harmonics (with normalization if enabled)
+     * @return base + harmonics (with current normalization applied)
      */
     double evaluateBaseAndHarmonics(double x) const;
 

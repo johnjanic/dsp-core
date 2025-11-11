@@ -92,11 +92,11 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
     samples.reserve(tableSize * 2);  // Reserve extra space for densification
 
     // Raster-to-polyline: sample entire composite (what user sees)
-    // CRITICAL: Always read base + harmonics, ignoring spline layer state
-    // When re-entering spline mode, we must fit the baked base curve, not the old spline
+    // CRITICAL: normalizationScalar is preserved when entering spline mode
+    // evaluateBaseAndHarmonics applies the correct normScalar to return normalized values
     for (int i = 0; i < tableSize; ++i) {
         double x = ltf.normalizeIndex(i);  // Maps to [-1, 1]
-        double y = ltf.evaluateBaseAndHarmonics(x);  // FIX: Always read base+harmonics
+        double y = ltf.evaluateBaseAndHarmonics(x);  // Returns normalized base + harmonics
         samples.push_back({x, y});
     }
 
@@ -113,9 +113,9 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
         if (i < samples.size() - 1) {
             double midX = (samples[i].x + samples[i+1].x) / 2.0;
 
-            // Sample the ACTUAL base+harmonics curve at midpoint
+            // Sample the ACTUAL normalized composite at midpoint
             // This prevents false errors from linear interpolation on high-frequency curves
-            double midY = ltf.evaluateBaseAndHarmonics(midX);  // FIX: Always read base+harmonics
+            double midY = ltf.evaluateBaseAndHarmonics(midX);
 
             densified.push_back({midX, midY});
         }
@@ -887,9 +887,9 @@ SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(
 
     ZeroCrossingInfo info;
 
-    // Evaluate base + harmonics at exactly x=0 (matches what we're fitting)
-    // CRITICAL: Must use evaluateBaseAndHarmonics, not raw base layer
-    // This ensures we're checking zero-crossing of the actual curve being fitted
+    // Evaluate normalized composite at exactly x=0 (matches what we're fitting)
+    // normalizationScalar is preserved when entering spline mode, so this returns
+    // the normalized value that SplineFitter is actually fitting
     info.baseYAtZero = ltf.evaluateBaseAndHarmonics(0.0);
 
     // Check if base curve crosses zero (within tolerance)

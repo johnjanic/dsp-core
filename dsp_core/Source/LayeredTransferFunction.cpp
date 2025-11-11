@@ -213,13 +213,16 @@ bool LayeredTransferFunction::isNormalizationEnabled() const {
 }
 
 void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
-    if (enabled) {
-        // Entering spline mode:
-        // - Harmonics are kept intact (hidden but present for undo)
-        // - Spline fits to composite (base + harmonics)
-        // - Lock normalization to identity (user controls amplitude via anchors)
-        normalizationScalar.store(1.0, std::memory_order_release);
-    }
+    // Entering spline mode:
+    // - Harmonics are kept intact (hidden but present for undo)
+    // - Spline will fit to the current normalized composite (base + harmonics)
+    // - Spline evaluation bypasses normalization (user controls amplitude via anchors)
+    //
+    // CRITICAL: We do NOT modify normalizationScalar here!
+    // - normalizationScalar only affects harmonic mode evaluation
+    // - Spline mode evaluation doesn't use normalizationScalar (direct PCHIP)
+    // - SplineFitter needs the correct normScalar to read normalized composite
+    // - Premature reset to 1.0 caused bug where SplineFitter fit unnormalized values
 
     splineLayerEnabled.store(enabled, std::memory_order_release);
     invalidateCompositeCache();
@@ -476,15 +479,17 @@ double LayeredTransferFunction::interpolateBase(double x) const {
 
 double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     // CRITICAL: Always evaluate base + harmonics, ignoring spline layer state
-    // This is used by SplineFitter to read the baked base curve when re-entering spline mode
+    // Used by SplineFitter to read the normalized composite when entering spline mode
+    //
+    // normalizationScalar is preserved when entering spline mode (not reset to 1.0),
+    // so this returns the properly normalized values that SplineFitter needs to fit
 
     double baseValue = interpolateBase(x);
     double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
     double wtCoeff = coefficients[0];
     double result = wtCoeff * baseValue + harmonicValue;
 
-    // Apply normalization scalar (always, to match composite output)
-    // CRITICAL: SplineFitter must fit to the NORMALIZED composite when normalization is on
+    // Apply normalization scalar to match what user sees on screen
     double normScalar = normalizationScalar.load(std::memory_order_acquire);
     return normScalar * result;
 }
