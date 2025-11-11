@@ -227,16 +227,22 @@ struct SplineFitConfig {
     /**
      * Symmetry mode for anchor placement.
      *
+     * ⚠️ EXPERIMENTAL FEATURE - Disabled by default due to quality regressions
+     *
      * Auto: Analyzes curve symmetry, enables paired anchors if score > threshold
      * Always: Forces symmetric anchor placement regardless of curve shape
-     * Never: Disables symmetric fitting (original greedy algorithm)
+     * Never: Disables symmetric fitting (original greedy algorithm) - DEFAULT
      *
      * Symmetric fitting adds anchors in complementary pairs (x, -x) to
      * maintain visual symmetry for symmetric curves (tanh, x³, odd harmonics).
      *
-     * Recommendation: Auto (default) - respects user intent for symmetric shapes
+     * Known Issues:
+     * - Averaging y-values causes regressions on high-frequency harmonics
+     * - Can waste anchor budget on low-error complementary positions
+     *
+     * Recommendation: Never (default) - preserves optimal greedy fitting quality
      */
-    SymmetryMode symmetryMode = SymmetryMode::Auto;
+    SymmetryMode symmetryMode = SymmetryMode::Never;
 
     /**
      * Symmetry detection threshold (for Auto mode).

@@ -690,11 +690,21 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
                     return std::abs(a.x - worstSample.x) < 1e-9;
                 });
 
+            // Check if complementary position ALSO has significant error
+            // (Don't waste anchor budget on low-error positions)
+            double complementaryError = 0.0;
+            if (!hasComplementaryAnchor) {
+                double splineYAtComplementary = SplineEvaluator::evaluate(anchors, complementarySample.x);
+                complementaryError = std::abs(complementarySample.y - splineYAtComplementary);
+            }
+
             // Only add complementary pair if:
             // 1. Original position doesn't have anchor
             // 2. Complementary position doesn't have anchor
-            // 3. We have room for 2 more anchors
+            // 3. Complementary position has significant error (>50% of adaptive tolerance)
+            // 4. We have room for 2 more anchors
             bool canAddPair = !hasOriginalAnchor && !hasComplementaryAnchor &&
+                              complementaryError > adaptiveTolerance * 0.5 &&
                               (iteration + 1 < remainingAnchors);
 
             if (canAddPair) {
@@ -726,9 +736,22 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
                 ++iteration;
 
             } else {
-                // In symmetric mode: stop if we can't add a pair
-                // (preserves anchor symmetry rather than adding asymmetric anchor)
-                break;
+                // Fallback: add single anchor (asymmetric, but necessary)
+                // Better to break symmetry slightly than leave large errors unaddressed
+                auto insertPos = std::lower_bound(
+                    anchors.begin(), anchors.end(), worstSample.x,
+                    [](const SplineAnchor& a, double x) { return a.x < x; }
+                );
+
+                bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
+                    [&worstSample](const SplineAnchor& a) {
+                        return std::abs(a.x - worstSample.x) < 1e-9;
+                    });
+
+                if (isDuplicate)
+                    break;  // No progress possible
+
+                anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
             }
 
         } else {

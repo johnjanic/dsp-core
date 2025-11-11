@@ -1334,6 +1334,94 @@ TEST_F(SplineFitterTest, AllHarmonics_MixedWithIdentity) {
 }
 
 /**
+ * Regression test: Compare curve fitting WITH vs WITHOUT enhancements
+ * Tests if Phase 1-3 enhancements (zero-crossing, symmetry) cause regression
+ */
+TEST_F(SplineFitterTest, RegressionTest_EnhancementsComparison) {
+    std::cout << "\n=== Regression Test: Enhancements Comparison ===" << std::endl;
+    std::cout << "Testing Harmonic15 (known to show regression)" << std::endl;
+    std::cout << std::endl;
+
+    setHarmonicCurve(*ltf, 15);
+
+    // Test WITH enhancements (current defaults)
+    auto configWith = dsp_core::SplineFitConfig::smooth();
+    std::cout << "WITH Enhancements (Current Defaults):" << std::endl;
+    std::cout << "  enableZeroCrossingCheck: " << configWith.enableZeroCrossingCheck << std::endl;
+    std::cout << "  symmetryMode: " << (int)configWith.symmetryMode << " (0=Auto, 1=Always, 2=Never)" << std::endl;
+
+    auto resultWith = dsp_core::Services::SplineFitter::fitCurve(*ltf, configWith);
+    std::cout << "  Anchors: " << resultWith.numAnchors << std::endl;
+    std::cout << "  MaxError: " << std::fixed << std::setprecision(4) << resultWith.maxError << std::endl;
+    std::cout << std::endl;
+
+    // Test WITHOUT enhancements (original behavior)
+    auto configWithout = dsp_core::SplineFitConfig::smooth();
+    configWithout.enableZeroCrossingCheck = false;
+    configWithout.symmetryMode = dsp_core::SymmetryMode::Never;
+
+    std::cout << "WITHOUT Enhancements (Original Behavior):" << std::endl;
+    std::cout << "  enableZeroCrossingCheck: " << configWithout.enableZeroCrossingCheck << std::endl;
+    std::cout << "  symmetryMode: " << (int)configWithout.symmetryMode << std::endl;
+
+    auto resultWithout = dsp_core::Services::SplineFitter::fitCurve(*ltf, configWithout);
+    std::cout << "  Anchors: " << resultWithout.numAnchors << std::endl;
+    std::cout << "  MaxError: " << std::fixed << std::setprecision(4) << resultWithout.maxError << std::endl;
+    std::cout << std::endl;
+
+    // Test ONLY zero-crossing (symmetry disabled)
+    auto configZeroCrossingOnly = dsp_core::SplineFitConfig::smooth();
+    configZeroCrossingOnly.enableZeroCrossingCheck = true;
+    configZeroCrossingOnly.symmetryMode = dsp_core::SymmetryMode::Never;
+
+    std::cout << "ONLY Zero-Crossing Check (Symmetry Disabled):" << std::endl;
+    auto resultZCOnly = dsp_core::Services::SplineFitter::fitCurve(*ltf, configZeroCrossingOnly);
+    std::cout << "  Anchors: " << resultZCOnly.numAnchors << std::endl;
+    std::cout << "  MaxError: " << std::fixed << std::setprecision(4) << resultZCOnly.maxError << std::endl;
+    std::cout << std::endl;
+
+    // Test ONLY symmetry (zero-crossing disabled)
+    auto configSymmetryOnly = dsp_core::SplineFitConfig::smooth();
+    configSymmetryOnly.enableZeroCrossingCheck = false;
+    configSymmetryOnly.symmetryMode = dsp_core::SymmetryMode::Auto;
+
+    std::cout << "ONLY Symmetry Mode (Zero-Crossing Disabled):" << std::endl;
+    auto resultSymOnly = dsp_core::Services::SplineFitter::fitCurve(*ltf, configSymmetryOnly);
+    std::cout << "  Anchors: " << resultSymOnly.numAnchors << std::endl;
+    std::cout << "  MaxError: " << std::fixed << std::setprecision(4) << resultSymOnly.maxError << std::endl;
+    std::cout << std::endl;
+
+    // Compare
+    std::cout << "COMPARISON:" << std::endl;
+    std::cout << "  Baseline (no enhancements):     " << std::setprecision(4) << resultWithout.maxError << std::endl;
+    std::cout << "  Zero-crossing only:             " << std::setprecision(4) << resultZCOnly.maxError
+              << " (diff: " << std::showpos << (resultZCOnly.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+    std::cout << "  Symmetry only:                  " << std::setprecision(4) << resultSymOnly.maxError
+              << " (diff: " << std::showpos << (resultSymOnly.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+    std::cout << "  Both enhancements:              " << std::setprecision(4) << resultWith.maxError
+              << " (diff: " << std::showpos << (resultWith.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+    std::cout << std::endl;
+
+    if (resultWith.maxError > resultWithout.maxError * 1.1) {
+        std::cout << "  ⚠️  REGRESSION DETECTED: Error increased by >10% with enhancements!" << std::endl;
+
+        // Identify culprit
+        if (resultZCOnly.maxError > resultWithout.maxError * 1.1) {
+            std::cout << "  🔍 Zero-crossing check is causing regression" << std::endl;
+        }
+        if (resultSymOnly.maxError > resultWithout.maxError * 1.1) {
+            std::cout << "  🔍 Symmetry mode is causing regression" << std::endl;
+        }
+    } else {
+        std::cout << "  ✅ No significant regression" << std::endl;
+    }
+
+    // Don't fail the test, just report the comparison
+    // EXPECT_LE(resultWith.maxError, resultWithout.maxError * 1.1)
+    //     << "Enhancements should not significantly worsen fitting quality";
+}
+
+/**
  * Focused test on problematic high-frequency harmonics (15-20)
  * These are most likely to trigger clustering bugs
  */
