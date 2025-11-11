@@ -38,6 +38,20 @@ public:
         const SplineFitConfig& config = SplineFitConfig::smooth()
     );
 
+    // Zero-crossing analysis (exposed for testing)
+    struct ZeroCrossingInfo {
+        bool baseCurveHasZeroCrossing = false;
+        double baseYAtZero = 0.0;
+        double fittedYAtZero = 0.0;
+        double drift = 0.0;
+    };
+
+    static ZeroCrossingInfo analyzeZeroCrossing(
+        const LayeredTransferFunction& ltf,
+        const std::vector<SplineAnchor>& anchors,
+        const SplineFitConfig& config
+    );
+
 private:
     // Step 1: Sample & sanitize
     struct Sample { double x, y; };

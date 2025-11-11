@@ -12,6 +12,13 @@ enum class TangentAlgorithm {
     FiniteDifference    // Simple baseline (for comparison)
 };
 
+// Symmetry mode for anchor placement
+enum class SymmetryMode {
+    Auto,    // Auto-detect symmetry, enable if score > threshold
+    Always,  // Force symmetric fitting regardless of detection
+    Never    // Disable symmetric fitting (original behavior)
+};
+
 // Control point with optional tangent override
 struct SplineAnchor {
     double x = 0.0;  // Position in [-1, 1]
@@ -188,6 +195,58 @@ struct SplineFitConfig {
      * Default: 1.5 (moderate, but still too aggressive in practice)
      */
     double pruningToleranceMultiplier = 1.5;
+
+    /**
+     * Enable zero-crossing drift detection (defensive DC blocking).
+     *
+     * After greedy fitting completes, checks if fitted spline introduced
+     * DC drift at x=0 compared to original curve. Only adds corrective
+     * anchor if drift exceeds tolerance.
+     *
+     * Philosophy: Trust the algorithm, verify the result.
+     * - If base curve crosses zero at x≈0 AND fitted spline drifts → add anchor
+     * - If fitted spline naturally preserves zero-crossing → no intervention
+     *
+     * Recommended: true (defensive protection with zero overhead when not needed)
+     */
+    bool enableZeroCrossingCheck = true;
+
+    /**
+     * Zero-crossing tolerance (vertical distance from base curve at x=0).
+     *
+     * Drift threshold: |y_fitted(0) - y_base(0)|
+     * If drift > tolerance AND base curve crosses zero → add corrective anchor
+     *
+     * Note: Uses interpolation to handle even table sizes (no exact x=0 sample)
+     *
+     * Range: 0.001 (strict) to 0.05 (relaxed)
+     * Default: 0.01 (1% of full range, balances protection vs intervention)
+     */
+    double zeroCrossingTolerance = 0.01;
+
+    /**
+     * Symmetry mode for anchor placement.
+     *
+     * Auto: Analyzes curve symmetry, enables paired anchors if score > threshold
+     * Always: Forces symmetric anchor placement regardless of curve shape
+     * Never: Disables symmetric fitting (original greedy algorithm)
+     *
+     * Symmetric fitting adds anchors in complementary pairs (x, -x) to
+     * maintain visual symmetry for symmetric curves (tanh, x³, odd harmonics).
+     *
+     * Recommendation: Auto (default) - respects user intent for symmetric shapes
+     */
+    SymmetryMode symmetryMode = SymmetryMode::Auto;
+
+    /**
+     * Symmetry detection threshold (for Auto mode).
+     *
+     * If symmetry score >= threshold, enable paired anchor placement.
+     *
+     * Range: 0.0-1.0
+     * Recommended: 0.90 (90% symmetric or better)
+     */
+    double symmetryThreshold = 0.90;
 
     // Presets
     static SplineFitConfig tight() {

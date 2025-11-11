@@ -2,6 +2,7 @@
 #include "SplineEvaluator.h"
 #include "CurveFeatureDetector.h"
 #include "AdaptiveToleranceCalculator.h"
+#include "SymmetryAnalyzer.h"
 #include <algorithm>
 #include <cmath>
 
@@ -631,6 +632,16 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         adaptiveConfig.relativeErrorTarget = 0.01;  // Fallback for flat curves
     }
 
+    // Analyze symmetry if needed
+    bool useSymmetricMode = false;
+    if (config.symmetryMode == SymmetryMode::Always) {
+        useSymmetricMode = true;
+    } else if (config.symmetryMode == SymmetryMode::Auto && ltf != nullptr) {
+        auto symmetryResult = SymmetryAnalyzer::analyzeOddSymmetry(*ltf);
+        useSymmetricMode = (symmetryResult.score >= config.symmetryThreshold);
+    }
+    // If Never: useSymmetricMode remains false
+
     // Iteratively refine with error-driven placement (quality)
     for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
         // Compute tangents for current anchor set using configured algorithm
@@ -654,25 +665,135 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         if (worst.maxError <= adaptiveTolerance)
             break;
 
-        // Insert anchor at worst-fit location
+        // Insert anchor(s) at worst-fit location
         const auto& worstSample = samples[worst.sampleIndex];
 
-        // Find insertion point (maintain sorted order by x)
-        auto insertPos = std::lower_bound(
-            anchors.begin(), anchors.end(), worstSample.x,
-            [](const SplineAnchor& a, double x) { return a.x < x; }
-        );
+        if (useSymmetricMode) {
+            // === SYMMETRIC MODE: Add complementary pair ===
 
-        // Don't insert duplicate x positions
-        bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
-            [&worstSample](const SplineAnchor& a) {
-                return std::abs(a.x - worstSample.x) < 1e-9;
-            });
+            // Find complementary x position
+            double complementaryX = -worstSample.x;
 
-        if (isDuplicate)
-            break;  // No progress possible
+            // Find sample closest to complementary x
+            size_t complementaryIdx = 0;
+            double minDist = std::abs(samples[0].x - complementaryX);
+            for (size_t i = 1; i < samples.size(); ++i) {
+                double dist = std::abs(samples[i].x - complementaryX);
+                if (dist < minDist) {
+                    minDist = dist;
+                    complementaryIdx = i;
+                }
+            }
 
-        anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+            const auto& complementarySample = samples[complementaryIdx];
+
+            // Check if complementary position already has anchor
+            bool hasComplementaryAnchor = std::any_of(anchors.begin(), anchors.end(),
+                [&complementarySample](const SplineAnchor& a) {
+                    return std::abs(a.x - complementarySample.x) < 1e-9;
+                });
+
+            // Check if original position already has anchor
+            bool hasOriginalAnchor = std::any_of(anchors.begin(), anchors.end(),
+                [&worstSample](const SplineAnchor& a) {
+                    return std::abs(a.x - worstSample.x) < 1e-9;
+                });
+
+            // Only add complementary pair if:
+            // 1. Original position doesn't have anchor
+            // 2. Complementary position doesn't have anchor
+            // 3. We have room for 2 more anchors
+            bool canAddPair = !hasOriginalAnchor && !hasComplementaryAnchor &&
+                              (iteration + 1 < remainingAnchors);
+
+            if (canAddPair) {
+                // Add both anchors with symmetric y values
+                // For odd symmetry: if we have f(x) at x and f(-x) at -x,
+                // we want to enforce perfect symmetry by using the average
+                double yOriginal = worstSample.y;  // f(x)
+                double yComplementary = complementarySample.y;  // f(-x)
+
+                // For perfect odd symmetry: f(-x) = -f(x)
+                // Average the two to get a symmetric value
+                double ySymmetric = (yOriginal - yComplementary) / 2.0;
+
+                // Insert original anchor at (x, ySymmetric)
+                auto insertPos1 = std::lower_bound(
+                    anchors.begin(), anchors.end(), worstSample.x,
+                    [](const SplineAnchor& a, double x) { return a.x < x; }
+                );
+                anchors.insert(insertPos1, {worstSample.x, ySymmetric, false, 0.0});
+
+                // Insert complementary anchor at (-x, -ySymmetric) for odd symmetry
+                auto insertPos2 = std::lower_bound(
+                    anchors.begin(), anchors.end(), complementarySample.x,
+                    [](const SplineAnchor& a, double x) { return a.x < x; }
+                );
+                anchors.insert(insertPos2, {complementarySample.x, -ySymmetric, false, 0.0});
+
+                // Consume 2 iterations (we added 2 anchors)
+                ++iteration;
+
+            } else {
+                // In symmetric mode: stop if we can't add a pair
+                // (preserves anchor symmetry rather than adding asymmetric anchor)
+                break;
+            }
+
+        } else {
+            // === ASYMMETRIC MODE: Original greedy algorithm ===
+
+            // Find insertion point (maintain sorted order by x)
+            auto insertPos = std::lower_bound(
+                anchors.begin(), anchors.end(), worstSample.x,
+                [](const SplineAnchor& a, double x) { return a.x < x; }
+            );
+
+            // Don't insert duplicate x positions
+            bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
+                [&worstSample](const SplineAnchor& a) {
+                    return std::abs(a.x - worstSample.x) < 1e-9;
+                });
+
+            if (isDuplicate)
+                break;  // No progress possible
+
+            anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+        }
+    }
+
+    // Zero-crossing drift verification (defensive DC blocking)
+    if (config.enableZeroCrossingCheck && ltf != nullptr) {
+        auto zcInfo = analyzeZeroCrossing(*ltf, anchors, config);
+
+        // Only intervene if:
+        // 1. Base curve has zero-crossing
+        // 2. Fitted spline introduced significant drift
+        // 3. No anchor already exists at x≈0
+        // 4. Anchor budget allows
+        if (zcInfo.baseCurveHasZeroCrossing &&
+            zcInfo.drift > config.zeroCrossingTolerance &&
+            anchors.size() < static_cast<size_t>(config.maxAnchors)) {
+
+            // Check if anchor already exists at x≈0
+            bool hasAnchorAtZero = std::any_of(anchors.begin(), anchors.end(),
+                [](const SplineAnchor& a) {
+                    return std::abs(a.x) < 1e-6;  // Within 1e-6 of origin
+                });
+
+            if (!hasAnchorAtZero) {
+                // Add corrective anchor at exactly x=0 with base curve's y value
+                // (Anchors have continuous freedom - can be placed at exact 0.0)
+                auto insertPos = std::lower_bound(
+                    anchors.begin(), anchors.end(), 0.0,
+                    [](const SplineAnchor& a, double x) { return a.x < x; }
+                );
+                anchors.insert(insertPos, {0.0, zcInfo.baseYAtZero, false, 0.0});
+
+                // Recompute tangents with new anchor
+                computeTangents(anchors, config);
+            }
+        }
     }
 
     // Optional: Prune redundant anchors after fitting
@@ -736,6 +857,48 @@ void SplineFitter::pruneRedundantAnchors(
         }
         // else: anchor was successfully removed, check same index again (array shifted)
     }
+}
+
+//==============================================================================
+// Zero-Crossing Analysis (Defensive DC Drift Detection)
+//==============================================================================
+
+SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(
+    const LayeredTransferFunction& ltf,
+    const std::vector<SplineAnchor>& anchors,
+    const SplineFitConfig& config) {
+
+    ZeroCrossingInfo info;
+    const int tableSize = ltf.getTableSize();
+
+    // With even table size (e.g., 16384), no sample exists at exactly x=0
+    // We interpolate between the two samples closest to zero
+
+    // Find indices bracketing x=0
+    int centerIdx = tableSize / 2;
+    double xRight = ltf.normalizeIndex(centerIdx);       // x ≈ +ε
+    double xLeft = ltf.normalizeIndex(centerIdx - 1);    // x ≈ -ε
+
+    // Linear interpolation to get y at exactly x=0
+    double yLeft = ltf.getBaseLayerValue(centerIdx - 1);
+    double yRight = ltf.getBaseLayerValue(centerIdx);
+
+    // Interpolate: y(0) = yLeft + (yRight - yLeft) * (0 - xLeft) / (xRight - xLeft)
+    double t = (0.0 - xLeft) / (xRight - xLeft);
+    info.baseYAtZero = yLeft + t * (yRight - yLeft);
+
+    // Check if base curve crosses zero (within tolerance)
+    if (std::abs(info.baseYAtZero) < config.zeroCrossingTolerance) {
+        info.baseCurveHasZeroCrossing = true;
+
+        // Evaluate fitted spline at exactly x=0
+        info.fittedYAtZero = SplineEvaluator::evaluate(anchors, 0.0);
+
+        // Compute drift
+        info.drift = std::abs(info.fittedYAtZero - info.baseYAtZero);
+    }
+
+    return info;
 }
 
 } // namespace Services

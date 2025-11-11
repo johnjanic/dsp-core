@@ -363,6 +363,31 @@ endif()
 
 add_test(NAME AdaptiveToleranceTests COMMAND adaptive_tolerance_tests)
 
+# SymmetryAnalyzer tests
+add_executable(symmetry_analyzer_tests
+    SymmetryAnalyzerTest.cpp
+)
+
+target_include_directories(symmetry_analyzer_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(symmetry_analyzer_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(symmetry_analyzer_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(symmetry_analyzer_tests)
+endif()
+
+add_test(NAME SymmetryAnalyzerTests COMMAND symmetry_analyzer_tests)
+
 # SplineFitterIntegration tests
 add_executable(spline_fitter_integration_tests
     SplineFitterIntegrationTest.cpp

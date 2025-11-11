@@ -33,6 +33,8 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineFitter.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineEvaluator.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SplineEvaluator.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SymmetryAnalyzer.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SymmetryAnalyzer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/ZeroCrossingSolver.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/ZeroCrossingSolver.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioProcessingStage.h"
