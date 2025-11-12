@@ -56,7 +56,7 @@ struct FeatureDetectionConfig {
         : significanceThreshold(0.001)
         , maxFeatures(100)
         , derivativeThreshold(1e-06)
-        , secondDerivativeThreshold(0.002)
+        , secondDerivativeThreshold(0.0015)
         , extremaInflectionRatio(0.8)
     {}
 

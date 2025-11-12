@@ -299,7 +299,7 @@ struct SplineFitConfig {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.005;  // Relaxed from 0.002 for backtranslation stability
         cfg.derivativeTolerance = 0.05;
-        cfg.maxAnchors = 128;  // Increased from 64 to allow better convergence for steep curves
+        cfg.maxAnchors = 112;  // Increased from 64 to allow better convergence for steep curves
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }
