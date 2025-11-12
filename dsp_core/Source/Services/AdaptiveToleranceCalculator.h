@@ -45,7 +45,7 @@ public:
         /**
          * Multiplier for anchor density scaling
          * Higher values increase tolerance more aggressively as anchors accumulate
-         * Default: 8.0 (tolerance 9x at 100% capacity - balanced backtranslation)
+         * Default: 10.0 (tolerance 11x at 100% capacity - optimal backtranslation)
          * Linear formula: tolerance = baseline × (1 + anchorRatio × multiplier)
          */
         double anchorDensityMultiplier;
@@ -53,7 +53,7 @@ public:
         /**
          * Default constructor - uses recommended defaults
          */
-        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(8.0) {}
+        Config() : relativeErrorTarget(0.01), anchorDensityMultiplier(10.0) {}
     };
 
     /**
