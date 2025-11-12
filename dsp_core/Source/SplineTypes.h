@@ -101,7 +101,7 @@ struct SplineFitConfig {
      * Range: 16 (minimal) to 128 (high precision)
      * Recommended: 24 for interactive editing, 64 for offline processing
      */
-    int maxAnchors = 64;
+    int maxAnchors = 128;
 
     /**
      * Enable greedy refinement phase.
@@ -275,7 +275,7 @@ struct SplineFitConfig {
      * Recommendation: false (default) - preserves backtranslation stability
      * Only enable for experimentation or if you need guaranteed feature preservation
      */
-    bool enableFeatureDetection = false;
+    bool enableFeatureDetection = true;
 
     /**
      * Feature detection configuration (only used if enableFeatureDetection = true)
