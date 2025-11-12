@@ -462,3 +462,28 @@ else()
 endif()
 
 add_test(NAME ExtremaQualityMetricsTests COMMAND extrema_quality_metrics_tests)
+
+# FeatureDetectionDiagnostic tests (for root cause analysis)
+add_executable(feature_detection_diagnostic_tests
+    FeatureDetectionDiagnosticTest.cpp
+)
+
+target_include_directories(feature_detection_diagnostic_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(feature_detection_diagnostic_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(feature_detection_diagnostic_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(feature_detection_diagnostic_tests)
+endif()
+
+add_test(NAME FeatureDetectionDiagnosticTests COMMAND feature_detection_diagnostic_tests)

@@ -173,4 +173,54 @@ TEST_F(ExtremaQualityMetrics, Harmonic10_PositionError) {
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
 
+/**
+ * Harmonic 20 extrema quality metric (HIGH FREQUENCY)
+ */
+TEST_F(ExtremaQualityMetrics, Harmonic20_PositionError) {
+    // Create Harmonic 20
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(20.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    auto extrema = findNumericalExtrema(*ltf);
+    auto config = dsp_core::SplineFitConfig::tight();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    ASSERT_TRUE(result.success) << "Harmonic 20 fit failed";
+
+    double avg_error = computeAveragePositionError(result.anchors, extrema);
+
+    std::cout << "METRIC: Harmonic20_PositionError = "
+              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+
+    EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
+}
+
+/**
+ * Harmonic 40 extrema quality metric (VERY HIGH FREQUENCY - stress test)
+ */
+TEST_F(ExtremaQualityMetrics, Harmonic40_PositionError) {
+    // Create Harmonic 40
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(40.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    auto extrema = findNumericalExtrema(*ltf);
+    auto config = dsp_core::SplineFitConfig::tight();
+    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+
+    ASSERT_TRUE(result.success) << "Harmonic 40 fit failed";
+
+    double avg_error = computeAveragePositionError(result.anchors, extrema);
+
+    std::cout << "METRIC: Harmonic40_PositionError = "
+              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+
+    EXPECT_LT(avg_error, 0.15) << "Position error should be reasonable (relaxed for H40)";
+}
+
 } // namespace dsp_core_test
