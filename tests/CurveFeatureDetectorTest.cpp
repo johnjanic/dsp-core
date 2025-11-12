@@ -305,4 +305,283 @@ TEST_F(CurveFeatureDetectorTest, LegacyOverload_WorksCorrectly) {
         << "Should always have at least endpoints";
 }
 
+// ============================================================================
+// Exact Extrema Positioning Tests (TDD - Stage 1: Expose discretization issue)
+// ============================================================================
+
+/**
+ * Test fixture for high-resolution extrema positioning tests
+ * Uses production table size (16384) to test real-world behavior
+ */
+class ExactExtremaPositioningTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Use production resolution: 16384 samples
+        ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
+    }
+
+    // Helper: Extract x-coordinates from extrema indices
+    std::vector<double> getExtremaPositions(const dsp_core::Services::CurveFeatureDetector::FeatureResult& features) {
+        std::vector<double> positions;
+        for (int idx : features.localExtrema) {
+            positions.push_back(ltf->normalizeIndex(idx));
+        }
+        std::sort(positions.begin(), positions.end());
+        return positions;
+    }
+
+    std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
+};
+
+/**
+ * Test: Harmonic 3 has extrema at EXACTLY x = ±0.5
+ *
+ * Background: Harmonic 3 is Chebyshev polynomial T_3(x) = cos(3*acos(x))
+ * Mathematically, T_3 has extrema at x = cos(kπ/3) for k=1,2:
+ *   - x = cos(π/3) = 0.5
+ *   - x = cos(2π/3) = -0.5
+ *
+ * Current issue: With 16384 samples, extremum at x=0.5 falls at index ≈12287.25
+ * Algorithm picks index 12287 or 12288, giving x ≈ 0.4999 or 0.5001 (visible offset)
+ *
+ * Expected (after refinement): x within 1e-4 of true extremum (0.01% tolerance)
+ */
+TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
+    // Create Harmonic 3: sin(3*asin(x)) = Chebyshev T_3
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    // Disable significance filtering to test raw extrema detection
+    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    config.significanceThreshold = 0.0;  // Disable filtering
+    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
+
+    // Should detect 2 extrema (peaks at x = ±0.5)
+    EXPECT_EQ(2, features.localExtrema.size())
+        << "Harmonic 3 has exactly 2 extrema";
+
+    auto positions = getExtremaPositions(features);
+
+    // Mathematical truth: extrema at exactly x = ±0.5
+    std::vector<double> expected = {-0.5, 0.5};
+
+    ASSERT_EQ(2, positions.size()) << "Should have 2 extrema positions";
+
+    // CRITICAL: Verify positions are EXACT within tight tolerance
+    // This test will FAIL initially, exposing discretization issue
+    for (size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_NEAR(positions[i], expected[i], 1e-4)
+            << "Extremum " << i << " should be at x = " << expected[i]
+            << " but got x = " << positions[i]
+            << " (error: " << std::abs(positions[i] - expected[i]) << ")";
+    }
+}
+
+/**
+ * Test: Harmonic 5 has extrema at x = cos(kπ/5)
+ *
+ * Chebyshev T_5 has 4 extrema at mathematically exact positions.
+ * Tests refinement algorithm's ability to find non-trivial extrema positions.
+ */
+TEST_F(ExactExtremaPositioningTest, Harmonic5_ExactExtremaPositions) {
+    // Create Harmonic 5
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(5.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    config.significanceThreshold = 0.0;  // Disable filtering
+    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
+
+    // Should detect 4 extrema
+    EXPECT_EQ(4, features.localExtrema.size())
+        << "Harmonic 5 has exactly 4 extrema";
+
+    auto positions = getExtremaPositions(features);
+
+    // Mathematical truth: extrema at x = cos(kπ/5) for k=1,2,3,4
+    std::vector<double> expected = {
+        std::cos(4.0 * M_PI / 5.0),  // -0.809...
+        std::cos(3.0 * M_PI / 5.0),  // -0.309...
+        std::cos(2.0 * M_PI / 5.0),  //  0.309...
+        std::cos(1.0 * M_PI / 5.0)   //  0.809...
+    };
+
+    ASSERT_EQ(4, positions.size()) << "Should have 4 extrema positions";
+
+    // Verify exact positions
+    for (size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_NEAR(positions[i], expected[i], 1e-4)
+            << "Extremum " << i << " at x = " << positions[i]
+            << " should be at " << expected[i]
+            << " (error: " << std::abs(positions[i] - expected[i]) << ")";
+    }
+}
+
+/**
+ * Test: Simple parabola y = -(x - 0.3)² + 0.5
+ *
+ * Has single extremum at EXACTLY x = 0.3 (vertex of parabola).
+ * Clean test case with known analytical solution.
+ */
+TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
+    const double vertexX = 0.3;
+    const double vertexY = 0.5;
+
+    // Create downward-facing parabola with vertex at (0.3, 0.5)
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = -(x - vertexX) * (x - vertexX) + vertexY;
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    config.significanceThreshold = 0.0;  // Disable filtering
+    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
+
+    // Should detect 1 extremum (peak)
+    EXPECT_EQ(1, features.localExtrema.size())
+        << "Parabola has exactly 1 extremum";
+
+    auto positions = getExtremaPositions(features);
+
+    ASSERT_EQ(1, positions.size());
+
+    // Vertex is at EXACTLY x = 0.3
+    EXPECT_NEAR(positions[0], vertexX, 1e-4)
+        << "Parabola extremum should be at vertex x = " << vertexX
+        << " but got x = " << positions[0]
+        << " (error: " << std::abs(positions[0] - vertexX) << ")";
+}
+
+/**
+ * Test: Harmonic 40 extrema count and positioning
+ *
+ * Production use case - 39 extrema should all be at exact mathematical positions.
+ * This is the scenario shown in user's screenshot.
+ */
+TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
+    // Create Harmonic 40
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(40.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    config.significanceThreshold = 0.0;  // Disable filtering
+    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
+
+    // Should detect 39 extrema (Chebyshev T_n has n-1 extrema)
+    // Note: May detect 40 if boundary is included - accept 39-40
+    EXPECT_GE(features.localExtrema.size(), 39)
+        << "Harmonic 40 has at least 39 extrema";
+    EXPECT_LE(features.localExtrema.size(), 40)
+        << "Harmonic 40 has at most 40 extrema (39 + possible boundary)";
+
+    auto positions = getExtremaPositions(features);
+
+    // Generate expected positions: x = cos(kπ/40) for k=1..39
+    std::vector<double> expected;
+    for (int k = 39; k >= 1; --k) {  // Reverse order for ascending x
+        expected.push_back(std::cos(k * M_PI / 40.0));
+    }
+
+    ASSERT_GE(positions.size(), 39) << "Should have at least 39 extrema positions";
+
+    // Verify ALL 39 extrema are within tolerance
+    int numWithinTolerance = 0;
+    for (size_t i = 0; i < expected.size(); ++i) {
+        double error = std::abs(positions[i] - expected[i]);
+        if (error < 1e-4) {
+            numWithinTolerance++;
+        }
+
+        EXPECT_NEAR(positions[i], expected[i], 1e-4)
+            << "Extremum " << i << " at x = " << positions[i]
+            << " should be at " << expected[i]
+            << " (error: " << error << ")";
+    }
+
+    // Summary metric: what percentage are exact?
+    double accuracy = 100.0 * numWithinTolerance / expected.size();
+    std::cout << "Harmonic 40 extrema accuracy: " << accuracy << "% within 0.01% tolerance\n";
+    std::cout << "Exact: " << numWithinTolerance << "/" << expected.size() << "\n";
+}
+
+/**
+ * Test: Verify discretization is the issue, not algorithmic error
+ *
+ * This test demonstrates that with COARSE resolution (256 samples),
+ * discretization error is much larger (~0.008 = 0.8%).
+ *
+ * With FINE resolution (16384), error should be ~64x smaller (~0.0001 = 0.01%)
+ * if extremum falls exactly on a sample. But if extremum falls BETWEEN samples,
+ * error can still be ~0.00006 (0.006%), which is visible with 39 extrema.
+ */
+TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
+    // Disable significance filtering for both tests
+    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    config.significanceThreshold = 0.0;
+
+    // Test with COARSE resolution
+    auto ltfCoarse = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
+    for (int i = 0; i < 256; ++i) {
+        double x = ltfCoarse->normalizeIndex(i);
+        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltfCoarse->setBaseLayerValue(i, y);
+    }
+
+    auto featuresCoarse = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltfCoarse, config);
+
+    // Expected extrema at x = ±0.5
+    std::vector<double> positionsCoarse;
+    for (int idx : featuresCoarse.localExtrema) {
+        positionsCoarse.push_back(ltfCoarse->normalizeIndex(idx));
+    }
+    std::sort(positionsCoarse.begin(), positionsCoarse.end());
+
+    // Compute coarse discretization error
+    double coarseError = 0.0;
+    if (positionsCoarse.size() >= 2) {
+        coarseError = std::max(
+            std::abs(positionsCoarse[0] - (-0.5)),
+            std::abs(positionsCoarse[1] - 0.5)
+        );
+    }
+
+    // Test with FINE resolution (production)
+    // Create Harmonic 3 for fine resolution test
+    for (int i = 0; i < 16384; ++i) {
+        double x = ltf->normalizeIndex(i);
+        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        ltf->setBaseLayerValue(i, y);
+    }
+
+    auto featuresFine = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
+    auto positionsFine = getExtremaPositions(featuresFine);
+
+    double fineError = 0.0;
+    if (positionsFine.size() >= 2) {
+        fineError = std::max(
+            std::abs(positionsFine[0] - (-0.5)),
+            std::abs(positionsFine[1] - 0.5)
+        );
+    }
+
+    std::cout << "Coarse (256 samples) discretization error: " << coarseError << " (" << (coarseError * 100) << "%)\n";
+    std::cout << "Fine (16384 samples) discretization error: " << fineError << " (" << (fineError * 100) << "%)\n";
+    std::cout << "Improvement ratio: " << (coarseError / fineError) << "x\n";
+
+    // Fine resolution should have much smaller error
+    // But even 0.0001 (0.01%) is visible when you have 39 extrema aligned
+    EXPECT_LT(fineError, coarseError / 10.0)
+        << "Fine resolution should have <10% of coarse error";
+}
+
 } // namespace dsp_core_test
