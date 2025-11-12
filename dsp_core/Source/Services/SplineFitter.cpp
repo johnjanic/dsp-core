@@ -24,8 +24,14 @@ SplineFitResult SplineFitter::fitCurve(
     // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
     std::vector<int> mandatoryIndices;
     if (config.enableFeatureDetection) {
-        int maxFeatures = static_cast<int>(config.maxAnchors * 0.7);
-        auto features = CurveFeatureDetector::detectFeatures(ltf, maxFeatures);
+        // Use feature detection config from SplineFitConfig, but cap maxFeatures
+        // to 70% of anchor budget to reserve 30% for error-driven refinement
+        auto featureConfig = config.featureConfig;
+        int maxFeaturesFromBudget = static_cast<int>(config.maxAnchors * 0.7);
+        if (featureConfig.maxFeatures == 0 || featureConfig.maxFeatures > maxFeaturesFromBudget) {
+            featureConfig.maxFeatures = maxFeaturesFromBudget;
+        }
+        auto features = CurveFeatureDetector::detectFeatures(ltf, featureConfig);
         mandatoryIndices = features.mandatoryAnchors;
     }
 

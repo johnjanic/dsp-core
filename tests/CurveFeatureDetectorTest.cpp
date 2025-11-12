@@ -242,7 +242,7 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_NoisyScribble_FiltersMinorBu
     }
 
     // Apply significance filtering: 2% threshold (should filter out 0.1% bumps but keep 15% peaks)
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.02;  // 2% of vertical range
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -261,7 +261,7 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_NoisyScribble_FiltersMinorBu
 TEST_F(CurveFeatureDetectorTest, SignificanceFilter_SmoothCurve_NoFalsePositives) {
     createTanhCurve();
 
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.01;  // Even with low threshold
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -278,7 +278,7 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_LargeExtrema_AllPreserved) {
 
     // Apply very low significance threshold to ensure all extrema are detected
     // Note: With 256 samples over 2 periods, local amplitude at peaks is relatively small
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.001;  // 0.1% of range (very permissive)
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -355,7 +355,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
     }
 
     // Disable significance filtering to test raw extrema detection
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.0;  // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -394,7 +394,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic5_ExactExtremaPositions) {
         ltf->setBaseLayerValue(i, y);
     }
 
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.0;  // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -440,7 +440,7 @@ TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
         ltf->setBaseLayerValue(i, y);
     }
 
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.0;  // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -473,7 +473,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
         ltf->setBaseLayerValue(i, y);
     }
 
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.0;  // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
@@ -526,7 +526,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
  */
 TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
     // Disable significance filtering for both tests
-    dsp_core::Services::CurveFeatureDetector::FeatureDetectionConfig config;
+    dsp_core::FeatureDetectionConfig config;
     config.significanceThreshold = 0.0;
 
     // Test with COARSE resolution

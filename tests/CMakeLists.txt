@@ -437,3 +437,28 @@ else()
 endif()
 
 add_test(NAME SplineFitterExactExtremaTests COMMAND spline_fitter_exact_extrema_tests)
+
+# ExtremaQualityMetrics tests (for parameter tuning)
+add_executable(extrema_quality_metrics_tests
+    ExtremaQualityMetricsTest.cpp
+)
+
+target_include_directories(extrema_quality_metrics_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(extrema_quality_metrics_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(extrema_quality_metrics_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(extrema_quality_metrics_tests)
+endif()
+
+add_test(NAME ExtremaQualityMetricsTests COMMAND extrema_quality_metrics_tests)

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <juce_core/juce_core.h>
+#include "Services/CurveFeatureDetector.h"
 
 namespace dsp_core {
 
@@ -275,6 +276,23 @@ struct SplineFitConfig {
      * Only enable for experimentation or if you need guaranteed feature preservation
      */
     bool enableFeatureDetection = false;
+
+    /**
+     * Feature detection configuration (only used if enableFeatureDetection = true)
+     *
+     * Controls how geometric features (extrema, inflection points) are detected
+     * and prioritized for mandatory anchor placement.
+     *
+     * Key parameters:
+     * - significanceThreshold: Noise filtering (0.001 = 0.1% of vertical range)
+     * - maxFeatures: Hard limit on detected features (100 default)
+     * - derivativeThreshold: First derivative noise floor (1e-6 default)
+     * - secondDerivativeThreshold: Second derivative noise floor (1e-4 default)
+     * - extremaInflectionRatio: Budget ratio for extrema vs inflections (0.8 default)
+     *
+     * See docs/feature-plans/feature-detection-parameter-tuning.md for tuning guidance.
+     */
+    FeatureDetectionConfig featureConfig;
 
     // Presets
     static SplineFitConfig tight() {

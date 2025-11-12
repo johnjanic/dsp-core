@@ -1,4 +1,5 @@
 #include "CurveFeatureDetector.h"
+#include "../LayeredTransferFunction.h"
 #include <algorithm>
 #include <cmath>
 
@@ -22,10 +23,6 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     double verticalRange = maxY - minY;
     double amplitudeThreshold = verticalRange * config.significanceThreshold;
 
-    // Tolerance thresholds to avoid detecting numerical noise
-    const double derivativeThreshold = 1e-6;
-    const double secondDerivativeThreshold = 1e-4;
-
     // 1. Find local extrema (dy/dx sign changes) with significance scores
     struct Feature {
         int index;
@@ -42,8 +39,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
         // Note: At extrema, one derivative may be near zero, so we check if
         // at least one is significant OR if there's a clear sign change
         bool hasSignChange = (deriv_prev * deriv < 0.0);
-        bool atLeastOneSignificant = (std::abs(deriv_prev) > derivativeThreshold ||
-                                      std::abs(deriv) > derivativeThreshold);
+        bool atLeastOneSignificant = (std::abs(deriv_prev) > config.derivativeThreshold ||
+                                      std::abs(deriv) > config.derivativeThreshold);
 
         if (hasSignChange && atLeastOneSignificant) {
 
@@ -72,8 +69,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
         double d2y = estimateSecondDerivative(ltf, i);
 
         // Only detect sign changes if both second derivatives are significant
-        if (std::abs(d2y_prev) > secondDerivativeThreshold &&
-            std::abs(d2y) > secondDerivativeThreshold &&
+        if (std::abs(d2y_prev) > config.secondDerivativeThreshold &&
+            std::abs(d2y) > config.secondDerivativeThreshold &&
             d2y_prev * d2y < 0.0) {  // Sign change = inflection point
             result.inflectionPoints.push_back(i);
 
@@ -88,8 +85,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
 
     if (config.maxFeatures > 0 && static_cast<int>(features.size()) + 2 > config.maxFeatures) {
         // Too many features - prioritize by significance
-        // Reserve 80% for extrema (peaks/valleys are more important than inflection points)
-        int maxExtrema = static_cast<int>((config.maxFeatures - 2) * 0.8);
+        // Reserve extremaInflectionRatio for extrema (peaks/valleys are typically more important than inflection points)
+        int maxExtrema = static_cast<int>((config.maxFeatures - 2) * config.extremaInflectionRatio);
         int maxInflections = (config.maxFeatures - 2) - maxExtrema;
 
         // Separate extrema and inflections
