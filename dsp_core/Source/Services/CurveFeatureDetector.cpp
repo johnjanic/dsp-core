@@ -98,29 +98,32 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     }
 
     // 2. Find inflection points (d²y/dx² sign changes) with curvature scores
-    for (int i = 2; i < tableSize - 2; ++i) {
-        double d2y_prev = estimateSecondDerivative(ltf, i - 1);
-        double d2y = estimateSecondDerivative(ltf, i);
+    // Only run if enabled - saves CPU and reduces anchor count
+    if (config.enableInflectionDetection) {
+        for (int i = 2; i < tableSize - 2; ++i) {
+            double d2y_prev = estimateSecondDerivative(ltf, i - 1);
+            double d2y = estimateSecondDerivative(ltf, i);
 
-        // Adaptive threshold: stricter near boundaries to avoid false inflections
-        // where derivatives explode (common for odd harmonics)
-        double x = ltf.normalizeIndex(i);
-        double distanceFromBoundary = std::min(std::abs(x - (-1.0)), std::abs(x - 1.0));
-        double threshold = config.secondDerivativeThreshold;
+            // Adaptive threshold: stricter near boundaries to avoid false inflections
+            // where derivatives explode (common for odd harmonics)
+            double x = ltf.normalizeIndex(i);
+            double distanceFromBoundary = std::min(std::abs(x - (-1.0)), std::abs(x - 1.0));
+            double threshold = config.secondDerivativeThreshold;
 
-        // Increase threshold by 5x within 0.1 units of boundary
-        if (distanceFromBoundary < 0.1) {
-            threshold *= 5.0;
-        }
+            // Increase threshold by 5x within 0.1 units of boundary
+            if (distanceFromBoundary < 0.1) {
+                threshold *= 5.0;
+            }
 
-        // Only detect sign changes if both second derivatives are significant
-        if (std::abs(d2y_prev) > threshold &&
-            std::abs(d2y) > threshold &&
-            d2y_prev * d2y < 0.0) {  // Sign change = inflection point
-            result.inflectionPoints.push_back(i);
+            // Only detect sign changes if both second derivatives are significant
+            if (std::abs(d2y_prev) > threshold &&
+                std::abs(d2y) > threshold &&
+                d2y_prev * d2y < 0.0) {  // Sign change = inflection point
+                result.inflectionPoints.push_back(i);
 
-            // Significance = curvature magnitude
-            features.push_back({i, std::abs(d2y), false});
+                // Significance = curvature magnitude
+                features.push_back({i, std::abs(d2y), false});
+            }
         }
     }
 

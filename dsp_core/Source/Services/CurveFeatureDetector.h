@@ -63,6 +63,22 @@ struct FeatureDetectionConfig {
     bool enableSignificanceFiltering;
 
     /**
+     * Enable inflection point detection
+     * When enabled, detects curvature changes (d²y/dx² sign changes) as features
+     * When disabled, only detects extrema (peaks/valleys) - saves CPU
+     * Default: false (disabled) - extrema-only detection
+     *
+     * Rationale: Phase 4 v5 testing showed that with secondDerivativeThreshold=0.002
+     * (optimized to filter artifact inflections), effectively ZERO inflection points
+     * are detected anyway. Disabling saves ~30-40% of feature detection CPU time
+     * with no impact on anchor count or quality.
+     *
+     * When to enable: Only if you need genuine inflection points (e.g., S-curves with
+     * sharp curvature changes). For typical harmonic waveshaping, extrema-only is sufficient.
+     */
+    bool enableInflectionDetection;
+
+    /**
      * Default constructor - uses sensible defaults
      * Note: Very low significance threshold (0.1%) to preserve all real features
      * Increase threshold (e.g., 2-5%) for noise filtering
@@ -74,6 +90,7 @@ struct FeatureDetectionConfig {
         , secondDerivativeThreshold(0.002)  // Phase 4 v3: Filters artifact inflections (20× higher than 0.0001 default)
         , extremaInflectionRatio(0.8)
         , enableSignificanceFiltering(false)
+        , enableInflectionDetection(false)   // Phase 4 v5: Disabled by default - saves CPU with no quality impact
     {}
 
     bool operator==(const FeatureDetectionConfig&) const = default;
