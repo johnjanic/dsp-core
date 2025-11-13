@@ -73,10 +73,20 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_WithInflections) {
     config.enableFeatureDetection = true;
     // Default: extremaInflectionRatio = 0.8 (80% extrema, 20% inflections)
 
-    // Show what features are detected
+    // Show what features are detected WITH and WITHOUT significance filtering
+    std::cout << "\n--- WITHOUT Significance Filtering ---" << std::endl;
     dsp_core::FeatureDetectionConfig featureConfig;
     featureConfig.maxFeatures = 100;  // No limit
+    featureConfig.enableSignificanceFiltering = false;  // Default
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
+
+    std::cout << "Local extrema: " << features.localExtrema.size() << std::endl;
+
+    std::cout << "\n--- WITH Significance Filtering ---" << std::endl;
+    featureConfig.enableSignificanceFiltering = true;
+    featureConfig.significanceThreshold = 0.001;  // 0.1% of vertical range
+    auto featuresFiltered = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
+    std::cout << "Local extrema: " << featuresFiltered.localExtrema.size() << std::endl;
 
     std::cout << "\n=== H3 Feature Detection ===" << std::endl;
     std::cout << "Local extrema: " << features.localExtrema.size() << std::endl;

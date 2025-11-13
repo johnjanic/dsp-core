@@ -12,7 +12,11 @@ class LayeredTransferFunction;
 struct FeatureDetectionConfig {
     /**
      * Significance threshold as percentage of vertical range (0.0-1.0)
-     * Extrema with local amplitude change less than this threshold are discarded
+     * Extrema with LOCAL PROMINENCE less than this threshold are discarded
+     * Prominence = how much an extremum stands out from nearby points (~0.6% domain window)
+     * - Peak: prominence = y_peak - max(neighbors)
+     * - Valley: prominence = min(neighbors) - y_valley
+     * This correctly filters noise while preserving extrema at ANY y-value (e.g., peak at y=0)
      * Default: 0.001 (0.1% of vertical range)
      */
     double significanceThreshold;
@@ -48,6 +52,17 @@ struct FeatureDetectionConfig {
     double extremaInflectionRatio;
 
     /**
+     * Enable significance filtering based on local prominence
+     * When enabled, filters extrema with prominence < significanceThreshold
+     * When disabled, accepts all extrema with valid derivative sign changes
+     * Default: false (disabled) - accepts all detected extrema
+     *
+     * Note: Significance filtering is experimental and may incorrectly filter
+     * valid features. Disable if you observe missing extrema or peaks/valleys.
+     */
+    bool enableSignificanceFiltering;
+
+    /**
      * Default constructor - uses sensible defaults
      * Note: Very low significance threshold (0.1%) to preserve all real features
      * Increase threshold (e.g., 2-5%) for noise filtering
@@ -58,6 +73,7 @@ struct FeatureDetectionConfig {
         , derivativeThreshold(1e-06)
         , secondDerivativeThreshold(0.0015)
         , extremaInflectionRatio(0.8)
+        , enableSignificanceFiltering(false)
     {}
 
     bool operator==(const FeatureDetectionConfig&) const = default;

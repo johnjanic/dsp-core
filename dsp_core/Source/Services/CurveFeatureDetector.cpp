@@ -2,6 +2,8 @@
 #include "../LayeredTransferFunction.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <limits>
 
 namespace dsp_core {
 namespace Services {
@@ -22,6 +24,7 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     }
     double verticalRange = maxY - minY;
     double amplitudeThreshold = verticalRange * config.significanceThreshold;
+    double verticalCenter = (minY + maxY) / 2.0;
 
     // 1. Find local extrema (dy/dx sign changes) with significance scores
     struct Feature {
@@ -43,22 +46,53 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
                                       std::abs(deriv) > config.derivativeThreshold);
 
         if (hasSignChange && atLeastOneSignificant) {
-
-            // Measure local amplitude change (peak/valley height relative to neighbors)
             // Use base layer for testing (composite might have normalization issues)
             double y = ltf.getBaseLayerValue(i);
-            double y_prev = ltf.getBaseLayerValue(i - 1);
-            double y_next = ltf.getBaseLayerValue(i + 1);
 
-            // For a peak/valley, measure the maximum deviation from neighbors
-            double localAmplitude = std::max(std::abs(y - y_prev), std::abs(y - y_next));
+            if (config.enableSignificanceFiltering) {
+                // EXPERIMENTAL: Local prominence filtering
+                // Measure how much this extremum stands out from nearby points
+                // A peak at y=0 is just as significant as a peak at y=1!
 
-            // Apply significance filtering: discard minor bumps
-            if (localAmplitude >= amplitudeThreshold) {
+                // Define adaptive window size for prominence measurement
+                // For 16k samples: ~10 samples = 0.06% of domain
+                // Conservative window size to preserve smooth extrema
+                int windowSize = std::max(5, tableSize / 1600);
+                int windowStart = std::max(1, i - windowSize);
+                int windowEnd = std::min(tableSize - 1, i + windowSize);
+
+                // Find min/max in neighborhood (excluding the extremum itself)
+                // Use sentinel values to handle edge case where windowStart == i
+                double neighborMin = std::numeric_limits<double>::max();
+                double neighborMax = std::numeric_limits<double>::lowest();
+                for (int j = windowStart; j <= windowEnd; ++j) {
+                    if (j == i) continue;  // Skip the extremum itself
+                    double y_j = ltf.getBaseLayerValue(j);
+                    neighborMin = std::min(neighborMin, y_j);
+                    neighborMax = std::max(neighborMax, y_j);
+                }
+
+                // Prominence: how much does this extremum stand out from neighbors?
+                double prominence;
+                if (deriv_prev > 0.0) {  // Peak (derivative changes from + to -)
+                    prominence = y - neighborMax;
+                } else {  // Valley (derivative changes from - to +)
+                    prominence = neighborMin - y;
+                }
+
+                // Apply significance filtering based on local prominence
+                if (prominence >= amplitudeThreshold) {
+                    result.localExtrema.push_back(i);
+                    features.push_back({i, prominence, true});
+                }
+            } else {
+                // Default: Accept all extrema with valid derivative sign changes
+                // The derivative threshold already filtered numerical noise
                 result.localExtrema.push_back(i);
 
-                // Significance = local amplitude change
-                features.push_back({i, localAmplitude, true});
+                // For prioritization when hitting maxFeatures limit
+                double significance = std::abs(y - verticalCenter);
+                features.push_back({i, significance, true});
             }
         }
     }
