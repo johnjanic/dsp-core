@@ -326,4 +326,300 @@ TEST_F(LayeredTransferFunctionTest, Coefficients_GetSetConsistent) {
     }
 }
 
+// ============================================================================
+// Harmonic Baking Tests
+// ============================================================================
+
+TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_ReturnsFalseForAllZero) {
+    // Set WT mix but no harmonics
+    ltf->setCoefficient(0, 0.8);  // WT mix (not a harmonic)
+
+    // All harmonics (indices 1-40) are zero
+    for (int i = 1; i <= 40; ++i) {
+        ltf->setCoefficient(i, 0.0);
+    }
+
+    EXPECT_FALSE(ltf->hasNonZeroHarmonics());
+}
+
+TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_ReturnsTrueForNonZero) {
+    // Set one harmonic to non-zero
+    ltf->setCoefficient(3, 0.5);
+
+    EXPECT_TRUE(ltf->hasNonZeroHarmonics());
+}
+
+TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_UsesEpsilonThreshold) {
+    // Set harmonic below epsilon threshold (should be treated as zero)
+    ltf->setCoefficient(3, 1e-7);  // Below HARMONIC_EPSILON (1e-6)
+
+    EXPECT_FALSE(ltf->hasNonZeroHarmonics());
+
+    // Set harmonic above epsilon threshold
+    ltf->setCoefficient(3, 1e-5);  // Above HARMONIC_EPSILON
+
+    EXPECT_TRUE(ltf->hasNonZeroHarmonics());
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_NoOpForZeroHarmonics) {
+    // Set WT mix and base layer
+    ltf->setCoefficient(0, 1.0);
+    for (int i = 0; i < 256; ++i) {
+        ltf->setBaseLayerValue(i, static_cast<double>(i) / 256.0);
+    }
+    ltf->updateComposite();
+
+    // Capture base layer before baking
+    std::vector<double> baseLayerBefore(256);
+    for (int i = 0; i < 256; ++i) {
+        baseLayerBefore[i] = ltf->getBaseLayerValue(i);
+    }
+
+    // Bake with all-zero harmonics
+    bool baked = ltf->bakeHarmonicsToBase();
+
+    // Should return false (no-op)
+    EXPECT_FALSE(baked);
+
+    // Base layer should be unchanged
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_NEAR(ltf->getBaseLayerValue(i), baseLayerBefore[i], 1e-12);
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_TransfersCompositeToBase) {
+    // Set base layer and harmonics
+    ltf->setCoefficient(0, 1.0);  // Full WT mix
+    for (int i = 0; i < 256; ++i) {
+        ltf->setBaseLayerValue(i, static_cast<double>(i) / 512.0);  // Half range
+    }
+    ltf->setCoefficient(3, 0.5);  // Add 3rd harmonic
+    ltf->updateComposite();
+
+    // Capture composite BEFORE baking
+    std::vector<double> compositeBefore(256);
+    for (int i = 0; i < 256; ++i) {
+        compositeBefore[i] = ltf->getCompositeValue(i);
+    }
+
+    // Bake
+    bool baked = ltf->bakeHarmonicsToBase();
+
+    EXPECT_TRUE(baked);
+
+    // Base layer should now match old composite (visual identity preserved)
+    for (int i = 0; i < 256; ++i) {
+        double baseAfter = ltf->getBaseLayerValue(i);
+        EXPECT_NEAR(compositeBefore[i], baseAfter, 1e-12)
+            << "Visual discontinuity at index " << i;
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_ZerosHarmonicCoefficients) {
+    // Set harmonics
+    ltf->setCoefficient(3, 0.5);
+    ltf->setCoefficient(5, 0.3);
+    ltf->setCoefficient(7, 0.2);
+
+    EXPECT_TRUE(ltf->hasNonZeroHarmonics());
+
+    // Bake
+    ltf->bakeHarmonicsToBase();
+
+    // All harmonics should be zero
+    EXPECT_FALSE(ltf->hasNonZeroHarmonics());
+
+    // Verify individual harmonics are zero
+    for (int i = 1; i <= 40; ++i) {
+        EXPECT_NEAR(ltf->getCoefficient(i), 0.0, 1e-12);
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_PreservesWTMix) {
+    // Set WT mix
+    ltf->setCoefficient(0, 0.7);
+    ltf->setCoefficient(3, 0.5);
+
+    // Bake
+    ltf->bakeHarmonicsToBase();
+
+    // WT mix should be unchanged
+    EXPECT_NEAR(ltf->getCoefficient(0), 0.7, 1e-12);
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_IdempotentMultipleCalls) {
+    // Set harmonics and bake
+    ltf->setCoefficient(3, 0.5);
+    ltf->bakeHarmonicsToBase();
+
+    // Capture base layer after first bake
+    std::vector<double> baseAfterFirstBake(256);
+    for (int i = 0; i < 256; ++i) {
+        baseAfterFirstBake[i] = ltf->getBaseLayerValue(i);
+    }
+
+    // Second bake should be no-op
+    bool secondBake = ltf->bakeHarmonicsToBase();
+    EXPECT_FALSE(secondBake);
+
+    // Base layer should be unchanged
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_NEAR(ltf->getBaseLayerValue(i), baseAfterFirstBake[i], 1e-12);
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_RecalculatesNormalizationScalar) {
+    // Set up curve that requires normalization
+    ltf->setCoefficient(0, 1.0);
+    for (int i = 0; i < 256; ++i) {
+        ltf->setBaseLayerValue(i, 2.0);  // Out of range
+    }
+    ltf->setCoefficient(3, 0.5);
+    ltf->updateComposite();
+
+    // Capture normalization scalar before baking
+    double normScalarBefore = ltf->getNormalizationScalar();
+    EXPECT_LT(normScalarBefore, 1.0);  // Should be scaled down
+
+    // Capture composite values (for visual continuity check)
+    std::vector<double> compositeBefore(256);
+    for (int i = 0; i < 256; ++i) {
+        compositeBefore[i] = ltf->getCompositeValue(i);
+    }
+
+    // Bake
+    ltf->bakeHarmonicsToBase();
+
+    // Normalization scalar recalculates because base layer now contains normalized values
+    // This is correct behavior - the scalar adapts to the new base layer state
+    double normScalarAfter = ltf->getNormalizationScalar();
+    EXPECT_NEAR(normScalarAfter, 1.0, 0.1);  // Should be close to 1.0 now
+
+    // What matters is visual continuity (composite unchanged)
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_DOUBLE_EQ(compositeBefore[i], ltf->getCompositeValue(i));
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_VisualContinuityBitLevel) {
+    // Set complex harmonic configuration
+    ltf->setCoefficient(0, 1.0);
+    ltf->setCoefficient(1, 0.3);
+    ltf->setCoefficient(3, 0.5);
+    ltf->setCoefficient(5, 0.2);
+    ltf->updateComposite();
+
+    // Capture composite BEFORE baking
+    std::vector<double> compositeBefore(256);
+    for (int i = 0; i < 256; ++i) {
+        compositeBefore[i] = ltf->getCompositeValue(i);
+    }
+
+    // Bake
+    ltf->bakeHarmonicsToBase();
+
+    // Composite AFTER baking should be identical (bit-level)
+    for (int i = 0; i < 256; ++i) {
+        double compositeAfter = ltf->getCompositeValue(i);
+        EXPECT_DOUBLE_EQ(compositeBefore[i], compositeAfter)
+            << "Visual discontinuity at index " << i;
+    }
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_Performance) {
+    // Setup: non-trivial harmonics
+    ltf->setCoefficient(0, 1.0);
+    for (int h = 1; h <= 40; ++h) {
+        ltf->setCoefficient(h, 0.1 / h);
+    }
+    ltf->updateComposite();
+
+    // Measure baking time
+    auto start = std::chrono::high_resolution_clock::now();
+    ltf->bakeHarmonicsToBase();
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    // Should be <1ms as claimed in feature plan
+    EXPECT_LT(duration.count(), 1000) << "Baking took " << duration.count() << "μs";
+}
+
+TEST_F(LayeredTransferFunctionTest, GetHarmonicCoefficients_ReturnsAllCoefficients) {
+    // Set known coefficients
+    ltf->setCoefficient(0, 0.8);  // WT mix
+    ltf->setCoefficient(1, 0.3);
+    ltf->setCoefficient(3, 0.5);
+    ltf->setCoefficient(40, 0.1);
+
+    // Get all coefficients
+    auto coeffs = ltf->getHarmonicCoefficients();
+
+    // Verify size
+    EXPECT_EQ(coeffs.size(), 41u);
+
+    // Verify values
+    EXPECT_NEAR(coeffs[0], 0.8, 1e-12);  // WT mix
+    EXPECT_NEAR(coeffs[1], 0.3, 1e-12);
+    EXPECT_NEAR(coeffs[3], 0.5, 1e-12);
+    EXPECT_NEAR(coeffs[40], 0.1, 1e-12);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetHarmonicCoefficients_SetsAllCoefficients) {
+    // Create coefficient array
+    std::array<double, 41> coeffs{};
+    coeffs[0] = 0.9;  // WT mix
+    coeffs[1] = 0.4;
+    coeffs[3] = 0.6;
+    coeffs[40] = 0.2;
+
+    // Set all coefficients
+    ltf->setHarmonicCoefficients(coeffs);
+
+    // Verify they were set
+    EXPECT_NEAR(ltf->getCoefficient(0), 0.9, 1e-12);
+    EXPECT_NEAR(ltf->getCoefficient(1), 0.4, 1e-12);
+    EXPECT_NEAR(ltf->getCoefficient(3), 0.6, 1e-12);
+    EXPECT_NEAR(ltf->getCoefficient(40), 0.2, 1e-12);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetHarmonicCoefficients_UpdatesComposite) {
+    // Set initial state
+    ltf->setCoefficient(0, 1.0);
+    ltf->updateComposite();
+    double compositeBefore = ltf->getCompositeValue(100);
+
+    // Set new coefficients via array
+    std::array<double, 41> coeffs{};
+    coeffs[0] = 1.0;
+    coeffs[3] = 0.5;  // Add 3rd harmonic
+    ltf->setHarmonicCoefficients(coeffs);
+
+    // Composite should have changed (harmonics added)
+    double compositeAfter = ltf->getCompositeValue(100);
+    EXPECT_NE(compositeBefore, compositeAfter);
+}
+
+TEST_F(LayeredTransferFunctionTest, GetSetHarmonicCoefficients_RoundTrip) {
+    // Set known coefficients
+    for (int i = 0; i <= 40; ++i) {
+        ltf->setCoefficient(i, static_cast<double>(i) / 100.0);
+    }
+
+    // Get coefficients
+    auto coeffs = ltf->getHarmonicCoefficients();
+
+    // Clear coefficients
+    std::array<double, 41> zeros{};
+    ltf->setHarmonicCoefficients(zeros);
+
+    // Restore original coefficients
+    ltf->setHarmonicCoefficients(coeffs);
+
+    // Verify restoration
+    for (int i = 0; i <= 40; ++i) {
+        EXPECT_NEAR(ltf->getCoefficient(i), static_cast<double>(i) / 100.0, 1e-12);
+    }
+}
+
 }  // namespace dsp_core_test

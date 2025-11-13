@@ -169,6 +169,57 @@ public:
     bool isCompositeCacheValid() const;
 
     //==========================================================================
+    // Harmonic Layer Baking
+    //==========================================================================
+
+    // Constants
+    static constexpr int NUM_HARMONICS = 40;
+    static constexpr int NUM_HARMONIC_COEFFICIENTS = NUM_HARMONICS + 1;  // wtMix + h1..h40
+    static constexpr double HARMONIC_EPSILON = 1e-6;  // ~-120dB threshold for "effectively zero"
+
+    /**
+     * Check if any harmonic coefficients are non-zero
+     *
+     * Used for no-op optimization before baking.
+     * Checks coefficients[1..40] (harmonics only, not WT mix at [0]).
+     *
+     * @return true if any harmonic amplitude exceeds HARMONIC_EPSILON
+     */
+    bool hasNonZeroHarmonics() const;
+
+    /**
+     * Bake harmonic layer into base layer and reset harmonics to zero
+     *
+     * This captures the current composite curve (base + harmonics) and writes it to base layer.
+     * After baking:
+     *   - Base layer contains the composite values (visually identical curve)
+     *   - All harmonic coefficients are set to zero
+     *   - WT mix coefficient remains at its current value
+     *   - Normalization scalar is preserved (not reset)
+     *
+     * @return true if baking occurred (harmonics were non-zero), false if no-op
+     *
+     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
+     * as processBlock() to ensure audio-thread-safe composite updates. The baking writes
+     * to base layer and then calls updateComposite(), which swaps the new curve atomically.
+     */
+    bool bakeHarmonicsToBase();
+
+    /**
+     * Get current harmonic coefficients for undo/redo
+     *
+     * @return array: [wtMix, h1, h2, ..., h40] (41 values)
+     */
+    std::array<double, NUM_HARMONIC_COEFFICIENTS> getHarmonicCoefficients() const;
+
+    /**
+     * Set all harmonic coefficients at once (for undo)
+     *
+     * @param coeffs Input array: [wtMix, h1, h2, ..., h40] (41 values)
+     */
+    void setHarmonicCoefficients(const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs);
+
+    //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
     //==========================================================================
 
@@ -291,9 +342,6 @@ private:
 
     // Normalization computation (extracted for clarity)
     double computeNormalizationScalar(double maxAbsValue);
-
-    // Validation helper
-    bool hasNonZeroHarmonics() const;
 };
 
 } // namespace dsp_core

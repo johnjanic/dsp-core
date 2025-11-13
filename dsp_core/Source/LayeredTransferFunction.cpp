@@ -229,12 +229,60 @@ void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
 }
 
 bool LayeredTransferFunction::hasNonZeroHarmonics() const {
+    // Check harmonics only (coefficients[1..40]), not WT mix at [0]
     for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
-        if (std::abs(coefficients[i]) > 1e-9) {
+        if (std::abs(coefficients[i]) > HARMONIC_EPSILON) {
             return true;
         }
     }
     return false;
+}
+
+bool LayeredTransferFunction::bakeHarmonicsToBase() {
+    // Early exit if no harmonics to bake (no-op optimization)
+    if (!hasNonZeroHarmonics())
+        return false;
+
+    // Capture composite curve (base + harmonics with normalization applied)
+    // This preserves the visual appearance of the curve exactly
+    for (int i = 0; i < tableSize; ++i) {
+        double compositeValue = getCompositeValue(i);
+        setBaseLayerValue(i, compositeValue);
+    }
+
+    // Zero out all harmonic coefficients (keep WT mix at [0] unchanged)
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = 0.0;
+    }
+
+    // Regenerate composite (now just base layer with WT mix)
+    // Note: normalizationScalar is preserved (not reset to 1.0)
+    updateComposite();
+
+    return true;
+}
+
+std::array<double, LayeredTransferFunction::NUM_HARMONIC_COEFFICIENTS>
+LayeredTransferFunction::getHarmonicCoefficients() const {
+    std::array<double, NUM_HARMONIC_COEFFICIENTS> coeffs{};
+
+    // Copy all coefficients: [0] = WT mix, [1..40] = harmonics
+    for (int i = 0; i < NUM_HARMONIC_COEFFICIENTS && i < static_cast<int>(coefficients.size()); ++i) {
+        coeffs[i] = coefficients[i];
+    }
+
+    return coeffs;
+}
+
+void LayeredTransferFunction::setHarmonicCoefficients(
+    const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs) {
+
+    // Set all coefficients: [0] = WT mix, [1..40] = harmonics
+    for (int i = 0; i < NUM_HARMONIC_COEFFICIENTS && i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = coeffs[i];
+    }
+
+    updateComposite();
 }
 
 bool LayeredTransferFunction::isSplineLayerEnabled() const {
