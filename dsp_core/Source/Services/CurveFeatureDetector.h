@@ -71,7 +71,7 @@ struct FeatureDetectionConfig {
         : significanceThreshold(0.001)
         , maxFeatures(100)
         , derivativeThreshold(1e-06)
-        , secondDerivativeThreshold(0.0015)
+        , secondDerivativeThreshold(0.002)  // Phase 4 v3: Filters artifact inflections (20× higher than 0.0001 default)
         , extremaInflectionRatio(0.8)
         , enableSignificanceFiltering(false)
     {}

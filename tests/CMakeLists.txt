@@ -441,6 +441,7 @@ add_test(NAME SplineFitterExactExtremaTests COMMAND spline_fitter_exact_extrema_
 # ExtremaQualityMetrics tests (for parameter tuning)
 add_executable(extrema_quality_metrics_tests
     ExtremaQualityMetricsTest.cpp
+    AnchorEfficiencyMetricsTest.cpp
 )
 
 target_include_directories(extrema_quality_metrics_tests
@@ -537,3 +538,28 @@ else()
 endif()
 
 add_test(NAME FeatureDetectorDebugTests COMMAND feature_detector_debug_tests)
+
+# AnchorClusteringAnalysis tests (for validating symmetry hypothesis)
+add_executable(anchor_clustering_analysis_tests
+    AnchorClusteringAnalysisTest.cpp
+)
+
+target_include_directories(anchor_clustering_analysis_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(anchor_clustering_analysis_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(anchor_clustering_analysis_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(anchor_clustering_analysis_tests)
+endif()
+
+add_test(NAME AnchorClusteringAnalysisTests COMMAND anchor_clustering_analysis_tests)
