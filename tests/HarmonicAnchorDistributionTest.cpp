@@ -219,4 +219,56 @@ TEST_F(HarmonicAnchorDistributionTest, ComparisonSummary) {
     }
 }
 
+// Regression test: Verify that boundary clustering bug is fixed
+TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
+    auto config = dsp_core::SplineFitConfig::smooth();
+    config.enableFeatureDetection = true;
+
+    // Test H3
+    {
+        setHarmonicCurve(3);
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+        ASSERT_TRUE(result.success);
+
+        // Count anchors in boundary region [-1.0, -0.66]
+        int boundaryAnchors = 0;
+        for (const auto& anchor : result.anchors) {
+            if (anchor.x < -0.66) {
+                boundaryAnchors++;
+            }
+        }
+
+        double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
+        std::cout << "\nH3 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size()
+                  << " (" << clusteringPercentage << "%)" << std::endl;
+
+        // Boundary region is 1/3 of domain, so expect roughly 33% of anchors there.
+        // Allow up to 50% to be generous, but previously this was clustering 60-70%.
+        EXPECT_LT(clusteringPercentage, 50.0)
+            << "H3: Too many anchors near x=-1 boundary (regression of clustering bug)";
+    }
+
+    // Test H5
+    {
+        setHarmonicCurve(5);
+        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
+        ASSERT_TRUE(result.success);
+
+        // Count anchors in boundary region [-1.0, -0.66]
+        int boundaryAnchors = 0;
+        for (const auto& anchor : result.anchors) {
+            if (anchor.x < -0.66) {
+                boundaryAnchors++;
+            }
+        }
+
+        double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
+        std::cout << "H5 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size()
+                  << " (" << clusteringPercentage << "%)" << std::endl;
+
+        EXPECT_LT(clusteringPercentage, 50.0)
+            << "H5: Too many anchors near x=-1 boundary (regression of clustering bug)";
+    }
+}
+
 } // namespace dsp_core_test

@@ -102,9 +102,20 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
         double d2y_prev = estimateSecondDerivative(ltf, i - 1);
         double d2y = estimateSecondDerivative(ltf, i);
 
+        // Adaptive threshold: stricter near boundaries to avoid false inflections
+        // where derivatives explode (common for odd harmonics)
+        double x = ltf.normalizeIndex(i);
+        double distanceFromBoundary = std::min(std::abs(x - (-1.0)), std::abs(x - 1.0));
+        double threshold = config.secondDerivativeThreshold;
+
+        // Increase threshold by 5x within 0.1 units of boundary
+        if (distanceFromBoundary < 0.1) {
+            threshold *= 5.0;
+        }
+
         // Only detect sign changes if both second derivatives are significant
-        if (std::abs(d2y_prev) > config.secondDerivativeThreshold &&
-            std::abs(d2y) > config.secondDerivativeThreshold &&
+        if (std::abs(d2y_prev) > threshold &&
+            std::abs(d2y) > threshold &&
             d2y_prev * d2y < 0.0) {  // Sign change = inflection point
             result.inflectionPoints.push_back(i);
 
@@ -169,10 +180,27 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
 }
 
 double CurveFeatureDetector::estimateDerivative(const LayeredTransferFunction& ltf, int idx) {
-    // Central difference (more accurate than forward/backward)
-    if (idx == 0 || idx == ltf.getTableSize() - 1)
-        return 0.0;  // Boundary handling
+    const int tableSize = ltf.getTableSize();
 
+    // Forward difference for first point
+    if (idx == 0) {
+        double x0 = ltf.normalizeIndex(0);
+        double x1 = ltf.normalizeIndex(1);
+        double y0 = ltf.getBaseLayerValue(0);
+        double y1 = ltf.getBaseLayerValue(1);
+        return (y1 - y0) / (x1 - x0);
+    }
+
+    // Backward difference for last point
+    if (idx == tableSize - 1) {
+        double x0 = ltf.normalizeIndex(tableSize - 2);
+        double x1 = ltf.normalizeIndex(tableSize - 1);
+        double y0 = ltf.getBaseLayerValue(tableSize - 2);
+        double y1 = ltf.getBaseLayerValue(tableSize - 1);
+        return (y1 - y0) / (x1 - x0);
+    }
+
+    // Central difference for interior points (more accurate)
     double x0 = ltf.normalizeIndex(idx - 1);
     double x1 = ltf.normalizeIndex(idx + 1);
     // Use base layer for testing (composite might have normalization issues)
