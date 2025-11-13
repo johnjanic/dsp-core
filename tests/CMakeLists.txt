@@ -487,3 +487,53 @@ else()
 endif()
 
 add_test(NAME FeatureDetectionDiagnosticTests COMMAND feature_detection_diagnostic_tests)
+
+# HarmonicAnchorDistribution tests (for debugging anchor clustering)
+add_executable(harmonic_anchor_distribution_tests
+    HarmonicAnchorDistributionTest.cpp
+)
+
+target_include_directories(harmonic_anchor_distribution_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(harmonic_anchor_distribution_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(harmonic_anchor_distribution_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(harmonic_anchor_distribution_tests)
+endif()
+
+add_test(NAME HarmonicAnchorDistributionTests COMMAND harmonic_anchor_distribution_tests)
+
+# FeatureDetectorDebug tests (for debugging extrema detection failure)
+add_executable(feature_detector_debug_tests
+    FeatureDetectorDebugTest.cpp
+)
+
+target_include_directories(feature_detector_debug_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(feature_detector_debug_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(feature_detector_debug_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(feature_detector_debug_tests)
+endif()
+
+add_test(NAME FeatureDetectorDebugTests COMMAND feature_detector_debug_tests)
