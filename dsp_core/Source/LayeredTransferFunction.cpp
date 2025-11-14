@@ -250,9 +250,11 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
         setBaseLayerValue(i, compositeValue);
     }
 
-    // Zero out all harmonic coefficients (keep WT mix at [0] unchanged)
+    // Set WT mix to 1.0 (full base layer) and zero all harmonic coefficients
+    // This makes the baked base layer fully visible regardless of previous wtCoeff
+    coefficients[0] = 1.0;  // WT coefficient = 100%
     for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
-        coefficients[i] = 0.0;
+        coefficients[i] = 0.0;  // Zero harmonics
     }
 
     // Regenerate composite (now just base layer with WT mix)
