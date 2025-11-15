@@ -435,16 +435,17 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_ZerosHarmonicCoefficients) {
     }
 }
 
-TEST_F(LayeredTransferFunctionTest, BakeHarmonics_PreservesWTMix) {
-    // Set WT mix
-    ltf->setCoefficient(0, 0.7);
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_SetsWTToOne) {
+    // Set WT mix to 0 (common case in Harmonic mode)
+    ltf->setCoefficient(0, 0.0);
     ltf->setCoefficient(3, 0.5);
 
     // Bake
     ltf->bakeHarmonicsToBase();
 
-    // WT mix should be unchanged
-    EXPECT_NEAR(ltf->getCoefficient(0), 0.7, 1e-12);
+    // WT coefficient MUST be set to 1.0 to make the baked base layer visible
+    // If WT remains at 0, the result would be: composite = 0 * base = 0 (flat line bug)
+    EXPECT_NEAR(ltf->getCoefficient(0), 1.0, 1e-12);
 }
 
 TEST_F(LayeredTransferFunctionTest, BakeHarmonics_IdempotentMultipleCalls) {
