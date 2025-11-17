@@ -206,6 +206,21 @@ public:
     bool bakeHarmonicsToBase();
 
     /**
+     * Bake composite layer (base + harmonics) into base layer and reset harmonics
+     *
+     * This captures the current composite curve (base + harmonics with normalization)
+     * and writes it to base layer. After baking:
+     *   - Base layer contains the composite values (visually identical curve)
+     *   - All harmonic coefficients are set to zero
+     *   - WT mix coefficient is set to 1.0 (enables base layer)
+     *   - Normalization scalar is recalculated
+     *
+     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
+     * as processBlock() to ensure audio-thread-safe composite updates.
+     */
+    void bakeCompositeToBase();
+
+    /**
      * Get current harmonic coefficients for undo/redo
      *
      * @return array: [wtMix, h1, h2, ..., h40] (41 values)

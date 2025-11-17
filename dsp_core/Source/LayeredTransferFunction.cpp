@@ -266,6 +266,26 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
     return true;
 }
 
+void LayeredTransferFunction::bakeCompositeToBase() {
+    // Capture composite curve (base + harmonics with normalization applied)
+    // This preserves the visual appearance of the curve exactly
+    for (int i = 0; i < tableSize; ++i) {
+        double compositeValue = getCompositeValue(i);
+        setBaseLayerValue(i, compositeValue);
+    }
+
+    // Set WT coefficient to 1.0 (enable base layer)
+    coefficients[0] = 1.0;
+
+    // Zero out all harmonic coefficients (h1..h40)
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = 0.0;
+    }
+
+    // Regenerate composite (now just base layer with WT mix = 1.0)
+    updateComposite();
+}
+
 std::array<double, LayeredTransferFunction::NUM_HARMONIC_COEFFICIENTS>
 LayeredTransferFunction::getHarmonicCoefficients() const {
     std::array<double, NUM_HARMONIC_COEFFICIENTS> coeffs{};
