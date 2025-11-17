@@ -597,12 +597,15 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     }
 
     // Load coefficients
+    // CRITICAL: Always maintain exactly NUM_HARMONIC_COEFFICIENTS (41) coefficients
+    // Old presets may have fewer coefficients - pad with zeros if needed
+    coefficients.resize(NUM_HARMONIC_COEFFICIENTS, 0.0);  // Reset to 41 zeros
     if (vt.hasProperty("coefficients")) {
         juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
         if (coeffArray != nullptr) {
-            coefficients.clear();
-            for (const auto& var : *coeffArray) {
-                coefficients.push_back(static_cast<double>(var));
+            int numToLoad = std::min(static_cast<int>(coeffArray->size()), NUM_HARMONIC_COEFFICIENTS);
+            for (int i = 0; i < numToLoad; ++i) {
+                coefficients[i] = static_cast<double>((*coeffArray)[i]);
             }
         }
     }
