@@ -16,20 +16,16 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
 
     // Step 1: Create the exact same 4-anchor curve from ArbitraryPositions test
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, -0.87, false, 0.0},
-        {-0.412, -0.653, false, 0.0},
-        {0.234, 0.123, false, 0.0},
-        {1.0, 0.92, false, 0.0}
-    };
+        {-1.0, -0.87, false, 0.0}, {-0.412, -0.653, false, 0.0}, {0.234, 0.123, false, 0.0}, {1.0, 0.92, false, 0.0}};
 
     auto config = dsp_core::SplineFitConfig::tight();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
     std::cout << "\nOriginal anchors (4):" << std::endl;
     for (size_t i = 0; i < originalAnchors.size(); ++i) {
-        std::cout << "  [" << i << "] x=" << std::setw(8) << std::fixed << std::setprecision(4)
-                  << originalAnchors[i].x << ", y=" << std::setw(8) << originalAnchors[i].y
-                  << ", m=" << std::setw(8) << originalAnchors[i].tangent << std::endl;
+        std::cout << "  [" << i << "] x=" << std::setw(8) << std::fixed << std::setprecision(4) << originalAnchors[i].x
+                  << ", y=" << std::setw(8) << originalAnchors[i].y << ", m=" << std::setw(8)
+                  << originalAnchors[i].tangent << std::endl;
     }
 
     // Step 2: Render to LayeredTransferFunction (like backtranslation does)
@@ -50,7 +46,7 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
     // Test A: Zero threshold (detect everything)
     {
         dsp_core::FeatureDetectionConfig featureConfig;
-        featureConfig.significanceThreshold = 0.0;  // Detect ALL features
+        featureConfig.significanceThreshold = 0.0; // Detect ALL features
         featureConfig.derivativeThreshold = 1e-6;
         featureConfig.secondDerivativeThreshold = 1e-4;
         featureConfig.extremaInflectionRatio = 0.8;
@@ -63,8 +59,8 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
             int idx = features.localExtrema[i];
             double x = ltf->normalizeIndex(idx);
             double y = ltf->evaluateBaseAndHarmonics(x);
-            std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x
-                      << ", y=" << y << std::endl;
+            std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x << ", y=" << y
+                      << std::endl;
         }
 
         std::cout << "  Inflection points: " << features.inflectionPoints.size() << std::endl;
@@ -72,8 +68,8 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
             int idx = features.inflectionPoints[i];
             double x = ltf->normalizeIndex(idx);
             double y = ltf->evaluateBaseAndHarmonics(x);
-            std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x
-                      << ", y=" << y << std::endl;
+            std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x << ", y=" << y
+                      << std::endl;
         }
 
         std::cout << "  Total mandatory anchors: " << features.mandatoryAnchors.size() << std::endl;
@@ -99,8 +95,8 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
     {
         dsp_core::FeatureDetectionConfig featureConfig;
         featureConfig.significanceThreshold = 0.001;
-        featureConfig.derivativeThreshold = 1e-5;  // 10x higher
-        featureConfig.secondDerivativeThreshold = 1e-3;  // 10x higher
+        featureConfig.derivativeThreshold = 1e-5;       // 10x higher
+        featureConfig.secondDerivativeThreshold = 1e-3; // 10x higher
         featureConfig.extremaInflectionRatio = 0.8;
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
@@ -116,8 +112,8 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         dsp_core::FeatureDetectionConfig featureConfig;
         featureConfig.significanceThreshold = 0.001;
         featureConfig.derivativeThreshold = 1e-6;
-        featureConfig.secondDerivativeThreshold = 1e-3;  // Very high → ignore inflections
-        featureConfig.extremaInflectionRatio = 1.0;  // 100% extrema, 0% inflections
+        featureConfig.secondDerivativeThreshold = 1e-3; // Very high → ignore inflections
+        featureConfig.extremaInflectionRatio = 1.0;     // 100% extrema, 0% inflections
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
 
@@ -152,7 +148,7 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         fitConfig.enableFeatureDetection = true;
         fitConfig.featureConfig.significanceThreshold = 0.001;
         fitConfig.featureConfig.derivativeThreshold = 1e-6;
-        fitConfig.featureConfig.secondDerivativeThreshold = 1e-3;  // Ignore inflections
+        fitConfig.featureConfig.secondDerivativeThreshold = 1e-3; // Ignore inflections
         fitConfig.featureConfig.extremaInflectionRatio = 1.0;
 
         auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, fitConfig);

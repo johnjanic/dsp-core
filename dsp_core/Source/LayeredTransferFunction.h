@@ -35,7 +35,7 @@ namespace dsp_core {
  *   - updateComposite() should be called from UI thread only
  */
 class LayeredTransferFunction {
-public:
+  public:
     LayeredTransferFunction(int tableSize, double minVal, double maxVal);
 
     //==========================================================================
@@ -45,7 +45,7 @@ public:
     // Base layer (user-drawn wavetable)
     double getBaseLayerValue(int index) const;
     void setBaseLayerValue(int index, double value);
-    void clearBaseLayer();  // Set all base values to 0.0
+    void clearBaseLayer(); // Set all base values to 0.0
 
     // Harmonic layer (for algorithm settings only)
     HarmonicLayer& getHarmonicLayer();
@@ -58,13 +58,17 @@ public:
     // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)
     void setCoefficient(int index, double value);
     double getCoefficient(int index) const;
-    int getNumCoefficients() const { return static_cast<int>(coefficients.size()); }
+    int getNumCoefficients() const {
+        return static_cast<int>(coefficients.size());
+    }
 
     // Composite (final output for audio processing)
     double getCompositeValue(int index) const;
 
     // Normalization scalar (read-only access)
-    double getNormalizationScalar() const { return normalizationScalar.load(std::memory_order_acquire); }
+    double getNormalizationScalar() const {
+        return normalizationScalar.load(std::memory_order_acquire);
+    }
 
     //==========================================================================
     // Composition
@@ -174,8 +178,8 @@ public:
 
     // Constants
     static constexpr int NUM_HARMONICS = 40;
-    static constexpr int NUM_HARMONIC_COEFFICIENTS = NUM_HARMONICS + 1;  // wtMix + h1..h40
-    static constexpr double HARMONIC_EPSILON = 1e-6;  // ~-120dB threshold for "effectively zero"
+    static constexpr int NUM_HARMONIC_COEFFICIENTS = NUM_HARMONICS + 1; // wtMix + h1..h40
+    static constexpr double HARMONIC_EPSILON = 1e-6;                    // ~-120dB threshold for "effectively zero"
 
     /**
      * Check if any harmonic coefficients are non-zero
@@ -238,9 +242,15 @@ public:
     // Utilities (same API as TransferFunction for compatibility)
     //==========================================================================
 
-    int getTableSize() const { return tableSize; }
-    double getMinSignalValue() const { return minValue; }
-    double getMaxSignalValue() const { return maxValue; }
+    int getTableSize() const {
+        return tableSize;
+    }
+    double getMinSignalValue() const {
+        return minValue;
+    }
+    double getMaxSignalValue() const {
+        return maxValue;
+    }
 
     /**
      * Map table index to normalized position x ∈ [minValue, maxValue]
@@ -283,11 +293,19 @@ public:
     enum class InterpolationMode { Linear, Cubic, CatmullRom };
     enum class ExtrapolationMode { Clamp, Linear };
 
-    void setInterpolationMode(InterpolationMode mode) { interpMode = mode; }
-    void setExtrapolationMode(ExtrapolationMode mode) { extrapMode = mode; }
+    void setInterpolationMode(InterpolationMode mode) {
+        interpMode = mode;
+    }
+    void setExtrapolationMode(ExtrapolationMode mode) {
+        extrapMode = mode;
+    }
 
-    InterpolationMode getInterpolationMode() const { return interpMode; }
-    ExtrapolationMode getExtrapolationMode() const { return extrapMode; }
+    InterpolationMode getInterpolationMode() const {
+        return interpMode;
+    }
+    ExtrapolationMode getExtrapolationMode() const {
+        return extrapMode;
+    }
 
     //==========================================================================
     // Serialization
@@ -296,31 +314,31 @@ public:
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& vt);
 
-private:
+  private:
     int tableSize;
     double minValue, maxValue;
 
     // Layers (declare before tables since constructor initializes them first)
-    std::unique_ptr<HarmonicLayer> harmonicLayer;    // Harmonic basis function evaluator (no data ownership)
-    std::unique_ptr<SplineLayer> splineLayer;        // NEW: Spline evaluator for spline mode
+    std::unique_ptr<HarmonicLayer> harmonicLayer; // Harmonic basis function evaluator (no data ownership)
+    std::unique_ptr<SplineLayer> splineLayer;     // NEW: Spline evaluator for spline mode
 
     // Coefficient storage (owned by LayeredTransferFunction)
-    std::vector<double> coefficients;  // [0] = WT mix, [1..N] = harmonics
+    std::vector<double> coefficients; // [0] = WT mix, [1..N] = harmonics
 
     // Layers (NEVER normalized directly - preserved as-is)
-    std::vector<std::atomic<double>> baseTable;      // User-drawn wavetable
+    std::vector<std::atomic<double>> baseTable; // User-drawn wavetable
 
     // Composite output (what audio thread reads)
     std::vector<std::atomic<double>> compositeTable;
 
     // Normalization scalar (applied to mix, not to layers)
-    std::atomic<double> normalizationScalar{ 1.0 };
+    std::atomic<double> normalizationScalar{1.0};
 
     // Normalization deferral (prevents visual shifting during paint strokes)
     bool deferNormalization = false;
 
     // Normalization enable/disable (allows bypassing auto-normalization for creative effects)
-    bool normalizationEnabled = true;  // Default: enabled (safe behavior)
+    bool normalizationEnabled = true; // Default: enabled (safe behavior)
 
     // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
     std::atomic<bool> splineLayerEnabled{false};

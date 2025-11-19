@@ -7,25 +7,25 @@ namespace dsp_core {
 
 // Tangent computation algorithms for spline fitting
 enum class TangentAlgorithm {
-    PCHIP,              // Piecewise Cubic Hermite Interpolating Polynomial (default)
-    FritschCarlson,     // Monotone-preserving variant
-    Akima,              // Local weighted average
-    FiniteDifference    // Simple baseline (for comparison)
+    PCHIP,           // Piecewise Cubic Hermite Interpolating Polynomial (default)
+    FritschCarlson,  // Monotone-preserving variant
+    Akima,           // Local weighted average
+    FiniteDifference // Simple baseline (for comparison)
 };
 
 // Symmetry mode for anchor placement
 enum class SymmetryMode {
-    Auto,    // Auto-detect symmetry, enable if score > threshold
-    Always,  // Force symmetric fitting regardless of detection
-    Never    // Disable symmetric fitting (original behavior)
+    Auto,   // Auto-detect symmetry, enable if score > threshold
+    Always, // Force symmetric fitting regardless of detection
+    Never   // Disable symmetric fitting (original behavior)
 };
 
 // Control point with optional tangent override
 struct SplineAnchor {
-    double x = 0.0;  // Position in [-1, 1]
-    double y = 0.0;  // Value in [-1, 1]
+    double x = 0.0; // Position in [-1, 1]
+    double y = 0.0; // Value in [-1, 1]
     bool hasCustomTangent = false;
-    double tangent = 0.0;  // m_i in PCHIP notation
+    double tangent = 0.0; // m_i in PCHIP notation
 
     bool operator==(const SplineAnchor&) const = default;
 };
@@ -34,9 +34,9 @@ struct SplineAnchor {
 struct SplineFitResult {
     bool success = false;
     std::vector<SplineAnchor> anchors;
-    double maxError = 0.0;  // Peak absolute error |y - ŷ|
+    double maxError = 0.0; // Peak absolute error |y - ŷ|
     int numAnchors = 0;
-    juce::String message;  // User-facing feedback
+    juce::String message; // User-facing feedback
 
     // Statistics for user feedback
     double averageError = 0.0;
@@ -138,8 +138,8 @@ struct SplineFitConfig {
      *
      * Recommended: Leave at defaults unless experiencing aliasing artifacts
      */
-    double minSlope = -8.0;   // Minimum tangent slope
-    double maxSlope = 8.0;    // Maximum tangent slope
+    double minSlope = -8.0; // Minimum tangent slope
+    double maxSlope = 8.0;  // Maximum tangent slope
 
     /**
      * Pin endpoints to (-1, -1) and (1, 1).
@@ -297,9 +297,10 @@ struct SplineFitConfig {
     // Presets
     static SplineFitConfig tight() {
         SplineFitConfig cfg;
-        cfg.positionTolerance = 0.005;  // Relaxed from 0.002 for backtranslation stability
+        cfg.positionTolerance = 0.005; // Relaxed from 0.002 for backtranslation stability
         cfg.derivativeTolerance = 0.05;
-        cfg.maxAnchors = 128;  // Phase 4 v3: Optimal for perfect stability (3→3, 4→4) + exceptional quality (0.01% error)
+        cfg.maxAnchors =
+            128; // Phase 4 v3: Optimal for perfect stability (3→3, 4→4) + exceptional quality (0.01% error)
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }

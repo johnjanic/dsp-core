@@ -3,8 +3,7 @@
 
 namespace dsp_core::audio_pipeline {
 
-void DCBlockingFilter::prepareToPlay(double sampleRate, int samplesPerBlock)
-{
+void DCBlockingFilter::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
 
     // Resize filters for stereo (will be resized in process() if needed)
@@ -15,8 +14,7 @@ void DCBlockingFilter::prepareToPlay(double sampleRate, int samplesPerBlock)
     updateFilterCoefficients();
 }
 
-void DCBlockingFilter::process(juce::AudioBuffer<double>& buffer)
-{
+void DCBlockingFilter::process(juce::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
@@ -41,16 +39,14 @@ void DCBlockingFilter::process(juce::AudioBuffer<double>& buffer)
     }
 }
 
-void DCBlockingFilter::reset()
-{
+void DCBlockingFilter::reset() {
     // Reset all filter states
     for (auto& filter : filters_) {
         filter.reset();
     }
 }
 
-void DCBlockingFilter::setCutoffFrequency(double frequencyHz)
-{
+void DCBlockingFilter::setCutoffFrequency(double frequencyHz) {
     // Clamp to 1-20Hz range (safety: preserve low-end, avoid audible filtering)
     frequencyHz = juce::jlimit(1.0, 20.0, frequencyHz);
 
@@ -61,17 +57,13 @@ void DCBlockingFilter::setCutoffFrequency(double frequencyHz)
     updateFilterCoefficients();
 }
 
-void DCBlockingFilter::updateFilterCoefficients()
-{
+void DCBlockingFilter::updateFilterCoefficients() {
     // Load cutoff frequency
     const double cutoffHz = cutoffFrequency_.load(std::memory_order_acquire);
 
     // Design 1st-order Butterworth highpass filter
     // H(s) = s / (s + ωc), where ωc = 2π * cutoffHz
-    auto coefficients = juce::dsp::IIR::Coefficients<double>::makeFirstOrderHighPass(
-        sampleRate_,
-        cutoffHz
-    );
+    auto coefficients = juce::dsp::IIR::Coefficients<double>::makeFirstOrderHighPass(sampleRate_, cutoffHz);
 
     // Update all filters
     for (auto& filter : filters_) {

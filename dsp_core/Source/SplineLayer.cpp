@@ -26,7 +26,7 @@ std::vector<SplineAnchor> SplineLayer::getAnchors() const {
         return *ptr;
     }
 
-    return {};  // Empty vector if null (defensive)
+    return {}; // Empty vector if null (defensive)
 }
 
 double SplineLayer::evaluate(double x) const {

@@ -10,29 +10,25 @@ using namespace dsp_core::Services;
 //==============================================================================
 
 class SplineEvaluatorTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Create simple test anchors
-        linearAnchors = {
-            {-1.0, -1.0, false, 1.0},  // y = x, slope = 1
-            {1.0, 1.0, false, 1.0}
-        };
+        linearAnchors = {{-1.0, -1.0, false, 1.0}, // y = x, slope = 1
+                         {1.0, 1.0, false, 1.0}};
 
         // Three-point S-curve
         sCurveAnchors = {
-            {-1.0, -1.0, false, 0.0},  // Start flat
-            {0.0, 0.0, false, 2.0},    // Steep middle
-            {1.0, 1.0, false, 0.0}     // End flat
+            {-1.0, -1.0, false, 0.0}, // Start flat
+            {0.0, 0.0, false, 2.0},   // Steep middle
+            {1.0, 1.0, false, 0.0}    // End flat
         };
 
         // Monotonic increasing curve
-        monotonicAnchors = {
-            {-1.0, -1.0, false, 0.5},
-            {-0.5, -0.7, false, 0.8},
-            {0.0, 0.0, false, 1.0},
-            {0.5, 0.7, false, 0.8},
-            {1.0, 1.0, false, 0.5}
-        };
+        monotonicAnchors = {{-1.0, -1.0, false, 0.5},
+                            {-0.5, -0.7, false, 0.8},
+                            {0.0, 0.0, false, 1.0},
+                            {0.5, 0.7, false, 0.8},
+                            {1.0, 1.0, false, 0.5}};
     }
 
     std::vector<SplineAnchor> linearAnchors;
@@ -72,8 +68,7 @@ TEST_F(SplineEvaluatorTest, EvaluateAtAnchorPositionsReturnsExactValues) {
     // Monotonic case
     for (const auto& anchor : monotonicAnchors) {
         double result = SplineEvaluator::evaluate(monotonicAnchors, anchor.x);
-        EXPECT_NEAR(result, anchor.y, kTolerance)
-            << "Failed at anchor x=" << anchor.x;
+        EXPECT_NEAR(result, anchor.y, kTolerance) << "Failed at anchor x=" << anchor.x;
     }
 }
 
@@ -138,7 +133,7 @@ TEST_F(SplineEvaluatorTest, SCurveHasFlatEndsAndSteepMiddle) {
 
     // Middle should have steeper slope
     double deriv_middle = SplineEvaluator::evaluateDerivative(sCurveAnchors, 0.0);
-    EXPECT_GT(deriv_middle, 1.5);  // Should be close to 2.0
+    EXPECT_GT(deriv_middle, 1.5); // Should be close to 2.0
 }
 
 //==============================================================================
@@ -154,9 +149,8 @@ TEST_F(SplineEvaluatorTest, MonotonicAnchorsProduceMonotonicCurve) {
         double x = -1.0 + (2.0 * i / numSamples);
         double y = SplineEvaluator::evaluate(monotonicAnchors, x);
 
-        EXPECT_GE(y, prevY - kTolerance)
-            << "Monotonicity violated at x=" << x
-            << " (y=" << y << ", prevY=" << prevY << ")";
+        EXPECT_GE(y, prevY - kTolerance) << "Monotonicity violated at x=" << x << " (y=" << y << ", prevY=" << prevY
+                                         << ")";
 
         prevY = y;
     }
@@ -169,8 +163,7 @@ TEST_F(SplineEvaluatorTest, MonotonicAnchorsProduceMonotonicCurve) {
 TEST_F(SplineEvaluatorTest, DegenerateSegmentWithZeroDx) {
     // Two anchors at same x position (degenerate)
     std::vector<SplineAnchor> degenerate = {
-        {0.0, -1.0, false, 0.0},
-        {0.0, 1.0, false, 0.0}  // Same x as previous
+        {0.0, -1.0, false, 0.0}, {0.0, 1.0, false, 0.0} // Same x as previous
     };
 
     // Should return first anchor's y value
@@ -180,10 +173,7 @@ TEST_F(SplineEvaluatorTest, DegenerateSegmentWithZeroDx) {
 
 TEST_F(SplineEvaluatorTest, VeryCloseAnchors) {
     // Two anchors very close together
-    std::vector<SplineAnchor> close = {
-        {-1.0, -1.0, false, 1.0},
-        {-0.999999, -0.999999, false, 1.0}
-    };
+    std::vector<SplineAnchor> close = {{-1.0, -1.0, false, 1.0}, {-0.999999, -0.999999, false, 1.0}};
 
     // Should still interpolate correctly
     double result = SplineEvaluator::evaluate(close, -0.9999995);
@@ -195,10 +185,7 @@ TEST_F(SplineEvaluatorTest, VeryCloseAnchors) {
 //==============================================================================
 
 TEST_F(SplineEvaluatorTest, DerivativeOfConstantIsZero) {
-    std::vector<SplineAnchor> flat = {
-        {-1.0, 0.5, false, 0.0},
-        {1.0, 0.5, false, 0.0}
-    };
+    std::vector<SplineAnchor> flat = {{-1.0, 0.5, false, 0.0}, {1.0, 0.5, false, 0.0}};
 
     // Derivative should be zero everywhere for flat curve
     EXPECT_NEAR(SplineEvaluator::evaluateDerivative(flat, -0.5), 0.0, 1e-6);
@@ -238,8 +225,7 @@ TEST_F(SplineEvaluatorTest, AnalyticalDerivativeMatchesNumerical) {
 
         double analytical_deriv = SplineEvaluator::evaluateDerivative(monotonicAnchors, x);
 
-        EXPECT_NEAR(analytical_deriv, numerical_deriv, 1e-3)
-            << "Derivative mismatch at x=" << x;
+        EXPECT_NEAR(analytical_deriv, numerical_deriv, 1e-3) << "Derivative mismatch at x=" << x;
     }
 }
 
@@ -251,11 +237,11 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
     // Fit y = x² using PCHIP anchors
     // Expected tangents at sample points
     std::vector<SplineAnchor> quadratic = {
-        {-1.0, 1.0, false, -2.0},   // y' = 2x at x=-1
-        {-0.5, 0.25, false, -1.0},  // y' = 2x at x=-0.5
-        {0.0, 0.0, false, 0.0},     // y' = 2x at x=0
-        {0.5, 0.25, false, 1.0},    // y' = 2x at x=0.5
-        {1.0, 1.0, false, 2.0}      // y' = 2x at x=1
+        {-1.0, 1.0, false, -2.0},  // y' = 2x at x=-1
+        {-0.5, 0.25, false, -1.0}, // y' = 2x at x=-0.5
+        {0.0, 0.0, false, 0.0},    // y' = 2x at x=0
+        {0.5, 0.25, false, 1.0},   // y' = 2x at x=0.5
+        {1.0, 1.0, false, 2.0}     // y' = 2x at x=1
     };
 
     // Sample and verify approximation quality
@@ -264,8 +250,7 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
         double actual = SplineEvaluator::evaluate(quadratic, x);
 
         // PCHIP should approximate x² very well
-        EXPECT_NEAR(actual, expected, 0.01)
-            << "Quadratic approximation poor at x=" << x;
+        EXPECT_NEAR(actual, expected, 0.01) << "Quadratic approximation poor at x=" << x;
     }
 }
 
@@ -275,9 +260,9 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
 
 TEST_F(SplineEvaluatorTest, CustomTangentOverride) {
     std::vector<SplineAnchor> custom = {
-        {-1.0, -1.0, true, 0.0},   // Override to flat start
-        {0.0, 0.0, false, 1.0},    // Use computed tangent
-        {1.0, 1.0, true, 0.0}      // Override to flat end
+        {-1.0, -1.0, true, 0.0}, // Override to flat start
+        {0.0, 0.0, false, 1.0},  // Use computed tangent
+        {1.0, 1.0, true, 0.0}    // Override to flat end
     };
 
     // Start and end should be flat
@@ -304,18 +289,12 @@ TEST_F(SplineEvaluatorTest, BatchEvaluateMatchesSingleEvaluate) {
     }
 
     // Batch evaluate
-    SplineEvaluator::evaluateBatch(
-        monotonicAnchors,
-        xValues.data(),
-        yBatch.data(),
-        count
-    );
+    SplineEvaluator::evaluateBatch(monotonicAnchors, xValues.data(), yBatch.data(), count);
 
     // Compare with individual evaluations
     for (int i = 0; i < count; ++i) {
         double yIndividual = SplineEvaluator::evaluate(monotonicAnchors, xValues[i]);
-        EXPECT_NEAR(yBatch[i], yIndividual, kTolerance)
-            << "Mismatch at index " << i << ", x=" << xValues[i];
+        EXPECT_NEAR(yBatch[i], yIndividual, kTolerance) << "Mismatch at index " << i << ", x=" << xValues[i];
     }
 }
 
@@ -356,15 +335,11 @@ TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesBoundaryConditions) {
 
     // Test values before, within, and after anchor range
     for (int i = 0; i < count; ++i) {
-        xValues[i] = -2.0 + (4.0 * i / (count - 1));  // Range [-2, 2]
+        xValues[i] = -2.0 + (4.0 * i / (count - 1)); // Range [-2, 2]
     }
 
-    SplineEvaluator::evaluateBatch(
-        sCurveAnchors,  // Anchors range from -1 to 1
-        xValues.data(),
-        yValues.data(),
-        count
-    );
+    SplineEvaluator::evaluateBatch(sCurveAnchors, // Anchors range from -1 to 1
+                                   xValues.data(), yValues.data(), count);
 
     // Values before first anchor should equal first anchor's y
     for (int i = 0; i < count; ++i) {

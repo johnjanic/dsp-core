@@ -12,20 +12,13 @@ using namespace dsp_core::Services;
 //==============================================================================
 
 class SplineLayerTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Create simple test anchors
-        linearAnchors = {
-            {-1.0, -1.0, false, 0.0},
-            {1.0, 1.0, false, 0.0}
-        };
+        linearAnchors = {{-1.0, -1.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
         // Three-point curve
-        threePtAnchors = {
-            {-1.0, -1.0, false, 0.0},
-            {0.0, 0.5, false, 0.0},
-            {1.0, 1.0, false, 0.0}
-        };
+        threePtAnchors = {{-1.0, -1.0, false, 0.0}, {0.0, 0.5, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
         // Compute tangents using Akima (default)
         SplineFitter::computeTangents(linearAnchors, SplineFitConfig::tight());
@@ -61,11 +54,7 @@ TEST_F(SplineLayerTest, LinearInterpolation) {
     SplineLayer layer;
 
     // Use 3 points to force linearity
-    std::vector<SplineAnchor> linear3Pt = {
-        {-1.0, -1.0, false, 0.0},
-        {0.0, 0.0, false, 0.0},
-        {1.0, 1.0, false, 0.0}
-    };
+    std::vector<SplineAnchor> linear3Pt = {{-1.0, -1.0, false, 0.0}, {0.0, 0.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
     SplineFitter::computeTangents(linear3Pt, SplineFitConfig::tight());
     layer.setAnchors(linear3Pt);
 
@@ -75,7 +64,7 @@ TEST_F(SplineLayerTest, LinearInterpolation) {
     EXPECT_NEAR(layer.evaluate(1.0), 1.0, 1e-9);
 
     // Test between anchors (should be close to linear: y = x)
-    EXPECT_NEAR(layer.evaluate(-0.5), -0.5, 0.01);  // Allow small deviation for cubic spline
+    EXPECT_NEAR(layer.evaluate(-0.5), -0.5, 0.01); // Allow small deviation for cubic spline
     EXPECT_NEAR(layer.evaluate(0.5), 0.5, 0.01);
 }
 
@@ -141,11 +130,7 @@ TEST_F(SplineLayerTest, ThreadSafetyStressTest) {
 TEST_F(SplineLayerTest, SerializationRoundTrip) {
     SplineLayer layer1;
 
-    std::vector<SplineAnchor> anchors = {
-        {-1.0, -1.0, true, 0.5},
-        {0.0, 0.5, true, 1.0},
-        {1.0, 1.0, true, -0.5}
-    };
+    std::vector<SplineAnchor> anchors = {{-1.0, -1.0, true, 0.5}, {0.0, 0.5, true, 1.0}, {1.0, 1.0, true, -0.5}};
     layer1.setAnchors(anchors);
 
     juce::ValueTree vt = layer1.toValueTree();

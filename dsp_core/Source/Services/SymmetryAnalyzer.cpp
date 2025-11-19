@@ -7,12 +7,11 @@
 namespace dsp_core {
 namespace Services {
 
-SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(
-    const LayeredTransferFunction& ltf,
-    const Config& config) {
+SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTransferFunction& ltf,
+                                                              const Config& config) {
 
     Result result;
-    result.centerX = 0.0;  // Assume symmetry about origin
+    result.centerX = 0.0; // Assume symmetry about origin
 
     // Sample curve at complementary points
     std::vector<double> fPositive, fNegative;
@@ -44,7 +43,7 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(
     // For odd symmetry f(-x) = -f(x), we must have f(0) = 0
     // If |f(0)| > tolerance, the curve cannot be odd-symmetric
     double yAtZero = ltf.evaluateBaseAndHarmonics(0.0);
-    const double zeroCrossingTolerance = 0.1;  // 10% tolerance
+    const double zeroCrossingTolerance = 0.1; // 10% tolerance
 
     if (std::abs(yAtZero) > zeroCrossingTolerance) {
         // Curve doesn't cross zero → NOT odd-symmetric
@@ -68,9 +67,8 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(
     return result;
 }
 
-double SymmetryAnalyzer::computeSymmetryScore(
-    const std::vector<double>& fPositive,
-    const std::vector<double>& fNegative) {
+double SymmetryAnalyzer::computeSymmetryScore(const std::vector<double>& fPositive,
+                                              const std::vector<double>& fNegative) {
 
     if (fPositive.size() != fNegative.size() || fPositive.empty()) {
         return 0.0;
@@ -93,7 +91,7 @@ double SymmetryAnalyzer::computeSymmetryScore(
 
     for (int i = 0; i < n; ++i) {
         double devPos = fPositive[i] - meanPos;
-        double devNeg = -fNegative[i] - meanNeg;  // Flip sign
+        double devNeg = -fNegative[i] - meanNeg; // Flip sign
 
         numerator += devPos * devNeg;
         denomPos += devPos * devPos;
@@ -112,8 +110,7 @@ double SymmetryAnalyzer::computeSymmetryScore(
     return std::max(0.0, std::min(1.0, correlation));
 }
 
-SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(
-    const LayeredTransferFunction& ltf) {
+SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTransferFunction& ltf) {
     return analyzeOddSymmetry(ltf, Config{});
 }
 

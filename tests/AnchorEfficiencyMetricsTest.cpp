@@ -11,7 +11,7 @@ namespace dsp_core_test {
  * Lower anchor counts are better (more efficient representation).
  */
 class AnchorEfficiencyMetrics : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(4096, -1.0, 1.0);
     }
@@ -42,7 +42,7 @@ void setSinCurve(dsp_core::LayeredTransferFunction& ltf, double frequency = 1.0)
 void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
         double x = ltf.normalizeIndex(i);
-        x = std::max(-1.0, std::min(1.0, x));  // Clamp
+        x = std::max(-1.0, std::min(1.0, x)); // Clamp
 
         double y = 0.0;
         if (harmonicNumber % 2 == 0) {
@@ -78,7 +78,7 @@ TEST_F(AnchorEfficiencyMetrics, Tanh_AnchorCount) {
 }
 
 TEST_F(AnchorEfficiencyMetrics, Sin_AnchorCount) {
-    setSinCurve(*ltf, 1.0);  // sin(πx)
+    setSinCurve(*ltf, 1.0); // sin(πx)
 
     auto config = dsp_core::SplineFitConfig::tight();
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);

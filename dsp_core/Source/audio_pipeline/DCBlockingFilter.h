@@ -35,14 +35,16 @@ namespace dsp_core::audio_pipeline {
  * CPU Cost: Minimal (~0.1% overhead per channel)
  */
 class DCBlockingFilter : public AudioProcessingStage {
-public:
+  public:
     DCBlockingFilter() = default;
 
     // AudioProcessingStage interface
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "DCBlockingFilter"; }
+    juce::String getName() const override {
+        return "DCBlockingFilter";
+    }
 
     // Control interface (thread-safe)
     void setEnabled(bool shouldBeEnabled) {
@@ -69,9 +71,9 @@ public:
         return cutoffFrequency_.load(std::memory_order_acquire);
     }
 
-private:
-    std::atomic<bool> enabled_{true};  // Default: ON (safety feature)
-    std::atomic<double> cutoffFrequency_{5.0};  // Hz
+  private:
+    std::atomic<bool> enabled_{true};          // Default: ON (safety feature)
+    std::atomic<double> cutoffFrequency_{5.0}; // Hz
 
     // Per-channel IIR filters (audio thread only)
     std::vector<juce::dsp::IIR::Filter<double>> filters_;

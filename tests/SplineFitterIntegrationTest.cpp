@@ -19,7 +19,7 @@ using namespace dsp_core::Services;
  * Goal: Validate no anchor creeping and proper shape preservation
  */
 class SplineFitterIntegrationTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Use high resolution (16k samples) for realistic production workflow
         ltf = std::make_unique<LayeredTransferFunction>(16384, -1.0, 1.0);
@@ -57,7 +57,7 @@ protected:
 
         // Zero harmonics, set wtCoeff = 1.0
         const int numCoeffs = ltf->getNumCoefficients();
-        ltf->setCoefficient(0, 1.0);  // wtCoeff
+        ltf->setCoefficient(0, 1.0); // wtCoeff
         for (int h = 1; h < numCoeffs; ++h) {
             ltf->setCoefficient(h, 0.0);
         }
@@ -83,9 +83,7 @@ protected:
             xValues[i] = ltf->normalizeIndex(i);
         }
 
-        SplineEvaluator::evaluateBatch(
-            anchors, xValues.data(), yValues.data(), tableSize
-        );
+        SplineEvaluator::evaluateBatch(anchors, xValues.data(), yValues.data(), tableSize);
 
         for (int i = 0; i < tableSize; ++i) {
             ltf->setBaseLayerValue(i, yValues[i]);
@@ -95,8 +93,7 @@ protected:
     /**
      * Helper: Measure max error between two tables
      */
-    double computeMaxError(const std::vector<double>& original,
-                          const std::vector<double>& fitted) const {
+    double computeMaxError(const std::vector<double>& original, const std::vector<double>& fitted) const {
         double maxError = 0.0;
         for (size_t i = 0; i < original.size(); ++i) {
             double error = std::abs(original[i] - fitted[i]);
@@ -143,9 +140,9 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     // STEP b: User adds 1 anchor, drags to (0, -0.25)
     // Simulate by creating 3-anchor curve manually
     std::vector<SplineAnchor> userAnchors = {
-        {-1.0, -1.0, false, 0.0},  // Left endpoint
-        {0.0, -0.25, false, 0.0},  // User dragged anchor
-        {1.0, 1.0, false, 0.0}     // Right endpoint
+        {-1.0, -1.0, false, 0.0}, // Left endpoint
+        {0.0, -0.25, false, 0.0}, // User dragged anchor
+        {1.0, 1.0, false, 0.0}    // Right endpoint
     };
 
     auto config = SplineFitConfig::smooth();
@@ -164,7 +161,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     auto bakedState = captureBaseLayer();
 
     // STEP d: Convert back to spline mode
-    bakeCompositeToBase();  // Flatten harmonics (no-op here)
+    bakeCompositeToBase(); // Flatten harmonics (no-op here)
     auto refitResult = SplineFitter::fitCurve(*ltf, config);
 
     // STEP e: Verify 3 anchors (±2) - NO ANCHOR CREEPING
@@ -187,7 +184,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
         if (x >= 0.3 && x <= 0.7) {
-            double localX = (x - 0.5) * 10.0;  // Scale to [-2, 2]
+            double localX = (x - 0.5) * 10.0; // Scale to [-2, 2]
             double bump = 0.1 * std::sin(localX * M_PI);
             ltf->setBaseLayerValue(i, ltf->getBaseLayerValue(i) + bump);
         }
@@ -235,11 +232,11 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
      */
 
     // STEP a: Mix in Harmonic 10 (50% amplitude)
-    ltf->setCoefficient(0, 1.0);   // wtCoeff = 100%
-    ltf->setCoefficient(10, 0.5);  // Harmonic 10 = 50%
+    ltf->setCoefficient(0, 1.0);  // wtCoeff = 100%
+    ltf->setCoefficient(10, 0.5); // Harmonic 10 = 50%
     ltf->updateComposite();
 
-    auto originalComposite = captureBaseLayer();  // Actually captures composite via base
+    auto originalComposite = captureBaseLayer(); // Actually captures composite via base
 
     // Capture true composite for comparison
     std::vector<double> originalState;
@@ -276,7 +273,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     // STEP f: User drags anchor (modify middle anchor)
     auto modifiedAnchors = harmonicFitResult.anchors;
     size_t midIdx = modifiedAnchors.size() / 2;
-    modifiedAnchors[midIdx].y += 0.2;  // Drag up by 0.2
+    modifiedAnchors[midIdx].y += 0.2; // Drag up by 0.2
 
     SplineFitter::computeTangents(modifiedAnchors, config);
     ltf->getSplineLayer().setAnchors(modifiedAnchors);
@@ -296,8 +293,8 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     // STEP h: Verify no anchor explosion
     // After one drag and refit, anchor count should be similar (±50%)
     EXPECT_TRUE(refitResult.success) << "Refit should succeed";
-    double anchorRatio = static_cast<double>(refitResult.anchors.size()) /
-                         static_cast<double>(harmonicFitResult.anchors.size());
+    double anchorRatio =
+        static_cast<double>(refitResult.anchors.size()) / static_cast<double>(harmonicFitResult.anchors.size());
 
     EXPECT_GT(anchorRatio, 0.5) << "Anchor count should not collapse";
     EXPECT_LT(anchorRatio, 1.5) << "Anchor count should not explode";
@@ -373,8 +370,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
     size_t lastCount = anchorHistory.back();
     size_t secondLastCount = anchorHistory[anchorHistory.size() - 2];
 
-    double countChange = std::abs(static_cast<int>(lastCount) -
-                                   static_cast<int>(secondLastCount));
+    double countChange = std::abs(static_cast<int>(lastCount) - static_cast<int>(secondLastCount));
 
     EXPECT_LE(countChange, 5) << "Anchor count should stabilize (change ≤5 in final cycles)";
 
@@ -382,21 +378,17 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
     for (size_t i = 0; i < errorHistory.size(); ++i) {
         if (i == 0) {
             // First cycle may have higher error due to initial fitting
-            EXPECT_LT(errorHistory[i], 0.6)
-                << "Cycle " << i << " error should be reasonable";
+            EXPECT_LT(errorHistory[i], 0.6) << "Cycle " << i << " error should be reasonable";
         } else {
-            EXPECT_LT(errorHistory[i], 0.05)
-                << "Cycle " << i << " error should remain <5%";
+            EXPECT_LT(errorHistory[i], 0.05) << "Cycle " << i << " error should remain <5%";
         }
     }
 
     // Print diagnostics
     std::cout << "\nMulti-cycle backtranslation results:\n";
     for (size_t i = 0; i < anchorHistory.size(); ++i) {
-        std::cout << "  Cycle " << i << ": "
-                  << anchorHistory[i] << " anchors, "
-                  << "error = " << std::fixed << std::setprecision(4)
-                  << errorHistory[i] << "\n";
+        std::cout << "  Cycle " << i << ": " << anchorHistory[i] << " anchors, "
+                  << "error = " << std::fixed << std::setprecision(4) << errorHistory[i] << "\n";
     }
 }
 
@@ -415,8 +407,8 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
      */
 
     // Mix in Harmonic 15 (challenging complexity)
-    ltf->setCoefficient(0, 1.0);   // wtCoeff = 100%
-    ltf->setCoefficient(15, 0.7);  // Harmonic 15 = 70%
+    ltf->setCoefficient(0, 1.0);  // wtCoeff = 100%
+    ltf->setCoefficient(15, 0.7); // Harmonic 15 = 70%
     ltf->updateComposite();
 
     // Capture original shape
@@ -460,8 +452,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Verify anchor count stability (±30%)
     EXPECT_TRUE(fitResult2.success) << "Second H15 fit should succeed";
-    double ratio = static_cast<double>(fitResult2.anchors.size()) /
-                   static_cast<double>(fitResult1.anchors.size());
+    double ratio = static_cast<double>(fitResult2.anchors.size()) / static_cast<double>(fitResult1.anchors.size());
 
     EXPECT_GT(ratio, 0.7) << "Anchor count should not collapse on backtranslation";
     EXPECT_LT(ratio, 1.3) << "Anchor count should not explode on backtranslation";
@@ -482,10 +473,9 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Print diagnostics
     std::cout << "\nH15 backtranslation results:\n"
-              << "  First fit: " << fitResult1.anchors.size() << " anchors, error = "
-              << std::fixed << std::setprecision(4) << firstError << "\n"
-              << "  Second fit: " << fitResult2.anchors.size() << " anchors, error = "
-              << secondError << "\n";
+              << "  First fit: " << fitResult1.anchors.size() << " anchors, error = " << std::fixed
+              << std::setprecision(4) << firstError << "\n"
+              << "  Second fit: " << fitResult2.anchors.size() << " anchors, error = " << secondError << "\n";
 }
 
 //==============================================================================
@@ -640,7 +630,7 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_Backtranslation_StableWithCorre
     ltf->updateComposite();
 
     auto config = SplineFitConfig::smooth();
-    config.maxAnchors = 8;  // Moderate budget
+    config.maxAnchors = 8; // Moderate budget
     config.enableZeroCrossingCheck = true;
     config.zeroCrossingTolerance = 0.01;
 
@@ -659,7 +649,7 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_Backtranslation_StableWithCorre
 
         // Check if anchor at x=0 was added
         bool hasZeroCrossingAnchor = std::any_of(fitResult.anchors.begin(), fitResult.anchors.end(),
-            [](const SplineAnchor& a) { return std::abs(a.x) < 1e-6; });
+                                                 [](const SplineAnchor& a) { return std::abs(a.x) < 1e-6; });
         hadZeroCrossingAnchor.push_back(hasZeroCrossingAnchor);
 
         // Measure drift at x=0
@@ -685,14 +675,12 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_Backtranslation_StableWithCorre
     // Verify anchor count stability (no creeping)
     size_t maxAnchors = *std::max_element(anchorHistory.begin(), anchorHistory.end());
     size_t minAnchors = *std::min_element(anchorHistory.begin(), anchorHistory.end());
-    EXPECT_LE(maxAnchors - minAnchors, 3)
-        << "Anchor count should be stable across iterations";
+    EXPECT_LE(maxAnchors - minAnchors, 3) << "Anchor count should be stable across iterations";
 
     // Print diagnostics
     std::cout << "\nZero-crossing backtranslation stability:\n";
     for (int i = 0; i < numIterations; ++i) {
-        std::cout << "  Iteration " << i << ": "
-                  << anchorHistory[i] << " anchors, "
+        std::cout << "  Iteration " << i << ": " << anchorHistory[i] << " anchors, "
                   << "drift = " << std::fixed << std::setprecision(6) << driftHistory[i]
                   << ", anchor@x=0: " << (hadZeroCrossingAnchor[i] ? "YES" : "NO") << "\n";
     }
@@ -744,8 +732,7 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_CompareEnabled_vs_Disabled) {
     double driftDisabled = std::abs(SplineEvaluator::evaluate(resultDisabled.anchors, 0.0));
 
     // Verify Config A corrected drift
-    EXPECT_LT(driftEnabled, configEnabled.zeroCrossingTolerance)
-        << "Config A (enabled) should correct drift";
+    EXPECT_LT(driftEnabled, configEnabled.zeroCrossingTolerance) << "Config A (enabled) should correct drift";
 
     // Config B may have drift (no guarantee)
     // Just verify it ran successfully
@@ -756,8 +743,7 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_CompareEnabled_vs_Disabled) {
               << "drift = " << std::fixed << std::setprecision(6) << driftEnabled << "\n"
               << "  Disabled: " << resultDisabled.anchors.size() << " anchors, "
               << "drift = " << driftDisabled << "\n"
-              << "  Value of check: "
-              << (driftEnabled < driftDisabled ? "IMPROVED drift" : "similar drift") << "\n";
+              << "  Value of check: " << (driftEnabled < driftDisabled ? "IMPROVED drift" : "similar drift") << "\n";
 }
 
 //==============================================================================
@@ -794,8 +780,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
     ltf->updateComposite();
 
     auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Always;  // Force symmetric fitting
-    config.maxAnchors = 16;  // Moderate budget
+    config.symmetryMode = SymmetryMode::Always; // Force symmetric fitting
+    config.maxAnchors = 16;                     // Moderate budget
 
     std::vector<size_t> anchorHistory;
     std::vector<double> errorHistory;
@@ -837,8 +823,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
 
         // Compute pair ratio (expect ≥50% paired)
         // Note: Feature detection may add unpaired anchors, reducing pairing ratio
-        bool mostlyPaired = (totalNonCenter == 0) ||
-                           (static_cast<double>(pairedCount) / totalNonCenter >= 0.5);
+        bool mostlyPaired = (totalNonCenter == 0) || (static_cast<double>(pairedCount) / totalNonCenter >= 0.5);
         pairedHistory.push_back(mostlyPaired);
 
         // Apply fit and measure error
@@ -861,30 +846,25 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
     // Verify anchor count stability (no creeping)
     size_t maxAnchors = *std::max_element(anchorHistory.begin(), anchorHistory.end());
     size_t minAnchors = *std::min_element(anchorHistory.begin(), anchorHistory.end());
-    EXPECT_LE(maxAnchors - minAnchors, 4)
-        << "Symmetric mode should prevent anchor creeping";
+    EXPECT_LE(maxAnchors - minAnchors, 4) << "Symmetric mode should prevent anchor creeping";
 
     // Verify first iteration has good pairing
     // (Subsequent iterations may degrade due to feature detection adding unpaired anchors)
     if (!pairedHistory.empty()) {
-        EXPECT_TRUE(pairedHistory[0])
-            << "First iteration should have mostly paired anchors";
+        EXPECT_TRUE(pairedHistory[0]) << "First iteration should have mostly paired anchors";
     }
 
     // Verify shape preservation
     for (size_t i = 0; i < errorHistory.size(); ++i) {
-        EXPECT_LT(errorHistory[i], 0.05)
-            << "Iteration " << i << " error should be <5%";
+        EXPECT_LT(errorHistory[i], 0.05) << "Iteration " << i << " error should be <5%";
     }
 
     // Print diagnostics
     std::cout << "\nSymmetric fitting backtranslation stability:\n";
     for (int i = 0; i < numIterations; ++i) {
-        std::cout << "  Iteration " << i << ": "
-                  << anchorHistory[i] << " anchors, "
+        std::cout << "  Iteration " << i << ": " << anchorHistory[i] << " anchors, "
                   << "paired: " << (pairedHistory[i] ? "YES" : "NO") << ", "
-                  << "error = " << std::fixed << std::setprecision(4)
-                  << errorHistory[i] << "\n";
+                  << "error = " << std::fixed << std::setprecision(4) << errorHistory[i] << "\n";
     }
 }
 
@@ -908,7 +888,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
     // Create Harmonic 3 (odd symmetric via Chebyshev T₃)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = 4.0 * x * x * x - 3.0 * x;  // Chebyshev T₃
+        double y = 4.0 * x * x * x - 3.0 * x; // Chebyshev T₃
         ltf->setBaseLayerValue(i, y);
     }
     ltf->updateComposite();
@@ -917,7 +897,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
     auto originalState = captureBaseLayer();
 
     auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Never;  // Original greedy algorithm
+    config.symmetryMode = SymmetryMode::Never; // Original greedy algorithm
 
     auto result = SplineFitter::fitCurve(*ltf, config);
 
@@ -970,7 +950,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
     ltf->updateComposite();
 
     auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Auto;  // Should auto-detect
+    config.symmetryMode = SymmetryMode::Auto; // Should auto-detect
     config.symmetryThreshold = 0.90;
     config.maxAnchors = 12;
 
@@ -988,22 +968,21 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
         int totalNonCenter = 0;
 
         for (const auto& anchor : fitResult.anchors) {
-            if (std::abs(anchor.x) < 1e-4) continue;  // Skip near-center
+            if (std::abs(anchor.x) < 1e-4)
+                continue; // Skip near-center
 
             totalNonCenter++;
 
             // Find complementary anchor at (-x, -y)
             for (const auto& other : fitResult.anchors) {
-                if (std::abs(anchor.x + other.x) < 1e-4 &&
-                    std::abs(anchor.y + other.y) < 0.1) {
+                if (std::abs(anchor.x + other.x) < 1e-4 && std::abs(anchor.y + other.y) < 0.1) {
                     pairedCount++;
                     break;
                 }
             }
         }
 
-        double visualSymmetryScore = totalNonCenter > 0 ?
-            static_cast<double>(pairedCount) / totalNonCenter : 1.0;
+        double visualSymmetryScore = totalNonCenter > 0 ? static_cast<double>(pairedCount) / totalNonCenter : 1.0;
         symmetryScores.push_back(visualSymmetryScore);
 
         // Apply fit and bake for next cycle
@@ -1019,16 +998,14 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
     // Verify visual symmetry preserved across cycles
     // (≥50% paired, allowing for feature anchors to be unpaired)
     for (size_t i = 0; i < symmetryScores.size(); ++i) {
-        EXPECT_GE(symmetryScores[i], 0.50)
-            << "Cycle " << i << " should preserve visual symmetry (≥50% paired)";
+        EXPECT_GE(symmetryScores[i], 0.50) << "Cycle " << i << " should preserve visual symmetry (≥50% paired)";
     }
 
     // Print diagnostics
     std::cout << "\nVisual symmetry preservation across cycles:\n";
     for (int i = 0; i < numCycles; ++i) {
         std::cout << "  Cycle " << i << ": "
-                  << "visual symmetry = " << std::fixed << std::setprecision(2)
-                  << (symmetryScores[i] * 100) << "%\n";
+                  << "visual symmetry = " << std::fixed << std::setprecision(2) << (symmetryScores[i] * 100) << "%\n";
     }
 }
 
@@ -1122,10 +1099,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
 
     // Verify Auto mode stability
     if (anchorHistoryAuto.size() >= 2) {
-        size_t autoChange = std::abs(static_cast<int>(anchorHistoryAuto[1]) -
-                                      static_cast<int>(anchorHistoryAuto[0]));
-        EXPECT_LE(autoChange, 4)
-            << "Auto mode should have stable anchor count across cycles";
+        size_t autoChange = std::abs(static_cast<int>(anchorHistoryAuto[1]) - static_cast<int>(anchorHistoryAuto[0]));
+        EXPECT_LE(autoChange, 4) << "Auto mode should have stable anchor count across cycles";
     }
 
     // Print comparison
@@ -1141,8 +1116,9 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
 
     std::cout << "  Benefit: Auto mode "
               << (anchorHistoryAuto.size() >= 2 &&
-                  std::abs(static_cast<int>(anchorHistoryAuto[1]) - static_cast<int>(anchorHistoryAuto[0])) <= 2
-                  ? "demonstrates better stability" : "tested successfully")
+                          std::abs(static_cast<int>(anchorHistoryAuto[1]) - static_cast<int>(anchorHistoryAuto[0])) <= 2
+                      ? "demonstrates better stability"
+                      : "tested successfully")
               << "\n";
 }
 
@@ -1188,11 +1164,9 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
 
     // Step C: Simulate user dragging anchor to create asymmetric curve
     std::cout << "Step C: User drags anchor to (0.1, -0.5) → asymmetric curve\n";
-    std::vector<SplineAnchor> userEditedAnchors = {
-        {-1.0, -1.0, false, 0.0},
-        {0.1, -0.5, false, 0.0},   // Asymmetric anchor (drooping downward)
-        {1.0, 1.0, false, 0.0}
-    };
+    std::vector<SplineAnchor> userEditedAnchors = {{-1.0, -1.0, false, 0.0},
+                                                   {0.1, -0.5, false, 0.0}, // Asymmetric anchor (drooping downward)
+                                                   {1.0, 1.0, false, 0.0}};
     SplineFitter::computeTangents(userEditedAnchors, config);
     ltf->getSplineLayer().setAnchors(userEditedAnchors);
     ltf->invalidateCompositeCache();
@@ -1215,8 +1189,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     // Also verify via evaluateBaseAndHarmonics (what SplineFitter will use)
     double bakedYViaEval = ltf->evaluateBaseAndHarmonics(0.0);
     std::cout << "  evaluateBaseAndHarmonics(0.0) = " << bakedYViaEval << "\n";
-    EXPECT_NEAR(bakedYViaEval, yAtOrigin, 0.05)
-        << "Base layer should preserve asymmetric curve shape";
+    EXPECT_NEAR(bakedYViaEval, yAtOrigin, 0.05) << "Base layer should preserve asymmetric curve shape";
 
     // Step E: Re-enter spline mode → CRITICAL TEST
     std::cout << "Step E: Re-enter spline mode → fit should match baked curve\n";
@@ -1229,8 +1202,8 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     // Print anchors for debugging
     std::cout << "  Fitted anchors:\n";
     for (size_t i = 0; i < fitResult2.anchors.size(); ++i) {
-        std::cout << "    [" << i << "] x=" << std::fixed << std::setprecision(3)
-                  << fitResult2.anchors[i].x << ", y=" << fitResult2.anchors[i].y << "\n";
+        std::cout << "    [" << i << "] x=" << std::fixed << std::setprecision(3) << fitResult2.anchors[i].x
+                  << ", y=" << fitResult2.anchors[i].y << "\n";
     }
 
     // CRITICAL: Check that we DON'T have a spurious zero-crossing anchor at (0,0)
@@ -1254,12 +1227,10 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     EXPECT_NEAR(refittedYAtOrigin, yAtOrigin, 0.1)
         << "Refitted curve should match original asymmetric shape, not collapse to straight line";
 
-    EXPECT_LT(refittedYAtOrigin, 0.0)
-        << "Refitted curve should preserve drooping asymmetric characteristic";
+    EXPECT_LT(refittedYAtOrigin, 0.0) << "Refitted curve should preserve drooping asymmetric characteristic";
 
     // Verify we have more than 2 anchors (asymmetric curve needs more detail)
-    EXPECT_GE(fitResult2.anchors.size(), 3)
-        << "Asymmetric curve should require 3+ anchors, not just 2 endpoints";
+    EXPECT_GE(fitResult2.anchors.size(), 3) << "Asymmetric curve should require 3+ anchors, not just 2 endpoints";
 
     std::cout << "  ✓ Refit correctly preserved asymmetric curve shape\n";
     std::cout << "  ✓ No spurious zero-crossing anchor detected\n";

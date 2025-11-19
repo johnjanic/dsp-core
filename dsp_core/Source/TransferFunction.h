@@ -7,21 +7,11 @@
 
 namespace dsp_core {
 
-class TransferFunction
-{
-public:
-    enum class InterpolationMode
-    {
-        Linear,
-        Cubic,
-        CatmullRom
-    };
+class TransferFunction {
+  public:
+    enum class InterpolationMode { Linear, Cubic, CatmullRom };
 
-    enum class ExtrapolationMode
-    {
-        Clamp,
-        Linear
-    };
+    enum class ExtrapolationMode { Clamp, Linear };
 
     TransferFunction(int tableSize, double minSignalValue = -1.0, double maxSignalValue = 1.0);
 
@@ -36,18 +26,27 @@ public:
     void setTableValue(int index, double value);
     void setTableValues(const double* samples, const int numSamples);
     double getTableValue(int index) const;
-    int getTableIndex(double x) const
-    {
+    int getTableIndex(double x) const {
         return static_cast<int>(juce::jmap(x, minSignalValue, maxSignalValue, 0.0, static_cast<double>(tableSize - 1)));
     }
 
-    int getTableSize() const { return tableSize; }
-    double getMinSignalValue() const { return minSignalValue; }
-    double getMaxSignalValue() const { return maxSignalValue; }
+    int getTableSize() const {
+        return tableSize;
+    }
+    double getMinSignalValue() const {
+        return minSignalValue;
+    }
+    double getMaxSignalValue() const {
+        return maxSignalValue;
+    }
 
     // For GUI/editor access
-    const std::vector<std::atomic<double>>& getTable() const { return table; }
-    std::vector<std::atomic<double>>& getTable() { return table; }
+    const std::vector<std::atomic<double>>& getTable() const {
+        return table;
+    }
+    std::vector<std::atomic<double>>& getTable() {
+        return table;
+    }
 
     // Serialization helpers
     void writeToStream(juce::MemoryOutputStream&) const;
@@ -60,7 +59,7 @@ public:
     // Normalize the table so the maximum value becomes 1.0 (if max != 0)
     void normalizeByMaximum();
 
-private:
+  private:
     const double minExtrapolationAmmount = -10.0;
     const double maxExtrapolationAmmount = 10.0;
 

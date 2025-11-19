@@ -5,17 +5,15 @@
 namespace dsp_core {
 namespace Services {
 
-double AdaptiveToleranceCalculator::computeTolerance(double verticalRange,
-                                                     int currentAnchors,
-                                                     int maxAnchors,
+double AdaptiveToleranceCalculator::computeTolerance(double verticalRange, int currentAnchors, int maxAnchors,
                                                      const Config& config) {
     // Sanity checks
     if (maxAnchors <= 0) {
-        return config.relativeErrorTarget * verticalRange;  // Fallback to baseline
+        return config.relativeErrorTarget * verticalRange; // Fallback to baseline
     }
 
     if (currentAnchors < 0) {
-        currentAnchors = 0;  // Clamp to zero
+        currentAnchors = 0; // Clamp to zero
     }
 
     // Compute baseline tolerance from vertical range
@@ -23,7 +21,7 @@ double AdaptiveToleranceCalculator::computeTolerance(double verticalRange,
 
     // Compute anchor density ratio (0.0 = no anchors, 1.0 = at capacity)
     double anchorRatio = static_cast<double>(currentAnchors) / static_cast<double>(maxAnchors);
-    anchorRatio = std::min(1.0, anchorRatio);  // Clamp to [0, 1]
+    anchorRatio = std::min(1.0, anchorRatio); // Clamp to [0, 1]
 
     // Apply adaptive scaling
     // Formula: tolerance = baseline × (1 + anchorRatio × multiplier)

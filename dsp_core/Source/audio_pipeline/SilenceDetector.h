@@ -28,14 +28,16 @@ namespace dsp_core::audio_pipeline {
  * CPU Cost: ~4 FLOPs per sample (envelope detection only)
  */
 class SilenceDetector : public AudioProcessingStage {
-public:
+  public:
     SilenceDetector() = default;
 
     // AudioProcessingStage interface
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "SilenceDetector"; }
+    juce::String getName() const override {
+        return "SilenceDetector";
+    }
 
     /**
      * Check if signal is currently near silence.
@@ -62,7 +64,7 @@ public:
         return 0.0;
     }
 
-private:
+  private:
     std::vector<PeakEnvelopeDetector> channelEnvelopes_;
     std::atomic<bool> isNearSilence_{false};
     double sampleRate_ = 44100.0;

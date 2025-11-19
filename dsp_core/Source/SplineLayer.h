@@ -21,7 +21,7 @@ namespace dsp_core {
  * Pattern: Mirrors HarmonicLayer (pure evaluator, no table storage)
  */
 class SplineLayer {
-public:
+  public:
     SplineLayer();
 
     //==========================================================================
@@ -65,7 +65,7 @@ public:
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& vt);
 
-private:
+  private:
     // Lock-free anchor storage (C++17 compatible)
     // Uses std::atomic_load/store for thread-safe shared_ptr operations
     // Audio thread reads via atomic_load, UI thread writes via atomic_store

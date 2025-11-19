@@ -10,7 +10,7 @@ namespace dsp_core_test {
  * Tests normalization, deferred normalization, harmonic mixing, and thread safety
  */
 class LayeredTransferFunctionTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
     }
@@ -25,7 +25,7 @@ protected:
 TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesToRange) {
     // Set extreme base layer values
     for (int i = 0; i < 256; ++i) {
-        ltf->setBaseLayerValue(i, 10.0);  // Way out of range
+        ltf->setBaseLayerValue(i, 10.0); // Way out of range
     }
 
     ltf->updateComposite();
@@ -41,7 +41,7 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesToRange) {
 TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesNegativeValues) {
     // Set extreme negative base layer values
     for (int i = 0; i < 256; ++i) {
-        ltf->setBaseLayerValue(i, -5.0);  // Way out of range
+        ltf->setBaseLayerValue(i, -5.0); // Way out of range
     }
 
     ltf->updateComposite();
@@ -57,8 +57,8 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesNegativeValues) {
 TEST_F(LayeredTransferFunctionTest, UpdateComposite_MaintainsRelativeProportions) {
     // Set base layer with known proportions
     ltf->setBaseLayerValue(100, 2.0);
-    ltf->setBaseLayerValue(150, 4.0);  // Double the value at index 100
-    ltf->setCoefficient(0, 1.0);  // 100% WT mix
+    ltf->setBaseLayerValue(150, 4.0); // Double the value at index 100
+    ltf->setCoefficient(0, 1.0);      // 100% WT mix
 
     ltf->updateComposite();
 
@@ -66,7 +66,7 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_MaintainsRelativeProportions
     double value100 = ltf->getCompositeValue(100);
     double value150 = ltf->getCompositeValue(150);
 
-    EXPECT_NEAR(value150 / value100, 2.0, 0.01);  // Ratio should be ~2.0
+    EXPECT_NEAR(value150 / value100, 2.0, 0.01); // Ratio should be ~2.0
 }
 
 // ============================================================================
@@ -76,7 +76,7 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_MaintainsRelativeProportions
 TEST_F(LayeredTransferFunctionTest, DeferNormalization_FreezesScalar) {
     // Set initial state
     ltf->setBaseLayerValue(100, 0.5);
-    ltf->setCoefficient(0, 1.0);  // 100% WT mix
+    ltf->setCoefficient(0, 1.0); // 100% WT mix
     ltf->updateComposite();
     double composite1 = ltf->getCompositeValue(100);
     double scalar1 = ltf->getNormalizationScalar();
@@ -95,7 +95,7 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_FreezesScalar) {
 
     // Composite should change but use frozen scalar
     double composite2 = ltf->getCompositeValue(100);
-    EXPECT_NE(composite1, composite2);  // Value changed
+    EXPECT_NE(composite1, composite2); // Value changed
 }
 
 TEST_F(LayeredTransferFunctionTest, DeferNormalization_ResumesAfterDisable) {
@@ -123,12 +123,12 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_ResumesAfterDisable) {
     // Update composite again - scalar should now update
     ltf->updateComposite();
     double scalar3 = ltf->getNormalizationScalar();
-    EXPECT_NE(scalar1, scalar3);  // Scalar should have changed
+    EXPECT_NE(scalar1, scalar3); // Scalar should have changed
 }
 
 TEST_F(LayeredTransferFunctionTest, DeferNormalization_PreventsVisualJumping) {
     // Simulate paint stroke scenario
-    ltf->setCoefficient(0, 1.0);  // 100% WT mix
+    ltf->setCoefficient(0, 1.0); // 100% WT mix
 
     // Set initial values
     for (int i = 0; i < 256; ++i) {
@@ -157,7 +157,7 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_PreventsVisualJumping) {
 
     // Now scalar can update
     double finalScalar = ltf->getNormalizationScalar();
-    EXPECT_LT(finalScalar, initialScalar);  // Larger values require smaller scalar
+    EXPECT_LT(finalScalar, initialScalar); // Larger values require smaller scalar
 }
 
 // ============================================================================
@@ -166,8 +166,8 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_PreventsVisualJumping) {
 
 TEST_F(LayeredTransferFunctionTest, HarmonicMixing_WeightedSum) {
     // Set WT coefficient to 0.6, first harmonic to 0.4
-    ltf->setCoefficient(0, 0.6);  // WT mix
-    ltf->setCoefficient(1, 0.4);  // First harmonic
+    ltf->setCoefficient(0, 0.6); // WT mix
+    ltf->setCoefficient(1, 0.4); // First harmonic
 
     // Set known base layer value
     ltf->setBaseLayerValue(100, 1.0);
@@ -183,8 +183,8 @@ TEST_F(LayeredTransferFunctionTest, HarmonicMixing_WeightedSum) {
 
 TEST_F(LayeredTransferFunctionTest, HarmonicMixing_ZeroWTCoeff) {
     // Set WT coefficient to 0, harmonic to 1.0 (pure harmonic mode)
-    ltf->setCoefficient(0, 0.0);  // No WT
-    ltf->setCoefficient(1, 1.0);  // 100% first harmonic
+    ltf->setCoefficient(0, 0.0); // No WT
+    ltf->setCoefficient(1, 1.0); // 100% first harmonic
 
     // Set base layer values (should have no effect)
     for (int i = 0; i < 256; ++i) {
@@ -204,9 +204,9 @@ TEST_F(LayeredTransferFunctionTest, HarmonicMixing_ZeroWTCoeff) {
 
 TEST_F(LayeredTransferFunctionTest, HarmonicMixing_MultipleHarmonics) {
     // Set multiple harmonic coefficients
-    ltf->setCoefficient(0, 0.5);  // WT mix
-    ltf->setCoefficient(1, 0.3);  // First harmonic
-    ltf->setCoefficient(2, 0.2);  // Second harmonic
+    ltf->setCoefficient(0, 0.5); // WT mix
+    ltf->setCoefficient(1, 0.3); // First harmonic
+    ltf->setCoefficient(2, 0.2); // Second harmonic
 
     // Set base layer
     for (int i = 0; i < 256; ++i) {
@@ -288,7 +288,7 @@ TEST_F(LayeredTransferFunctionTest, ThreadSafety_MultipleIndices) {
 
     audioThread.join();
     EXPECT_TRUE(readComplete.load());
-    EXPECT_EQ(readCount.load(), 100 * 256);  // All reads completed
+    EXPECT_EQ(readCount.load(), 100 * 256); // All reads completed
 }
 
 // ============================================================================
@@ -332,7 +332,7 @@ TEST_F(LayeredTransferFunctionTest, Coefficients_GetSetConsistent) {
 
 TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_ReturnsFalseForAllZero) {
     // Set WT mix but no harmonics
-    ltf->setCoefficient(0, 0.8);  // WT mix (not a harmonic)
+    ltf->setCoefficient(0, 0.8); // WT mix (not a harmonic)
 
     // All harmonics (indices 1-40) are zero
     for (int i = 1; i <= 40; ++i) {
@@ -351,12 +351,12 @@ TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_ReturnsTrueForNonZero) {
 
 TEST_F(LayeredTransferFunctionTest, HasNonZeroHarmonics_UsesEpsilonThreshold) {
     // Set harmonic below epsilon threshold (should be treated as zero)
-    ltf->setCoefficient(3, 1e-7);  // Below HARMONIC_EPSILON (1e-6)
+    ltf->setCoefficient(3, 1e-7); // Below HARMONIC_EPSILON (1e-6)
 
     EXPECT_FALSE(ltf->hasNonZeroHarmonics());
 
     // Set harmonic above epsilon threshold
-    ltf->setCoefficient(3, 1e-5);  // Above HARMONIC_EPSILON
+    ltf->setCoefficient(3, 1e-5); // Above HARMONIC_EPSILON
 
     EXPECT_TRUE(ltf->hasNonZeroHarmonics());
 }
@@ -389,11 +389,11 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_NoOpForZeroHarmonics) {
 
 TEST_F(LayeredTransferFunctionTest, BakeHarmonics_TransfersCompositeToBase) {
     // Set base layer and harmonics
-    ltf->setCoefficient(0, 1.0);  // Full WT mix
+    ltf->setCoefficient(0, 1.0); // Full WT mix
     for (int i = 0; i < 256; ++i) {
-        ltf->setBaseLayerValue(i, static_cast<double>(i) / 512.0);  // Half range
+        ltf->setBaseLayerValue(i, static_cast<double>(i) / 512.0); // Half range
     }
-    ltf->setCoefficient(3, 0.5);  // Add 3rd harmonic
+    ltf->setCoefficient(3, 0.5); // Add 3rd harmonic
     ltf->updateComposite();
 
     // Capture composite BEFORE baking
@@ -410,8 +410,7 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_TransfersCompositeToBase) {
     // Base layer should now match old composite (visual identity preserved)
     for (int i = 0; i < 256; ++i) {
         double baseAfter = ltf->getBaseLayerValue(i);
-        EXPECT_NEAR(compositeBefore[i], baseAfter, 1e-12)
-            << "Visual discontinuity at index " << i;
+        EXPECT_NEAR(compositeBefore[i], baseAfter, 1e-12) << "Visual discontinuity at index " << i;
     }
 }
 
@@ -473,14 +472,14 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_RecalculatesNormalizationScala
     // Set up curve that requires normalization
     ltf->setCoefficient(0, 1.0);
     for (int i = 0; i < 256; ++i) {
-        ltf->setBaseLayerValue(i, 2.0);  // Out of range
+        ltf->setBaseLayerValue(i, 2.0); // Out of range
     }
     ltf->setCoefficient(3, 0.5);
     ltf->updateComposite();
 
     // Capture normalization scalar before baking
     double normScalarBefore = ltf->getNormalizationScalar();
-    EXPECT_LT(normScalarBefore, 1.0);  // Should be scaled down
+    EXPECT_LT(normScalarBefore, 1.0); // Should be scaled down
 
     // Capture composite values (for visual continuity check)
     std::vector<double> compositeBefore(256);
@@ -494,7 +493,7 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_RecalculatesNormalizationScala
     // Normalization scalar recalculates because base layer now contains normalized values
     // This is correct behavior - the scalar adapts to the new base layer state
     double normScalarAfter = ltf->getNormalizationScalar();
-    EXPECT_NEAR(normScalarAfter, 1.0, 0.1);  // Should be close to 1.0 now
+    EXPECT_NEAR(normScalarAfter, 1.0, 0.1); // Should be close to 1.0 now
 
     // What matters is visual continuity (composite unchanged)
     for (int i = 0; i < 256; ++i) {
@@ -522,8 +521,7 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_VisualContinuityBitLevel) {
     // Composite AFTER baking should be identical (bit-level)
     for (int i = 0; i < 256; ++i) {
         double compositeAfter = ltf->getCompositeValue(i);
-        EXPECT_DOUBLE_EQ(compositeBefore[i], compositeAfter)
-            << "Visual discontinuity at index " << i;
+        EXPECT_DOUBLE_EQ(compositeBefore[i], compositeAfter) << "Visual discontinuity at index " << i;
     }
 }
 
@@ -548,7 +546,7 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_Performance) {
 
 TEST_F(LayeredTransferFunctionTest, GetHarmonicCoefficients_ReturnsAllCoefficients) {
     // Set known coefficients
-    ltf->setCoefficient(0, 0.8);  // WT mix
+    ltf->setCoefficient(0, 0.8); // WT mix
     ltf->setCoefficient(1, 0.3);
     ltf->setCoefficient(3, 0.5);
     ltf->setCoefficient(40, 0.1);
@@ -560,7 +558,7 @@ TEST_F(LayeredTransferFunctionTest, GetHarmonicCoefficients_ReturnsAllCoefficien
     EXPECT_EQ(coeffs.size(), 41u);
 
     // Verify values
-    EXPECT_NEAR(coeffs[0], 0.8, 1e-12);  // WT mix
+    EXPECT_NEAR(coeffs[0], 0.8, 1e-12); // WT mix
     EXPECT_NEAR(coeffs[1], 0.3, 1e-12);
     EXPECT_NEAR(coeffs[3], 0.5, 1e-12);
     EXPECT_NEAR(coeffs[40], 0.1, 1e-12);
@@ -569,7 +567,7 @@ TEST_F(LayeredTransferFunctionTest, GetHarmonicCoefficients_ReturnsAllCoefficien
 TEST_F(LayeredTransferFunctionTest, SetHarmonicCoefficients_SetsAllCoefficients) {
     // Create coefficient array
     std::array<double, 41> coeffs{};
-    coeffs[0] = 0.9;  // WT mix
+    coeffs[0] = 0.9; // WT mix
     coeffs[1] = 0.4;
     coeffs[3] = 0.6;
     coeffs[40] = 0.2;
@@ -593,7 +591,7 @@ TEST_F(LayeredTransferFunctionTest, SetHarmonicCoefficients_UpdatesComposite) {
     // Set new coefficients via array
     std::array<double, 41> coeffs{};
     coeffs[0] = 1.0;
-    coeffs[3] = 0.5;  // Add 3rd harmonic
+    coeffs[3] = 0.5; // Add 3rd harmonic
     ltf->setHarmonicCoefficients(coeffs);
 
     // Composite should have changed (harmonics added)
@@ -623,4 +621,4 @@ TEST_F(LayeredTransferFunctionTest, GetSetHarmonicCoefficients_RoundTrip) {
     }
 }
 
-}  // namespace dsp_core_test
+} // namespace dsp_core_test

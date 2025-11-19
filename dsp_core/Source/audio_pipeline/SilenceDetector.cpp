@@ -8,10 +8,10 @@ void SilenceDetector::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Initialize per-channel envelopes (typically 2 for stereo)
     // Note: Buffer channel count determined at process() time
     channelEnvelopes_.clear();
-    channelEnvelopes_.resize(2);  // Default to stereo, will resize if needed
+    channelEnvelopes_.resize(2); // Default to stereo, will resize if needed
 
     for (auto& envelope : channelEnvelopes_) {
-        envelope.configure(sampleRate, 20.0);  // 20ms decay time (balanced: fast but stable)
+        envelope.configure(sampleRate, 20.0); // 20ms decay time (balanced: fast but stable)
     }
 
     // Start with "not silent" to avoid false positives on startup
@@ -26,7 +26,7 @@ void SilenceDetector::process(juce::AudioBuffer<double>& buffer) {
     if (static_cast<int>(channelEnvelopes_.size()) != numChannels) {
         channelEnvelopes_.resize(numChannels);
         for (auto& envelope : channelEnvelopes_) {
-            envelope.configure(sampleRate_, 20.0);  // 20ms decay time (balanced: fast but stable)
+            envelope.configure(sampleRate_, 20.0); // 20ms decay time (balanced: fast but stable)
         }
     }
 

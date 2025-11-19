@@ -12,7 +12,7 @@ namespace dsp_core_test {
  * Diagnostic test to understand anchor clustering near x=-1 for H3 and H5
  */
 class HarmonicAnchorDistributionTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
     }
@@ -38,16 +38,16 @@ protected:
         std::cout << "Total anchors: " << anchors.size() << std::endl;
 
         // Count anchors in regions
-        int nearMinusOne = 0;  // [-1.0, -0.66]
-        int middle = 0;        // (-0.66, 0.66)
-        int nearPlusOne = 0;   // [0.66, 1.0]
+        int nearMinusOne = 0; // [-1.0, -0.66]
+        int middle = 0;       // (-0.66, 0.66)
+        int nearPlusOne = 0;  // [0.66, 1.0]
 
         std::cout << "\nAnchors near x=-1 (x < -0.66):" << std::endl;
         for (const auto& anchor : anchors) {
             if (anchor.x < -0.66) {
                 nearMinusOne++;
-                std::cout << "  x=" << std::fixed << std::setprecision(6) << anchor.x
-                          << ", y=" << anchor.y << std::endl;
+                std::cout << "  x=" << std::fixed << std::setprecision(6) << anchor.x << ", y=" << anchor.y
+                          << std::endl;
             } else if (anchor.x < 0.66) {
                 middle++;
             } else {
@@ -56,12 +56,12 @@ protected:
         }
 
         std::cout << "\nRegion distribution:" << std::endl;
-        std::cout << "  [-1.0, -0.66]: " << nearMinusOne << " anchors ("
-                  << (100.0 * nearMinusOne / anchors.size()) << "%)" << std::endl;
-        std::cout << "  (-0.66, 0.66): " << middle << " anchors ("
-                  << (100.0 * middle / anchors.size()) << "%)" << std::endl;
-        std::cout << "  [0.66, 1.0]:   " << nearPlusOne << " anchors ("
-                  << (100.0 * nearPlusOne / anchors.size()) << "%)" << std::endl;
+        std::cout << "  [-1.0, -0.66]: " << nearMinusOne << " anchors (" << (100.0 * nearMinusOne / anchors.size())
+                  << "%)" << std::endl;
+        std::cout << "  (-0.66, 0.66): " << middle << " anchors (" << (100.0 * middle / anchors.size()) << "%)"
+                  << std::endl;
+        std::cout << "  [0.66, 1.0]:   " << nearPlusOne << " anchors (" << (100.0 * nearPlusOne / anchors.size())
+                  << "%)" << std::endl;
     }
 
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
@@ -78,15 +78,15 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_WithInflections) {
     // Show what features are detected WITH and WITHOUT significance filtering
     std::cout << "\n--- WITHOUT Significance Filtering ---" << std::endl;
     dsp_core::FeatureDetectionConfig featureConfig;
-    featureConfig.maxFeatures = 100;  // No limit
-    featureConfig.enableSignificanceFiltering = false;  // Default
+    featureConfig.maxFeatures = 100;                   // No limit
+    featureConfig.enableSignificanceFiltering = false; // Default
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
 
     std::cout << "Local extrema: " << features.localExtrema.size() << std::endl;
 
     std::cout << "\n--- WITH Significance Filtering ---" << std::endl;
     featureConfig.enableSignificanceFiltering = true;
-    featureConfig.significanceThreshold = 0.001;  // 0.1% of vertical range
+    featureConfig.significanceThreshold = 0.001; // 0.1% of vertical range
     auto featuresFiltered = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
     std::cout << "Local extrema: " << featuresFiltered.localExtrema.size() << std::endl;
 
@@ -118,7 +118,7 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_WithoutInflections) {
     // Test WITHOUT inflection detection
     auto config = dsp_core::SplineFitConfig::smooth();
     config.enableFeatureDetection = true;
-    config.featureConfig.extremaInflectionRatio = 1.0;  // 100% extrema, 0% inflections
+    config.featureConfig.extremaInflectionRatio = 1.0; // 100% extrema, 0% inflections
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
     ASSERT_TRUE(result.success);
@@ -198,7 +198,8 @@ TEST_F(HarmonicAnchorDistributionTest, ComparisonSummary) {
         std::cout << "\nHarmonic 3:" << std::endl;
         std::cout << "  WITH inflections:    " << resultWith.numAnchors << " anchors" << std::endl;
         std::cout << "  WITHOUT inflections: " << resultWithout.numAnchors << " anchors" << std::endl;
-        std::cout << "  Difference:          " << (resultWith.numAnchors - resultWithout.numAnchors) << " anchors" << std::endl;
+        std::cout << "  Difference:          " << (resultWith.numAnchors - resultWithout.numAnchors) << " anchors"
+                  << std::endl;
     }
 
     // H5 comparison
@@ -217,7 +218,8 @@ TEST_F(HarmonicAnchorDistributionTest, ComparisonSummary) {
         std::cout << "\nHarmonic 5:" << std::endl;
         std::cout << "  WITH inflections:    " << resultWith.numAnchors << " anchors" << std::endl;
         std::cout << "  WITHOUT inflections: " << resultWithout.numAnchors << " anchors" << std::endl;
-        std::cout << "  Difference:          " << (resultWith.numAnchors - resultWithout.numAnchors) << " anchors" << std::endl;
+        std::cout << "  Difference:          " << (resultWith.numAnchors - resultWithout.numAnchors) << " anchors"
+                  << std::endl;
     }
 }
 
@@ -241,8 +243,8 @@ TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
         }
 
         double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
-        std::cout << "\nH3 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size()
-                  << " (" << clusteringPercentage << "%)" << std::endl;
+        std::cout << "\nH3 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size() << " ("
+                  << clusteringPercentage << "%)" << std::endl;
 
         // Boundary region is 1/3 of domain, so expect roughly 33% of anchors there.
         // Allow up to 50% to be generous, but previously this was clustering 60-70%.
@@ -265,8 +267,8 @@ TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
         }
 
         double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
-        std::cout << "H5 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size()
-                  << " (" << clusteringPercentage << "%)" << std::endl;
+        std::cout << "H5 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size() << " ("
+                  << clusteringPercentage << "%)" << std::endl;
 
         EXPECT_LT(clusteringPercentage, 50.0)
             << "H5: Too many anchors near x=-1 boundary (regression of clustering bug)";
@@ -277,7 +279,7 @@ TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
 TEST_F(HarmonicAnchorDistributionTest, Harmonic3_TightConfig_ClusteringAnalysis) {
     setHarmonicCurve(3);
 
-    auto config = dsp_core::SplineFitConfig::tight();  // maxAnchors = 112
+    auto config = dsp_core::SplineFitConfig::tight(); // maxAnchors = 112
     config.enableFeatureDetection = true;
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -290,9 +292,8 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_TightConfig_ClusteringAnalysis)
     // Print ALL anchors with detailed x positions
     std::cout << "\nAll anchor positions:" << std::endl;
     for (size_t i = 0; i < result.anchors.size(); ++i) {
-        std::cout << "  [" << std::setw(3) << i << "] x=" << std::fixed << std::setprecision(6)
-                  << std::setw(10) << result.anchors[i].x
-                  << " y=" << std::setw(10) << result.anchors[i].y;
+        std::cout << "  [" << std::setw(3) << i << "] x=" << std::fixed << std::setprecision(6) << std::setw(10)
+                  << result.anchors[i].x << " y=" << std::setw(10) << result.anchors[i].y;
 
         if (result.anchors[i].x < -0.9) {
             std::cout << "  *** LEFT BOUNDARY CLUSTER ***";
@@ -301,18 +302,20 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_TightConfig_ClusteringAnalysis)
     }
 
     // Detailed clustering analysis
-    int nearLeftStrict = 0;  // x < -0.9 (very close to boundary)
-    int nearLeftLoose = 0;   // x < -0.66 (left third)
+    int nearLeftStrict = 0; // x < -0.9 (very close to boundary)
+    int nearLeftLoose = 0;  // x < -0.66 (left third)
     for (const auto& a : result.anchors) {
-        if (a.x < -0.9) nearLeftStrict++;
-        if (a.x < -0.66) nearLeftLoose++;
+        if (a.x < -0.9)
+            nearLeftStrict++;
+        if (a.x < -0.66)
+            nearLeftLoose++;
     }
 
     std::cout << "\nClustering analysis:" << std::endl;
-    std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size()
-              << " (" << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
-    std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size()
-              << " (" << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
+    std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size() << " ("
+              << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
+    std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size() << " ("
+              << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
 }
 
 TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis) {
@@ -331,9 +334,8 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
     // Print first 10, last 10, and highlight boundary clusters
     std::cout << "\nFirst 15 anchors:" << std::endl;
     for (size_t i = 0; i < std::min(size_t(15), result.anchors.size()); ++i) {
-        std::cout << "  [" << std::setw(3) << i << "] x=" << std::fixed << std::setprecision(6)
-                  << std::setw(10) << result.anchors[i].x
-                  << " y=" << std::setw(10) << result.anchors[i].y;
+        std::cout << "  [" << std::setw(3) << i << "] x=" << std::fixed << std::setprecision(6) << std::setw(10)
+                  << result.anchors[i].x << " y=" << std::setw(10) << result.anchors[i].y;
 
         if (result.anchors[i].x < -0.9) {
             std::cout << "  *** LEFT BOUNDARY CLUSTER ***";
@@ -345,15 +347,17 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
     int nearLeftStrict = 0;
     int nearLeftLoose = 0;
     for (const auto& a : result.anchors) {
-        if (a.x < -0.9) nearLeftStrict++;
-        if (a.x < -0.66) nearLeftLoose++;
+        if (a.x < -0.9)
+            nearLeftStrict++;
+        if (a.x < -0.66)
+            nearLeftLoose++;
     }
 
     std::cout << "\nClustering analysis:" << std::endl;
-    std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size()
-              << " (" << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
-    std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size()
-              << " (" << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
+    std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size() << " ("
+              << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
+    std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size() << " ("
+              << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
 
     // This should trigger if there's pathological clustering
     // DISABLED: This is expected behavior for steep boundary derivatives
@@ -365,9 +369,9 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
 
     // Sample the curve at many points and measure error in different regions
     int numSamples = 1000;
-    std::vector<double> errorsBoundaryLeft;   // x < -0.9
-    std::vector<double> errorsMiddle;         // -0.9 <= x <= 0.9
-    std::vector<double> errorsBoundaryRight;  // x > 0.9
+    std::vector<double> errorsBoundaryLeft;  // x < -0.9
+    std::vector<double> errorsMiddle;        // -0.9 <= x <= 0.9
+    std::vector<double> errorsBoundaryRight; // x > 0.9
 
     for (int i = 0; i < numSamples; ++i) {
         double x = -1.0 + (2.0 * i / (numSamples - 1));
@@ -385,7 +389,8 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
     }
 
     auto computeStats = [](const std::vector<double>& errors) {
-        if (errors.empty()) return std::make_pair(0.0, 0.0);
+        if (errors.empty())
+            return std::make_pair(0.0, 0.0);
         double maxErr = *std::max_element(errors.begin(), errors.end());
         double avgErr = std::accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
         return std::make_pair(maxErr, avgErr);
@@ -395,12 +400,10 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
     auto [maxErrMid, avgErrMid] = computeStats(errorsMiddle);
     auto [maxErrRight, avgErrRight] = computeStats(errorsBoundaryRight);
 
-    std::cout << "Error in x < -0.9:  max=" << std::setprecision(6) << maxErrLeft
-              << ", avg=" << avgErrLeft << std::endl;
-    std::cout << "Error in -0.9..0.9: max=" << maxErrMid
-              << ", avg=" << avgErrMid << std::endl;
-    std::cout << "Error in x > 0.9:   max=" << maxErrRight
-              << ", avg=" << avgErrRight << std::endl;
+    std::cout << "Error in x < -0.9:  max=" << std::setprecision(6) << maxErrLeft << ", avg=" << avgErrLeft
+              << std::endl;
+    std::cout << "Error in -0.9..0.9: max=" << maxErrMid << ", avg=" << avgErrMid << std::endl;
+    std::cout << "Error in x > 0.9:   max=" << maxErrRight << ", avg=" << avgErrRight << std::endl;
 
     // If boundary error is NOT significantly higher than middle error,
     // then the clustering is NOT justified

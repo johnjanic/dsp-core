@@ -13,9 +13,7 @@ namespace Services {
 // Main API
 //==============================================================================
 
-SplineFitResult SplineFitter::fitCurve(
-    const LayeredTransferFunction& ltf,
-    const SplineFitConfig& config) {
+SplineFitResult SplineFitter::fitCurve(const LayeredTransferFunction& ltf, const SplineFitConfig& config) {
 
     SplineFitResult result;
 
@@ -79,8 +77,7 @@ SplineFitResult SplineFitter::fitCurve(
     result.numAnchors = static_cast<int>(result.anchors.size());
     result.maxError = maxErr;
     result.averageError = sumErr / static_cast<double>(samples.size());
-    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " +
-                     juce::String(maxErr, 4);
+    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " + juce::String(maxErr, 4);
 
     return result;
 }
@@ -89,20 +86,19 @@ SplineFitResult SplineFitter::fitCurve(
 // Step 1: Sample & Sanitize
 //==============================================================================
 
-std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
-    const LayeredTransferFunction& ltf,
-    const SplineFitConfig& config) {
+std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(const LayeredTransferFunction& ltf,
+                                                                  const SplineFitConfig& config) {
 
     const int tableSize = ltf.getTableSize();
     std::vector<Sample> samples;
-    samples.reserve(tableSize * 2);  // Reserve extra space for densification
+    samples.reserve(tableSize * 2); // Reserve extra space for densification
 
     // Raster-to-polyline: sample entire composite (what user sees)
     // CRITICAL: normalizationScalar is preserved when entering spline mode
     // evaluateBaseAndHarmonics applies the correct normScalar to return normalized values
     for (int i = 0; i < tableSize; ++i) {
-        double x = ltf.normalizeIndex(i);  // Maps to [-1, 1]
-        double y = ltf.evaluateBaseAndHarmonics(x);  // Returns normalized base + harmonics
+        double x = ltf.normalizeIndex(i);           // Maps to [-1, 1]
+        double y = ltf.evaluateBaseAndHarmonics(x); // Returns normalized base + harmonics
         samples.push_back({x, y});
     }
 
@@ -117,7 +113,7 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
 
         // Add midpoint sample between this and next point
         if (i < samples.size() - 1) {
-            double midX = (samples[i].x + samples[i+1].x) / 2.0;
+            double midX = (samples[i].x + samples[i + 1].x) / 2.0;
 
             // Sample the ACTUAL normalized composite at midpoint
             // This prevents false errors from linear interpolation on high-frequency curves
@@ -147,8 +143,7 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(
 }
 
 void SplineFitter::sortByX(std::vector<Sample>& samples) {
-    std::sort(samples.begin(), samples.end(),
-        [](const Sample& a, const Sample& b) { return a.x < b.x; });
+    std::sort(samples.begin(), samples.end(), [](const Sample& a, const Sample& b) { return a.x < b.x; });
 }
 
 void SplineFitter::deduplicateNearVerticals(std::vector<Sample>& samples) {
@@ -158,14 +153,13 @@ void SplineFitter::deduplicateNearVerticals(std::vector<Sample>& samples) {
     std::vector<Sample> deduped;
     deduped.reserve(samples.size());
 
-    for (size_t i = 0; i < samples.size(); ) {
+    for (size_t i = 0; i < samples.size();) {
         double xSum = samples[i].x;
         double ySum = samples[i].y;
         int count = 1;
 
         // Group samples with similar x
-        while (i + count < samples.size() &&
-               std::abs(samples[i + count].x - samples[i].x) < kXEpsilon) {
+        while (i + count < samples.size() && std::abs(samples[i + count].x - samples[i].x) < kXEpsilon) {
             xSum += samples[i + count].x;
             ySum += samples[i + count].y;
             ++count;
@@ -183,15 +177,16 @@ void SplineFitter::enforceMonotonicity(std::vector<Sample>& samples) {
     // Light isotonic regression: ensure y is strictly increasing with x
     // Use Pool Adjacent Violators Algorithm (PAVA) with minimal deviation
 
-    if (samples.size() < 2) return;
+    if (samples.size() < 2)
+        return;
 
     // Forward pass: ensure y[i+1] >= y[i]
     for (size_t i = 1; i < samples.size(); ++i) {
-        if (samples[i].y < samples[i-1].y) {
+        if (samples[i].y < samples[i - 1].y) {
             // Average violating pairs (minimal deviation)
-            double avgY = (samples[i].y + samples[i-1].y) / 2.0;
+            double avgY = (samples[i].y + samples[i - 1].y) / 2.0;
             samples[i].y = avgY;
-            samples[i-1].y = avgY;
+            samples[i - 1].y = avgY;
         }
     }
 
@@ -210,27 +205,25 @@ void SplineFitter::clampToRange(std::vector<Sample>& samples) {
 // Tangent Computation (Dispatcher)
 //==============================================================================
 
-void SplineFitter::computeTangents(
-    std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+void SplineFitter::computeTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
     switch (config.tangentAlgorithm) {
-        case TangentAlgorithm::PCHIP:
-            computePCHIPTangentsImpl(anchors, config);
-            break;
-        case TangentAlgorithm::FritschCarlson:
-            computeFritschCarlsonTangents(anchors, config);
-            break;
-        case TangentAlgorithm::Akima:
-            computeAkimaTangents(anchors, config);
-            break;
-        case TangentAlgorithm::FiniteDifference:
-            computeFiniteDifferenceTangents(anchors, config);
-            break;
-        default:
-            jassertfalse;
-            computePCHIPTangentsImpl(anchors, config);
-            break;
+    case TangentAlgorithm::PCHIP:
+        computePCHIPTangentsImpl(anchors, config);
+        break;
+    case TangentAlgorithm::FritschCarlson:
+        computeFritschCarlsonTangents(anchors, config);
+        break;
+    case TangentAlgorithm::Akima:
+        computeAkimaTangents(anchors, config);
+        break;
+    case TangentAlgorithm::FiniteDifference:
+        computeFiniteDifferenceTangents(anchors, config);
+        break;
+    default:
+        jassertfalse;
+        computePCHIPTangentsImpl(anchors, config);
+        break;
     }
 }
 
@@ -238,21 +231,20 @@ void SplineFitter::computeTangents(
 // PCHIP Tangent Computation (Implementation)
 //==============================================================================
 
-void SplineFitter::computePCHIPTangentsImpl(
-    std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+void SplineFitter::computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
     const int n = static_cast<int>(anchors.size());
-    if (n < 2) return;
+    if (n < 2)
+        return;
 
     // Compute secant slopes d_i = (y_{i+1} - y_i) / (x_{i+1} - x_i)
     std::vector<double> secants(n - 1);
     for (int i = 0; i < n - 1; ++i) {
-        double dx = anchors[i+1].x - anchors[i].x;
+        double dx = anchors[i + 1].x - anchors[i].x;
         if (std::abs(dx) < 1e-12) {
-            secants[i] = 0.0;  // Degenerate segment
+            secants[i] = 0.0; // Degenerate segment
         } else {
-            secants[i] = (anchors[i+1].y - anchors[i].y) / dx;
+            secants[i] = (anchors[i + 1].y - anchors[i].y) / dx;
         }
     }
 
@@ -274,8 +266,8 @@ void SplineFitter::computePCHIPTangentsImpl(
                 anchors[i].tangent = 0.0;
             } else {
                 // Weighted harmonic mean
-                double dx_prev = anchors[i].x - anchors[i-1].x;
-                double dx_next = anchors[i+1].x - anchors[i].x;
+                double dx_prev = anchors[i].x - anchors[i - 1].x;
+                double dx_next = anchors[i + 1].x - anchors[i].x;
 
                 double w1 = 2.0 * dx_next + dx_prev;
                 double w2 = dx_next + 2.0 * dx_prev;
@@ -285,35 +277,34 @@ void SplineFitter::computePCHIPTangentsImpl(
         }
 
         // Enforce slope caps (for anti-aliasing)
-        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope,
-                                           anchors[i].tangent);
+        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, anchors[i].tangent);
     }
 
     // Phase 1.1: Overshoot detection and correction
     // Check if PCHIP cubic overshoots the monotonic range between anchors
     // This prevents visual "bulges" and sonic artifacts in smooth regions
-    const int maxOvershootIterations = 3;  // Iterative refinement
+    const int maxOvershootIterations = 3; // Iterative refinement
     for (int iter = 0; iter < maxOvershootIterations; ++iter) {
         bool hadOvershoot = false;
 
         for (int i = 0; i < n - 1; ++i) {
             // Sample cubic at 5 interior points between anchors
-            const double yMin = std::min(anchors[i].y, anchors[i+1].y);
-            const double yMax = std::max(anchors[i].y, anchors[i+1].y);
-            const double overshootTolerance = 0.001;  // Allow tiny numerical error
+            const double yMin = std::min(anchors[i].y, anchors[i + 1].y);
+            const double yMax = std::max(anchors[i].y, anchors[i + 1].y);
+            const double overshootTolerance = 0.001; // Allow tiny numerical error
 
             for (int j = 1; j < 5; ++j) {
                 const double t = j / 5.0;
-                const double x = anchors[i].x + t * (anchors[i+1].x - anchors[i].x);
-                const double y = SplineEvaluator::evaluateSegment(anchors[i], anchors[i+1], x);
+                const double x = anchors[i].x + t * (anchors[i + 1].x - anchors[i].x);
+                const double y = SplineEvaluator::evaluateSegment(anchors[i], anchors[i + 1], x);
 
                 // If cubic overshoots endpoint range, scale tangents down
                 if (y < yMin - overshootTolerance || y > yMax + overshootTolerance) {
-                    const double dampingFactor = 0.7;  // Reduce tangents by 30%
+                    const double dampingFactor = 0.7; // Reduce tangents by 30%
                     anchors[i].tangent *= dampingFactor;
-                    anchors[i+1].tangent *= dampingFactor;
+                    anchors[i + 1].tangent *= dampingFactor;
                     hadOvershoot = true;
-                    break;  // Move to next segment
+                    break; // Move to next segment
                 }
             }
         }
@@ -329,7 +320,7 @@ void SplineFitter::computePCHIPTangentsImpl(
     // Only apply scaling to segments longer than threshold (0.3 = 15% of full range)
     const double longSegmentThreshold = 0.3;
     for (int i = 0; i < n - 1; ++i) {
-        const double segmentLength = anchors[i+1].x - anchors[i].x;
+        const double segmentLength = anchors[i + 1].x - anchors[i].x;
 
         if (segmentLength > longSegmentThreshold) {
             // Scale factor for long segments: gradually reduce tangents
@@ -341,7 +332,7 @@ void SplineFitter::computePCHIPTangentsImpl(
 
             // Also scale the next anchor's tangent if it's the last one
             if (i == n - 2) {
-                anchors[i+1].tangent *= lengthFactor;
+                anchors[i + 1].tangent *= lengthFactor;
             }
         }
     }
@@ -359,57 +350,56 @@ double SplineFitter::harmonicMean(double a, double b, double wa, double wb) {
 // Fritsch-Carlson Tangent Computation (Monotone-Preserving)
 //==============================================================================
 
-void SplineFitter::computeFritschCarlsonTangents(
-    std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+void SplineFitter::computeFritschCarlsonTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
     const int n = static_cast<int>(anchors.size());
-    if (n < 2) return;
+    if (n < 2)
+        return;
 
     std::vector<double> tangents(n, 0.0);
     std::vector<double> deltas(n - 1);
 
     // 1. Compute segment slopes
     for (int i = 0; i < n - 1; ++i) {
-        double dx = anchors[i+1].x - anchors[i].x;
+        double dx = anchors[i + 1].x - anchors[i].x;
         if (std::abs(dx) < 1e-12) {
             deltas[i] = 0.0;
         } else {
-            deltas[i] = (anchors[i+1].y - anchors[i].y) / dx;
+            deltas[i] = (anchors[i + 1].y - anchors[i].y) / dx;
         }
     }
 
     // 2. Initial tangent estimates
     for (int i = 1; i < n - 1; ++i) {
-        if (deltas[i-1] * deltas[i] <= 0.0) {
-            tangents[i] = 0.0;  // Local extremum - force horizontal tangent
+        if (deltas[i - 1] * deltas[i] <= 0.0) {
+            tangents[i] = 0.0; // Local extremum - force horizontal tangent
         } else {
             // Weighted average (harmonic mean variant)
-            double w1 = 2.0 * (anchors[i+1].x - anchors[i].x) + (anchors[i].x - anchors[i-1].x);
-            double w2 = (anchors[i+1].x - anchors[i].x) + 2.0 * (anchors[i].x - anchors[i-1].x);
-            tangents[i] = (w1 * deltas[i-1] + w2 * deltas[i]) / (w1 + w2);
+            double w1 = 2.0 * (anchors[i + 1].x - anchors[i].x) + (anchors[i].x - anchors[i - 1].x);
+            double w2 = (anchors[i + 1].x - anchors[i].x) + 2.0 * (anchors[i].x - anchors[i - 1].x);
+            tangents[i] = (w1 * deltas[i - 1] + w2 * deltas[i]) / (w1 + w2);
         }
     }
 
     // 3. Enforce Fritsch-Carlson monotonicity constraints
     for (int i = 0; i < n - 1; ++i) {
         if (std::abs(deltas[i]) < 1e-9)
-            continue;  // Skip flat segments
+            continue; // Skip flat segments
 
         double alpha = tangents[i] / deltas[i];
-        double beta = tangents[i+1] / deltas[i];
+        double beta = tangents[i + 1] / deltas[i];
 
         // Constraint: α² + β² ≤ 9 (ensures no overshoot)
         if (alpha * alpha + beta * beta > 9.0) {
             double tau = 3.0 / std::sqrt(alpha * alpha + beta * beta);
             tangents[i] = tau * alpha * deltas[i];
-            tangents[i+1] = tau * beta * deltas[i];
+            tangents[i + 1] = tau * beta * deltas[i];
         }
     }
 
     // 4. Boundary tangents (use one-sided slopes)
     tangents[0] = deltas[0];
-    tangents[n-1] = deltas[n-2];
+    tangents[n - 1] = deltas[n - 2];
 
     // 5. Apply tangents to anchors and enforce slope bounds
     for (int i = 0; i < n; ++i) {
@@ -421,15 +411,14 @@ void SplineFitter::computeFritschCarlsonTangents(
 // Akima Tangent Computation (Local Weighted Average)
 //==============================================================================
 
-void SplineFitter::computeAkimaTangents(
-    std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+void SplineFitter::computeAkimaTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
     const int n = static_cast<int>(anchors.size());
-    if (n < 2) return;
+    if (n < 2)
+        return;
 
     std::vector<double> tangents(n);
-    std::vector<double> slopes(n + 3);  // Extended for boundary handling
+    std::vector<double> slopes(n + 3); // Extended for boundary handling
 
     // 1. Compute slopes with extrapolation for boundaries
     for (int i = 2; i < static_cast<int>(slopes.size()) - 2; ++i) {
@@ -459,7 +448,7 @@ void SplineFitter::computeAkimaTangents(
         double w2 = std::abs(m2 - m1);
 
         if (w1 + w2 < 1e-9) {
-            tangents[i] = (m2 + m3) * 0.5;  // Average if weights are zero
+            tangents[i] = (m2 + m3) * 0.5; // Average if weights are zero
         } else {
             tangents[i] = (w1 * m2 + w2 * m3) / (w1 + w2);
         }
@@ -475,12 +464,11 @@ void SplineFitter::computeAkimaTangents(
 // Finite Difference Tangent Computation (Simple Baseline)
 //==============================================================================
 
-void SplineFitter::computeFiniteDifferenceTangents(
-    std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+void SplineFitter::computeFiniteDifferenceTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
     const int n = static_cast<int>(anchors.size());
-    if (n < 2) return;
+    if (n < 2)
+        return;
 
     for (int i = 0; i < n; ++i) {
         double tangent = 0.0;
@@ -493,15 +481,15 @@ void SplineFitter::computeFiniteDifferenceTangents(
             }
         } else if (i == n - 1) {
             // Backward difference for last point
-            double dx = anchors[i].x - anchors[i-1].x;
+            double dx = anchors[i].x - anchors[i - 1].x;
             if (std::abs(dx) >= 1e-12) {
-                tangent = (anchors[i].y - anchors[i-1].y) / dx;
+                tangent = (anchors[i].y - anchors[i - 1].y) / dx;
             }
         } else {
             // Central difference for interior points
-            double dx = anchors[i+1].x - anchors[i-1].x;
+            double dx = anchors[i + 1].x - anchors[i - 1].x;
             if (std::abs(dx) >= 1e-12) {
-                tangent = (anchors[i+1].y - anchors[i-1].y) / dx;
+                tangent = (anchors[i + 1].y - anchors[i - 1].y) / dx;
             }
         }
 
@@ -513,9 +501,8 @@ void SplineFitter::computeFiniteDifferenceTangents(
 // Greedy Spline Fitting (Replaces RDP)
 //==============================================================================
 
-SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
-    const std::vector<Sample>& samples,
-    const std::vector<SplineAnchor>& anchors) {
+SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(const std::vector<Sample>& samples,
+                                                              const std::vector<SplineAnchor>& anchors) {
 
     WorstFitResult result{0, 0.0};
 
@@ -529,12 +516,10 @@ SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
 
         // Skip samples that already have anchors at their x position
         bool hasAnchor = std::any_of(anchors.begin(), anchors.end(),
-            [&sample](const SplineAnchor& a) {
-                return std::abs(a.x - sample.x) < 1e-9;
-            });
+                                     [&sample](const SplineAnchor& a) { return std::abs(a.x - sample.x) < 1e-9; });
 
         if (hasAnchor) {
-            continue;  // Skip this sample
+            continue; // Skip this sample
         }
 
         // Evaluate PCHIP spline at this x position
@@ -552,11 +537,10 @@ SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(
     return result;
 }
 
-std::vector<SplineAnchor> SplineFitter::greedySplineFit(
-    const std::vector<Sample>& samples,
-    const SplineFitConfig& config,
-    const LayeredTransferFunction* ltf,
-    const std::vector<int>& mandatoryAnchorIndices) {
+std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample>& samples,
+                                                        const SplineFitConfig& config,
+                                                        const LayeredTransferFunction* ltf,
+                                                        const std::vector<int>& mandatoryAnchorIndices) {
 
     if (samples.size() < 2)
         return {};
@@ -597,16 +581,13 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
 
         // Sort anchors by x (should already be sorted, but ensure)
         std::sort(anchors.begin(), anchors.end(),
-            [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
+                  [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
 
         // Remove any duplicates
         anchors.erase(
             std::unique(anchors.begin(), anchors.end(),
-                [](const SplineAnchor& a, const SplineAnchor& b) {
-                    return std::abs(a.x - b.x) < 1e-9;
-                }),
-            anchors.end()
-        );
+                        [](const SplineAnchor& a, const SplineAnchor& b) { return std::abs(a.x - b.x) < 1e-9; }),
+            anchors.end());
     }
 
     // Calculate how many additional anchors we can add
@@ -627,7 +608,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     // quality and anchor count. This is decoupled from positionTolerance to allow
     // adaptive tolerance to increase aggressively for backtranslation stability.
     AdaptiveToleranceCalculator::Config adaptiveConfig;
-    adaptiveConfig.relativeErrorTarget = 0.01;  // 1% of vertical range (balanced default)
+    adaptiveConfig.relativeErrorTarget = 0.01; // 1% of vertical range (balanced default)
     // anchorDensityMultiplier = 10.0 (default from AdaptiveToleranceCalculator::Config)
 
     // Analyze symmetry if needed (controlled by config.symmetryMode)
@@ -652,11 +633,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         // The adaptive tolerance calculator uses quadratic scaling and anchor density multiplier
         // to aggressively relax tolerance as anchors accumulate, solving the backtranslation problem.
         double adaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
-            verticalRange,
-            static_cast<int>(anchors.size()),
-            config.maxAnchors,
-            adaptiveConfig
-        );
+            verticalRange, static_cast<int>(anchors.size()), config.maxAnchors, adaptiveConfig);
 
         // NOTE: We do NOT apply positionTolerance as a floor here. The adaptive tolerance
         // calculator is trusted to compute the right tolerance based on curve complexity
@@ -689,16 +666,15 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             const auto& complementarySample = samples[complementaryIdx];
 
             // Check if complementary position already has anchor
-            bool hasComplementaryAnchor = std::any_of(anchors.begin(), anchors.end(),
-                [&complementarySample](const SplineAnchor& a) {
+            bool hasComplementaryAnchor =
+                std::any_of(anchors.begin(), anchors.end(), [&complementarySample](const SplineAnchor& a) {
                     return std::abs(a.x - complementarySample.x) < 1e-9;
                 });
 
             // Check if original position already has anchor
-            bool hasOriginalAnchor = std::any_of(anchors.begin(), anchors.end(),
-                [&worstSample](const SplineAnchor& a) {
-                    return std::abs(a.x - worstSample.x) < 1e-9;
-                });
+            bool hasOriginalAnchor = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
+                return std::abs(a.x - worstSample.x) < 1e-9;
+            });
 
             // Check if complementary position ALSO has significant error
             // (Don't waste anchor budget on low-error positions)
@@ -714,32 +690,27 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             // 3. Complementary position has significant error (>50% of adaptive tolerance)
             // 4. We have room for 2 more anchors
             bool canAddPair = !hasOriginalAnchor && !hasComplementaryAnchor &&
-                              complementaryError > adaptiveTolerance * 0.5 &&
-                              (iteration + 1 < remainingAnchors);
+                              complementaryError > adaptiveTolerance * 0.5 && (iteration + 1 < remainingAnchors);
 
             if (canAddPair) {
                 // Add both anchors with symmetric y values
                 // For odd symmetry: if we have f(x) at x and f(-x) at -x,
                 // we want to enforce perfect symmetry by using the average
-                double yOriginal = worstSample.y;  // f(x)
-                double yComplementary = complementarySample.y;  // f(-x)
+                double yOriginal = worstSample.y;              // f(x)
+                double yComplementary = complementarySample.y; // f(-x)
 
                 // For perfect odd symmetry: f(-x) = -f(x)
                 // Average the two to get a symmetric value
                 double ySymmetric = (yOriginal - yComplementary) / 2.0;
 
                 // Insert original anchor at (x, ySymmetric)
-                auto insertPos1 = std::lower_bound(
-                    anchors.begin(), anchors.end(), worstSample.x,
-                    [](const SplineAnchor& a, double x) { return a.x < x; }
-                );
+                auto insertPos1 = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                                   [](const SplineAnchor& a, double x) { return a.x < x; });
                 anchors.insert(insertPos1, {worstSample.x, ySymmetric, false, 0.0});
 
                 // Insert complementary anchor at (-x, -ySymmetric) for odd symmetry
-                auto insertPos2 = std::lower_bound(
-                    anchors.begin(), anchors.end(), complementarySample.x,
-                    [](const SplineAnchor& a, double x) { return a.x < x; }
-                );
+                auto insertPos2 = std::lower_bound(anchors.begin(), anchors.end(), complementarySample.x,
+                                                   [](const SplineAnchor& a, double x) { return a.x < x; });
                 anchors.insert(insertPos2, {complementarySample.x, -ySymmetric, false, 0.0});
 
                 // Consume 2 iterations (we added 2 anchors)
@@ -748,18 +719,15 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             } else {
                 // Fallback: add single anchor (asymmetric, but necessary)
                 // Better to break symmetry slightly than leave large errors unaddressed
-                auto insertPos = std::lower_bound(
-                    anchors.begin(), anchors.end(), worstSample.x,
-                    [](const SplineAnchor& a, double x) { return a.x < x; }
-                );
+                auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                                  [](const SplineAnchor& a, double x) { return a.x < x; });
 
-                bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
-                    [&worstSample](const SplineAnchor& a) {
-                        return std::abs(a.x - worstSample.x) < 1e-9;
-                    });
+                bool isDuplicate = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
+                    return std::abs(a.x - worstSample.x) < 1e-9;
+                });
 
                 if (isDuplicate)
-                    break;  // No progress possible
+                    break; // No progress possible
 
                 anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
             }
@@ -768,19 +736,16 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
             // === ASYMMETRIC MODE: Original greedy algorithm ===
 
             // Find insertion point (maintain sorted order by x)
-            auto insertPos = std::lower_bound(
-                anchors.begin(), anchors.end(), worstSample.x,
-                [](const SplineAnchor& a, double x) { return a.x < x; }
-            );
+            auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                              [](const SplineAnchor& a, double x) { return a.x < x; });
 
             // Don't insert duplicate x positions
-            bool isDuplicate = std::any_of(anchors.begin(), anchors.end(),
-                [&worstSample](const SplineAnchor& a) {
-                    return std::abs(a.x - worstSample.x) < 1e-9;
-                });
+            bool isDuplicate = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
+                return std::abs(a.x - worstSample.x) < 1e-9;
+            });
 
             if (isDuplicate)
-                break;  // No progress possible
+                break; // No progress possible
 
             anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
         }
@@ -796,23 +761,19 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
         // 2. Fitted spline introduced significant drift
         // 3. No anchor already exists at x≈0
         // 4. Anchor budget allows
-        if (zcInfo.baseCurveHasZeroCrossing &&
-            zcInfo.drift > config.zeroCrossingTolerance &&
+        if (zcInfo.baseCurveHasZeroCrossing && zcInfo.drift > config.zeroCrossingTolerance &&
             anchors.size() < static_cast<size_t>(config.maxAnchors)) {
 
             // Check if anchor already exists at x≈0
-            bool hasAnchorAtZero = std::any_of(anchors.begin(), anchors.end(),
-                [](const SplineAnchor& a) {
-                    return std::abs(a.x) < 1e-6;  // Within 1e-6 of origin
-                });
+            bool hasAnchorAtZero = std::any_of(anchors.begin(), anchors.end(), [](const SplineAnchor& a) {
+                return std::abs(a.x) < 1e-6; // Within 1e-6 of origin
+            });
 
             if (!hasAnchorAtZero) {
                 // Add corrective anchor at exactly x=0 with base curve's y value
                 // (Anchors have continuous freedom - can be placed at exact 0.0)
-                auto insertPos = std::lower_bound(
-                    anchors.begin(), anchors.end(), 0.0,
-                    [](const SplineAnchor& a, double x) { return a.x < x; }
-                );
+                auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), 0.0,
+                                                  [](const SplineAnchor& a, double x) { return a.x < x; });
                 anchors.insert(insertPos, {0.0, zcInfo.baseYAtZero, false, 0.0});
 
                 // Recompute tangents with new anchor
@@ -825,11 +786,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
     if (config.enableAnchorPruning && anchors.size() > 2) {
         // Use the final adaptive tolerance with multiplier for pruning
         double finalAdaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
-            verticalRange,
-            static_cast<int>(anchors.size()),
-            config.maxAnchors,
-            adaptiveConfig
-        );
+            verticalRange, static_cast<int>(anchors.size()), config.maxAnchors, adaptiveConfig);
         finalAdaptiveTolerance = std::max(finalAdaptiveTolerance, config.positionTolerance);
         double pruningTolerance = finalAdaptiveTolerance * config.pruningToleranceMultiplier;
 
@@ -846,19 +803,16 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(
 // Anchor Pruning (Optional Post-Processing)
 //==============================================================================
 
-void SplineFitter::pruneRedundantAnchors(
-    std::vector<SplineAnchor>& anchors,
-    const std::vector<Sample>& samples,
-    double pruningTolerance,
-    const SplineFitConfig& config) {
+void SplineFitter::pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
+                                         double pruningTolerance, const SplineFitConfig& config) {
 
     if (anchors.size() <= 2) {
-        return;  // Cannot prune endpoints
+        return; // Cannot prune endpoints
     }
 
     // Iteratively test removing each non-endpoint anchor
     // If removal doesn't increase error beyond tolerance, keep it removed
-    for (int i = 1; i < static_cast<int>(anchors.size()) - 1; ) {
+    for (int i = 1; i < static_cast<int>(anchors.size()) - 1;) {
         // 1. Temporarily remove anchor
         auto removed = anchors[i];
         anchors.erase(anchors.begin() + i);
@@ -878,7 +832,7 @@ void SplineFitter::pruneRedundantAnchors(
         // 4. If error exceeds tolerance, restore anchor
         if (maxError > pruningTolerance) {
             anchors.insert(anchors.begin() + i, removed);
-            ++i;  // Move to next anchor
+            ++i; // Move to next anchor
         }
         // else: anchor was successfully removed, check same index again (array shifted)
     }
@@ -888,10 +842,9 @@ void SplineFitter::pruneRedundantAnchors(
 // Zero-Crossing Analysis (Defensive DC Drift Detection)
 //==============================================================================
 
-SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(
-    const LayeredTransferFunction& ltf,
-    const std::vector<SplineAnchor>& anchors,
-    const SplineFitConfig& config) {
+SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(const LayeredTransferFunction& ltf,
+                                                                 const std::vector<SplineAnchor>& anchors,
+                                                                 const SplineFitConfig& config) {
 
     ZeroCrossingInfo info;
 

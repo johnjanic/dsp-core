@@ -15,15 +15,14 @@
 
 namespace dsp_core {
 
-class ExpressionEvaluator
-{
-public:
+class ExpressionEvaluator {
+  public:
     ExpressionEvaluator();
 
     bool compile(const std::string& expression);
     double evaluate(double x) const;
 
-private:
+  private:
     typedef exprtk::symbol_table<double> SymbolTable;
     typedef exprtk::expression<double> Expression;
     typedef exprtk::parser<double> Parser;

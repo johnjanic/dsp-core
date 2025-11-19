@@ -34,23 +34,22 @@ namespace dsp_core::audio_pipeline {
  * CPU Cost: ~3 FLOPs per sample (fade update + bias subtraction)
  */
 class DynamicOutputBiasing : public AudioProcessingStage {
-public:
+  public:
     /**
      * Constructor with dependency injection.
      *
      * @param ltf Reference to transfer function (must outlive this stage)
      * @param silenceDetector Reference to silence detector (must run before this stage)
      */
-    explicit DynamicOutputBiasing(
-        LayeredTransferFunction& ltf,
-        SilenceDetector& silenceDetector
-    );
+    explicit DynamicOutputBiasing(LayeredTransferFunction& ltf, SilenceDetector& silenceDetector);
 
     // AudioProcessingStage interface
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "DynamicOutputBiasing"; }
+    juce::String getName() const override {
+        return "DynamicOutputBiasing";
+    }
 
     /**
      * Enable/disable compensation (for A/B testing).
@@ -110,7 +109,7 @@ public:
         return fade_.getCurrentValue() > 0.01;
     }
 
-private:
+  private:
     /**
      * Update cached bias value (called from notifyTransferFunctionChanged).
      * UI thread only.
@@ -125,12 +124,12 @@ private:
 
     // State
     double sampleRate_ = 44100.0;
-    std::atomic<bool> enabled_{true};  // Default: ON (safety feature)
-    std::atomic<double> cachedBias_{0.0};  // UI writes, audio reads
+    std::atomic<bool> enabled_{true};     // Default: ON (safety feature)
+    std::atomic<double> cachedBias_{0.0}; // UI writes, audio reads
 
     // Rate limiting for bias updates (UI thread only)
     std::chrono::steady_clock::time_point lastBiasUpdate_;
-    static constexpr int kDebounceMs = 50;  // ~20 Hz max update rate
+    static constexpr int kDebounceMs = 50; // ~20 Hz max update rate
 };
 
 } // namespace dsp_core::audio_pipeline

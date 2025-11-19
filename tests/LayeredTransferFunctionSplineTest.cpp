@@ -10,21 +10,14 @@ using namespace dsp_core::Services;
 //==============================================================================
 
 class LayeredTransferFunctionSplineTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<LayeredTransferFunction>(256, -1.0, 1.0);
 
         // Create test anchors
-        linearAnchors = {
-            {-1.0, -1.0, false, 0.0},
-            {1.0, 1.0, false, 0.0}
-        };
+        linearAnchors = {{-1.0, -1.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
-        threePtAnchors = {
-            {-1.0, -1.0, false, 0.0},
-            {0.0, 0.5, false, 0.0},
-            {1.0, 1.0, false, 0.0}
-        };
+        threePtAnchors = {{-1.0, -1.0, false, 0.0}, {0.0, 0.5, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
         // Compute tangents using Akima (default)
         SplineFitter::computeTangents(linearAnchors, SplineFitConfig::tight());
@@ -159,7 +152,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ExplicitCacheInvalidation) {
 
 TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
     // Set up harmonics
-    ltf->setCoefficient(1, 0.5);  // Harmonic 1 amplitude
+    ltf->setCoefficient(1, 0.5); // Harmonic 1 amplitude
     ltf->updateComposite();
 
     // Enable spline layer
@@ -252,10 +245,7 @@ TEST_F(LayeredTransferFunctionSplineTest, CoefficientChangesInvalidateCache) {
 
 TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
     // Create anchors that would normally be normalized
-    std::vector<SplineAnchor> largeAnchors = {
-        {-1.0, -2.0, false, 0.0},
-        {1.0, 2.0, false, 0.0}
-    };
+    std::vector<SplineAnchor> largeAnchors = {{-1.0, -2.0, false, 0.0}, {1.0, 2.0, false, 0.0}};
     SplineFitter::computeTangents(largeAnchors, SplineFitConfig::tight());
 
     ltf->getSplineLayer().setAnchors(largeAnchors);
@@ -268,5 +258,5 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
 
     // Result should be close to 2.0 at x=1 (not normalized)
     double result = ltf->applyTransferFunction(1.0);
-    EXPECT_GT(result, 1.5);  // Should not be normalized to 1.0
+    EXPECT_GT(result, 1.5); // Should not be normalized to 1.0
 }

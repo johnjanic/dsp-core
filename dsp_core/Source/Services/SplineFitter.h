@@ -24,19 +24,15 @@ namespace Services {
  *   - Reusable across modules
  */
 class SplineFitter {
-public:
+  public:
     // Main API: Fit painted curve to spline anchors
-    static SplineFitResult fitCurve(
-        const LayeredTransferFunction& ltf,
-        const SplineFitConfig& config = SplineFitConfig::smooth()
-    );
+    static SplineFitResult fitCurve(const LayeredTransferFunction& ltf,
+                                    const SplineFitConfig& config = SplineFitConfig::smooth());
 
     // Tangent computation (exposed for manual anchor manipulation)
     // Recomputes tangents for anchors after position changes using configured algorithm
-    static void computeTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config = SplineFitConfig::smooth()
-    );
+    static void computeTangents(std::vector<SplineAnchor>& anchors,
+                                const SplineFitConfig& config = SplineFitConfig::smooth());
 
     // Zero-crossing analysis (exposed for testing)
     struct ZeroCrossingInfo {
@@ -46,19 +42,16 @@ public:
         double drift = 0.0;
     };
 
-    static ZeroCrossingInfo analyzeZeroCrossing(
-        const LayeredTransferFunction& ltf,
-        const std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
+    static ZeroCrossingInfo analyzeZeroCrossing(const LayeredTransferFunction& ltf,
+                                                const std::vector<SplineAnchor>& anchors,
+                                                const SplineFitConfig& config);
 
-private:
+  private:
     // Step 1: Sample & sanitize
-    struct Sample { double x, y; };
-    static std::vector<Sample> sampleAndSanitize(
-        const LayeredTransferFunction& ltf,
-        const SplineFitConfig& config
-    );
+    struct Sample {
+        double x, y;
+    };
+    static std::vector<Sample> sampleAndSanitize(const LayeredTransferFunction& ltf, const SplineFitConfig& config);
 
     // Sub-steps of sanitize
     static void sortByX(std::vector<Sample>& samples);
@@ -67,37 +60,22 @@ private:
     static void clampToRange(std::vector<Sample>& samples);
 
     // Tangent computation algorithms
-    static void computePCHIPTangentsImpl(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
+    static void computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config);
 
-    static void computeFritschCarlsonTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
+    static void computeFritschCarlsonTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config);
 
-    static void computeAkimaTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
+    static void computeAkimaTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config);
 
-    static void computeFiniteDifferenceTangents(
-        std::vector<SplineAnchor>& anchors,
-        const SplineFitConfig& config
-    );
+    static void computeFiniteDifferenceTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config);
 
     // Tangent computation helpers
     static double harmonicMean(double a, double b, double wa, double wb);
 
     // Greedy spline fitting (replaces RDP + refinement)
     // Now uses feature-based anchor placement: starts with mandatory feature anchors
-    static std::vector<SplineAnchor> greedySplineFit(
-        const std::vector<Sample>& samples,
-        const SplineFitConfig& config,
-        const LayeredTransferFunction* ltf = nullptr,
-        const std::vector<int>& mandatoryAnchorIndices = {}
-    );
+    static std::vector<SplineAnchor> greedySplineFit(const std::vector<Sample>& samples, const SplineFitConfig& config,
+                                                     const LayeredTransferFunction* ltf = nullptr,
+                                                     const std::vector<int>& mandatoryAnchorIndices = {});
 
     // Find sample with worst fit error
     struct WorstFitResult {
@@ -105,20 +83,14 @@ private:
         double maxError;
     };
 
-    static WorstFitResult findWorstFitSample(
-        const std::vector<Sample>& samples,
-        const std::vector<SplineAnchor>& anchors
-    );
+    static WorstFitResult findWorstFitSample(const std::vector<Sample>& samples,
+                                             const std::vector<SplineAnchor>& anchors);
 
     // Anchor pruning (optional post-processing)
-    static void pruneRedundantAnchors(
-        std::vector<SplineAnchor>& anchors,
-        const std::vector<Sample>& samples,
-        double pruningTolerance,
-        const SplineFitConfig& config
-    );
+    static void pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
+                                      double pruningTolerance, const SplineFitConfig& config);
 
-    SplineFitter() = delete;  // Pure static utility
+    SplineFitter() = delete; // Pure static utility
 };
 
 } // namespace Services

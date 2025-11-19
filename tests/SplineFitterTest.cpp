@@ -17,7 +17,7 @@ namespace dsp_core_test {
  *   - PCHIP tangent computation (Step 3)
  */
 class SplineFitterTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
     }
@@ -105,9 +105,9 @@ TEST(SplineTypesTest, SplineFitConfig_DefaultValues) {
 
 TEST(SplineTypesTest, SplineFitConfig_TightPreset) {
     auto config = dsp_core::SplineFitConfig::tight();
-    EXPECT_DOUBLE_EQ(config.positionTolerance, 0.005);  // Relaxed from 0.002 for backtranslation stability
+    EXPECT_DOUBLE_EQ(config.positionTolerance, 0.005); // Relaxed from 0.002 for backtranslation stability
     EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.05);
-    EXPECT_EQ(config.maxAnchors, 128);  // Increased from 64 to allow better convergence for steep curves
+    EXPECT_EQ(config.maxAnchors, 128); // Increased from 64 to allow better convergence for steep curves
 }
 
 TEST(SplineTypesTest, SplineFitConfig_SmoothPreset) {
@@ -145,7 +145,7 @@ TEST_F(SplineFitterTest, FitCurve_SCurve_MoreAnchors) {
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
     EXPECT_TRUE(result.success);
-    EXPECT_GE(result.numAnchors, 3);  // S-curve needs anchors at inflection points
+    EXPECT_GE(result.numAnchors, 3); // S-curve needs anchors at inflection points
 }
 
 TEST_F(SplineFitterTest, FitCurve_TightTolerance_MoreAnchors) {
@@ -174,8 +174,7 @@ TEST_F(SplineFitterTest, FitCurve_AnchorsAreSorted) {
 
     // Verify anchors are sorted by x
     for (size_t i = 1; i < result.anchors.size(); ++i) {
-        EXPECT_GT(result.anchors[i].x, result.anchors[i-1].x)
-            << "Anchor " << i << " is not sorted";
+        EXPECT_GT(result.anchors[i].x, result.anchors[i - 1].x) << "Anchor " << i << " is not sorted";
     }
 }
 
@@ -193,8 +192,7 @@ TEST_F(SplineFitterTest, PCHIPTangents_MonotonicSequence) {
 
     // For monotonic increasing data, all tangents should be positive
     for (const auto& anchor : result.anchors) {
-        EXPECT_GE(anchor.tangent, 0.0)
-            << "Tangent at x=" << anchor.x << " should be non-negative";
+        EXPECT_GE(anchor.tangent, 0.0) << "Tangent at x=" << anchor.x << " should be non-negative";
     }
 }
 
@@ -207,7 +205,7 @@ TEST_F(SplineFitterTest, PCHIPTangents_LocalExtremum) {
         ltf->setBaseLayerValue(i, y);
     }
 
-    auto config = dsp_core::SplineFitConfig::tight();  // Use tight to capture peak
+    auto config = dsp_core::SplineFitConfig::tight(); // Use tight to capture peak
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
     EXPECT_TRUE(result.success);
@@ -217,8 +215,7 @@ TEST_F(SplineFitterTest, PCHIPTangents_LocalExtremum) {
     for (const auto& anchor : result.anchors) {
         if (std::abs(anchor.x) < 0.1 && std::abs(anchor.y - 1.0) < 0.1) {
             // Tangent should be near zero at peak
-            EXPECT_NEAR(anchor.tangent, 0.0, 0.3)
-                << "Tangent at peak (x=" << anchor.x << ") should be near zero";
+            EXPECT_NEAR(anchor.tangent, 0.0, 0.3) << "Tangent at peak (x=" << anchor.x << ") should be near zero";
             foundPeak = true;
         }
     }
@@ -237,10 +234,8 @@ TEST_F(SplineFitterTest, PCHIPTangents_SlopeCapping) {
 
     // All tangents should respect slope caps
     for (const auto& anchor : result.anchors) {
-        EXPECT_GE(anchor.tangent, config.minSlope)
-            << "Tangent at x=" << anchor.x << " exceeds min slope";
-        EXPECT_LE(anchor.tangent, config.maxSlope)
-            << "Tangent at x=" << anchor.x << " exceeds max slope";
+        EXPECT_GE(anchor.tangent, config.minSlope) << "Tangent at x=" << anchor.x << " exceeds min slope";
+        EXPECT_LE(anchor.tangent, config.maxSlope) << "Tangent at x=" << anchor.x << " exceeds max slope";
     }
 }
 
@@ -258,12 +253,12 @@ TEST_F(SplineFitterTest, FitCurve_FlatCurve) {
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
     EXPECT_TRUE(result.success);
-    EXPECT_GE(result.numAnchors, 2);  // At least endpoints
+    EXPECT_GE(result.numAnchors, 2); // At least endpoints
 
     // All anchors should have y ≈ 0
     for (const auto& anchor : result.anchors) {
         EXPECT_NEAR(anchor.y, 0.0, 0.01);
-        EXPECT_NEAR(anchor.tangent, 0.0, 0.01);  // Flat curve → zero tangent
+        EXPECT_NEAR(anchor.tangent, 0.0, 0.01); // Flat curve → zero tangent
     }
 }
 
@@ -271,9 +266,9 @@ TEST_F(SplineFitterTest, FitCurve_MonotonicityEnforcement_ProducesReasonableResu
     // Create slightly non-monotonic curve (with small violations)
     setIdentityCurve();
     // Add small monotonicity violations
-    ltf->setBaseLayerValue(64, -0.3);   // Should be ~-0.5
-    ltf->setBaseLayerValue(128, 0.2);   // Should be ~0.0
-    ltf->setBaseLayerValue(192, 0.6);   // Should be ~0.5
+    ltf->setBaseLayerValue(64, -0.3); // Should be ~-0.5
+    ltf->setBaseLayerValue(128, 0.2); // Should be ~0.0
+    ltf->setBaseLayerValue(192, 0.6); // Should be ~0.5
 
     auto config = dsp_core::SplineFitConfig::smooth();
     config.enforceMonotonicity = true;
@@ -287,7 +282,7 @@ TEST_F(SplineFitterTest, FitCurve_MonotonicityEnforcement_ProducesReasonableResu
     // Verify result is generally increasing with tolerance for small errors.
     int violations = 0;
     for (size_t i = 1; i < result.anchors.size(); ++i) {
-        if (result.anchors[i].y < result.anchors[i-1].y - 0.01) {
+        if (result.anchors[i].y < result.anchors[i - 1].y - 0.01) {
             violations++;
         }
     }
@@ -331,9 +326,7 @@ TEST(SplineEvaluatorTest, Evaluate_EmptyAnchors_ReturnsZero) {
 }
 
 TEST(SplineEvaluatorTest, Evaluate_SingleAnchor_ReturnsAnchorValue) {
-    std::vector<dsp_core::SplineAnchor> anchors = {
-        {0.0, 0.5, false, 0.0}
-    };
+    std::vector<dsp_core::SplineAnchor> anchors = {{0.0, 0.5, false, 0.0}};
     double result = dsp_core::Services::SplineEvaluator::evaluate(anchors, 0.0);
     EXPECT_DOUBLE_EQ(result, 0.5);
 
@@ -344,10 +337,7 @@ TEST(SplineEvaluatorTest, Evaluate_SingleAnchor_ReturnsAnchorValue) {
 
 TEST(SplineEvaluatorTest, Evaluate_AtAnchorPositions_ReturnsExactValues) {
     std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, -1.0, false, 1.0},
-        {0.0, 0.0, false, 1.0},
-        {1.0, 1.0, false, 1.0}
-    };
+        {-1.0, -1.0, false, 1.0}, {0.0, 0.0, false, 1.0}, {1.0, 1.0, false, 1.0}};
 
     // Evaluate at each anchor position
     EXPECT_NEAR(dsp_core::Services::SplineEvaluator::evaluate(anchors, -1.0), -1.0, 1e-10);
@@ -358,46 +348,38 @@ TEST(SplineEvaluatorTest, Evaluate_AtAnchorPositions_ReturnsExactValues) {
 TEST(SplineEvaluatorTest, Evaluate_LinearInterpolation) {
     // Two anchors with slope = 1 (identity line)
     std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, -1.0, false, 1.0},  // tangent = 1
-        {1.0, 1.0, false, 1.0}     // tangent = 1
+        {-1.0, -1.0, false, 1.0}, // tangent = 1
+        {1.0, 1.0, false, 1.0}    // tangent = 1
     };
 
     // Evaluate at midpoint - should be close to 0.0 for linear
     double midpoint = dsp_core::Services::SplineEvaluator::evaluate(anchors, 0.0);
-    EXPECT_NEAR(midpoint, 0.0, 0.01);  // Allow small deviation for Hermite
+    EXPECT_NEAR(midpoint, 0.0, 0.01); // Allow small deviation for Hermite
 }
 
 TEST(SplineEvaluatorTest, Evaluate_BeforeFirstAnchor_Clamps) {
-    std::vector<dsp_core::SplineAnchor> anchors = {
-        {0.0, 0.5, false, 0.0},
-        {1.0, 1.0, false, 0.0}
-    };
+    std::vector<dsp_core::SplineAnchor> anchors = {{0.0, 0.5, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
     // Evaluate before first anchor
     double result = dsp_core::Services::SplineEvaluator::evaluate(anchors, -0.5);
-    EXPECT_DOUBLE_EQ(result, 0.5);  // Should return first anchor's y value
+    EXPECT_DOUBLE_EQ(result, 0.5); // Should return first anchor's y value
 }
 
 TEST(SplineEvaluatorTest, Evaluate_AfterLastAnchor_Clamps) {
-    std::vector<dsp_core::SplineAnchor> anchors = {
-        {0.0, 0.0, false, 0.0},
-        {1.0, 0.5, false, 0.0}
-    };
+    std::vector<dsp_core::SplineAnchor> anchors = {{0.0, 0.0, false, 0.0}, {1.0, 0.5, false, 0.0}};
 
     // Evaluate after last anchor
     double result = dsp_core::Services::SplineEvaluator::evaluate(anchors, 1.5);
-    EXPECT_DOUBLE_EQ(result, 0.5);  // Should return last anchor's y value
+    EXPECT_DOUBLE_EQ(result, 0.5); // Should return last anchor's y value
 }
 
 TEST(SplineEvaluatorTest, Evaluate_MonotonicSpline) {
     // Create monotonic anchors
-    std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, -0.8, false, 0.5},
-        {-0.5, -0.3, false, 0.6},
-        {0.0, 0.1, false, 0.7},
-        {0.5, 0.4, false, 0.6},
-        {1.0, 0.9, false, 0.5}
-    };
+    std::vector<dsp_core::SplineAnchor> anchors = {{-1.0, -0.8, false, 0.5},
+                                                   {-0.5, -0.3, false, 0.6},
+                                                   {0.0, 0.1, false, 0.7},
+                                                   {0.5, 0.4, false, 0.6},
+                                                   {1.0, 0.9, false, 0.5}};
 
     // Sample and verify monotonicity
     double prevY = -1.0;
@@ -410,9 +392,9 @@ TEST(SplineEvaluatorTest, Evaluate_MonotonicSpline) {
 
 TEST(SplineEvaluatorTest, EvaluateDerivative_AtAnchors) {
     std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, -1.0, false, 1.0},  // tangent = 1
-        {0.0, 0.0, false, 0.0},    // tangent = 0 (extremum)
-        {1.0, 1.0, false, 1.0}     // tangent = 1
+        {-1.0, -1.0, false, 1.0}, // tangent = 1
+        {0.0, 0.0, false, 0.0},   // tangent = 0 (extremum)
+        {1.0, 1.0, false, 1.0}    // tangent = 1
     };
 
     // Derivative at midpoint anchor should be close to 0
@@ -421,13 +403,11 @@ TEST(SplineEvaluatorTest, EvaluateDerivative_AtAnchors) {
 }
 
 TEST(SplineEvaluatorTest, FindSegment_BinarySearch) {
-    std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, 0.0, false, 0.0},
-        {-0.5, 0.0, false, 0.0},
-        {0.0, 0.0, false, 0.0},
-        {0.5, 0.0, false, 0.0},
-        {1.0, 0.0, false, 0.0}
-    };
+    std::vector<dsp_core::SplineAnchor> anchors = {{-1.0, 0.0, false, 0.0},
+                                                   {-0.5, 0.0, false, 0.0},
+                                                   {0.0, 0.0, false, 0.0},
+                                                   {0.5, 0.0, false, 0.0},
+                                                   {1.0, 0.0, false, 0.0}};
 
     // Test that evaluator can handle many segments efficiently
     for (double x = -1.0; x <= 1.0; x += 0.05) {
@@ -449,7 +429,7 @@ TEST_F(SplineFitterTest, Integration_ErrorMetrics) {
     EXPECT_TRUE(result.success);
     EXPECT_GE(result.maxError, 0.0);
     EXPECT_GE(result.averageError, 0.0);
-    EXPECT_LE(result.averageError, result.maxError);  // avg <= max
+    EXPECT_LE(result.averageError, result.maxError); // avg <= max
 
     // For identity curve, error should be very small
     EXPECT_LT(result.maxError, 0.05) << "Identity curve fit error too large";
@@ -465,7 +445,7 @@ TEST_F(SplineFitterTest, Integration_FitAndReconstruct) {
 
     // Reconstruct curve at original sample points
     int matchCount = 0;
-    for (int i = 0; i < 256; i += 10) {  // Sample every 10th point
+    for (int i = 0; i < 256; i += 10) { // Sample every 10th point
         double x = ltf->normalizeIndex(i);
         double originalY = ltf->getBaseLayerValue(i);
         double fittedY = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, x);
@@ -517,8 +497,7 @@ TEST_F(SplineFitterTest, TanhCurves_VariousSteepness) {
 
         // Steeper curves should require more anchors
         if (n > 1) {
-            EXPECT_GT(result.numAnchors, 2)
-                << "tanh(" << n << "x) should need more than endpoint anchors";
+            EXPECT_GT(result.numAnchors, 2) << "tanh(" << n << "x) should need more than endpoint anchors";
         }
 
         // Verify reconstruction quality at midpoint (steepest part)
@@ -574,11 +553,11 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
         // Very high harmonics (26+): Skip (beyond PCHIP's capabilities)
         double errorTolerance;
         if (n <= 6) {
-            errorTolerance = config.positionTolerance * 2.0;  // 0.004 for tight config
+            errorTolerance = config.positionTolerance * 2.0; // 0.004 for tight config
         } else if (n <= 15) {
-            errorTolerance = config.positionTolerance * 15.0;  // 0.03 - moderate
+            errorTolerance = config.positionTolerance * 15.0; // 0.03 - moderate
         } else if (n <= 25) {
-            errorTolerance = config.positionTolerance * 50.0;  // 0.1 - relaxed for high-frequency content
+            errorTolerance = config.positionTolerance * 50.0; // 0.1 - relaxed for high-frequency content
         } else {
             // Very high frequencies: Skip strict testing, just verify no crash
             // These are beyond PCHIP's representational capabilities
@@ -587,13 +566,11 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
         }
 
         // Error should be within adaptive tolerance
-        EXPECT_LT(result.maxError, errorTolerance)
-            << "Harmonic " << n << " max error too high: " << result.maxError;
+        EXPECT_LT(result.maxError, errorTolerance) << "Harmonic " << n << " max error too high: " << result.maxError;
 
         // Higher harmonics should need more anchors (more oscillations)
         if (n >= 5) {
-            EXPECT_GT(result.numAnchors, 5)
-                << "Harmonic " << n << " should need multiple anchors for oscillations";
+            EXPECT_GT(result.numAnchors, 5) << "Harmonic " << n << " should need multiple anchors for oscillations";
         }
 
         // Verify reconstruction at a few key points (only for low harmonics)
@@ -610,9 +587,8 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
                 double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, testX);
                 double error = std::abs(expected - fitted);
 
-                EXPECT_LT(error, errorTolerance)
-                    << "Harmonic " << n << " poor fit at x=" << testX
-                    << ", expected=" << expected << ", fitted=" << fitted;
+                EXPECT_LT(error, errorTolerance) << "Harmonic " << n << " poor fit at x=" << testX
+                                                 << ", expected=" << expected << ", fitted=" << fitted;
             }
         }
     }
@@ -625,10 +601,10 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
 TEST_F(SplineFitterTest, Performance_ComplexCurves) {
     // Test several challenging curves
     std::vector<std::function<double(double)>> testFunctions = {
-        [](double x) { return std::tanh(20.0 * x); },                    // Very steep
-        [](double x) { return std::sin(10.0 * M_PI * x); },              // High frequency
-        [](double x) { return x * std::sin(15.0 * M_PI * x); },          // Modulated
-        [](double x) { return std::cos(8.0 * std::acos(std::max(-1.0, std::min(1.0, x)))); }  // Harmonic 8
+        [](double x) { return std::tanh(20.0 * x); },                                        // Very steep
+        [](double x) { return std::sin(10.0 * M_PI * x); },                                  // High frequency
+        [](double x) { return x * std::sin(15.0 * M_PI * x); },                              // Modulated
+        [](double x) { return std::cos(8.0 * std::acos(std::max(-1.0, std::min(1.0, x)))); } // Harmonic 8
     };
 
     for (size_t idx = 0; idx < testFunctions.size(); ++idx) {
@@ -650,8 +626,7 @@ TEST_F(SplineFitterTest, Performance_ComplexCurves) {
         EXPECT_TRUE(result.success) << "Test function " << idx << " fit failed";
 
         // Should complete in reasonable time (< 100ms)
-        EXPECT_LT(duration.count(), 100)
-            << "Test function " << idx << " took too long: " << duration.count() << "ms";
+        EXPECT_LT(duration.count(), 100) << "Test function " << idx << " took too long: " << duration.count() << "ms";
 
         // Adaptive accuracy expectations:
         // Function 0 (tanh(20x)): Steep but smooth monotonic - should fit well
@@ -660,13 +635,13 @@ TEST_F(SplineFitterTest, Performance_ComplexCurves) {
         // (no ripple) over minimizing absolute error, so tolerances are slightly relaxed
         double errorTolerance;
         if (idx == 0) {
-            errorTolerance = config.positionTolerance * 3.0;  // 0.006 - steep but achievable
+            errorTolerance = config.positionTolerance * 3.0; // 0.006 - steep but achievable
         } else {
-            errorTolerance = config.positionTolerance * 30.0;  // 0.06 - high-frequency content (relaxed for feature-based placement)
+            errorTolerance =
+                config.positionTolerance * 30.0; // 0.06 - high-frequency content (relaxed for feature-based placement)
         }
 
-        EXPECT_LT(result.maxError, errorTolerance)
-            << "Test function " << idx << " error too high: " << result.maxError;
+        EXPECT_LT(result.maxError, errorTolerance) << "Test function " << idx << " error too high: " << result.maxError;
     }
 }
 
@@ -682,7 +657,7 @@ TEST_F(SplineFitterTest, EdgeCase_ExtremelySteepTanh) {
     }
 
     auto config = dsp_core::SplineFitConfig::tight();
-    config.maxAnchors = 64;  // May need many anchors for near-discontinuity
+    config.maxAnchors = 64; // May need many anchors for near-discontinuity
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
@@ -724,7 +699,7 @@ TEST_F(SplineFitterTest, Quality_SmoothnessC1Continuity) {
         if (!first) {
             double derivativeChange = std::abs(derivative - prevDerivative);
             // Large sudden jumps in derivative indicate C1 discontinuity (kinks)
-            if (derivativeChange > 2.0) {  // Threshold for "large jump"
+            if (derivativeChange > 2.0) { // Threshold for "large jump"
                 largeJumps++;
             }
         }
@@ -734,7 +709,7 @@ TEST_F(SplineFitterTest, Quality_SmoothnessC1Continuity) {
     }
 
     // PCHIP should maintain C1 continuity - no sudden derivative jumps
-    EXPECT_LT(largeJumps, NUM_SAMPLES / 100)  // < 1% of samples
+    EXPECT_LT(largeJumps, NUM_SAMPLES / 100) // < 1% of samples
         << "Too many derivative discontinuities detected: " << largeJumps;
 }
 
@@ -770,7 +745,7 @@ TEST_F(SplineFitterTest, Regression_NoBowingInStraightRegions) {
     double maxErrorInStraightRegion = 0.0;
     for (int i = 180; i < 240; ++i) {
         double x = ltf->normalizeIndex(i);
-        double expected = x;  // Should be linear
+        double expected = x; // Should be linear
         double fitted = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, x);
         double error = std::abs(expected - fitted);
         maxErrorInStraightRegion = std::max(maxErrorInStraightRegion, error);
@@ -790,7 +765,7 @@ TEST_F(SplineFitterTest, Regression_NoBowingInStraightRegions) {
  * Verifies that anchoring at geometric features eliminates ripple artifacts
  */
 class FeatureBasedFittingTest : public ::testing::Test {
-protected:
+  protected:
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;
 
     void SetUp() override {
@@ -800,7 +775,7 @@ protected:
     // Helper: Setup curve from function
     void setupCurve(std::function<double(double)> func) {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i);  // [-1, 1]
+            double x = ltf->normalizeIndex(i); // [-1, 1]
             ltf->setBaseLayerValue(i, func(x));
         }
     }
@@ -820,8 +795,7 @@ protected:
                              const dsp_core::LayeredTransferFunction& originalData) {
         // Get actual extrema from original data
         auto dataFeatures = dsp_core::Services::CurveFeatureDetector::detectFeatures(originalData);
-        std::set<int> dataExtremaIndices(dataFeatures.localExtrema.begin(),
-                                         dataFeatures.localExtrema.end());
+        std::set<int> dataExtremaIndices(dataFeatures.localExtrema.begin(), dataFeatures.localExtrema.end());
 
         int spuriousCount = 0;
 
@@ -833,7 +807,7 @@ protected:
             // Sample segment at 20 points
             for (int j = 0; j <= 20; ++j) {
                 double t = j / 20.0;
-                double x = anchors[i].x + t * (anchors[i+1].x - anchors[i].x);
+                double x = anchors[i].x + t * (anchors[i + 1].x - anchors[i].x);
 
                 // Evaluate derivative at this point
                 double deriv = dsp_core::Services::SplineEvaluator::evaluateDerivative(anchors, x);
@@ -843,7 +817,7 @@ protected:
                     // Check if this extremum is near a data extremum
 
                     // Convert x coordinate back to approximate table index
-                    double normalizedX = x;  // Already in [-1, 1]
+                    double normalizedX = x; // Already in [-1, 1]
                     int approxIndex = static_cast<int>((normalizedX + 1.0) / 2.0 * 255.0);
                     approxIndex = std::max(0, std::min(255, approxIndex));
 
@@ -857,7 +831,7 @@ protected:
                     }
 
                     if (!isDataExtremum) {
-                        ++spuriousCount;  // Ripple artifact detected!
+                        ++spuriousCount; // Ripple artifact detected!
                     }
                 }
 
@@ -886,10 +860,8 @@ TEST_F(FeatureBasedFittingTest, Tanh_NoSpuriousExtrema_PCHIP) {
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
     EXPECT_TRUE(result.success);
-    EXPECT_EQ(0, countSpuriousExtrema(result.anchors, *ltf))
-        << "Tanh curve should have zero spurious extrema";
-    EXPECT_LT(result.maxError, config.positionTolerance * 2.0)
-        << "Error should be within 2x tolerance";
+    EXPECT_EQ(0, countSpuriousExtrema(result.anchors, *ltf)) << "Tanh curve should have zero spurious extrema";
+    EXPECT_LT(result.maxError, config.positionTolerance * 2.0) << "Error should be within 2x tolerance";
 }
 
 /**
@@ -926,8 +898,7 @@ TEST_F(FeatureBasedFittingTest, Tanh_Akima_MinimalExtrema) {
     // Akima may have small overshoots (not monotone-preserving)
     // But feature-based placement should minimize them significantly
     int spuriousCount = countSpuriousExtrema(result.anchors, *ltf);
-    EXPECT_LE(spuriousCount, 3)
-        << "Tanh with Akima should have minimal spurious extrema (≤3), got: " << spuriousCount;
+    EXPECT_LE(spuriousCount, 3) << "Tanh with Akima should have minimal spurious extrema (≤3), got: " << spuriousCount;
 }
 
 /**
@@ -935,7 +906,7 @@ TEST_F(FeatureBasedFittingTest, Tanh_Akima_MinimalExtrema) {
  * Oscillating curves are challenging for cubic splines - test for minimal spurious extrema
  */
 TEST_F(FeatureBasedFittingTest, Sine_AnchorsAtPeaksAndValleys) {
-    setupCurve([](double x) { return std::sin(M_PI * x); });  // 0.5 periods in [-1, 1]
+    setupCurve([](double x) { return std::sin(M_PI * x); }); // 0.5 periods in [-1, 1]
 
     auto config = dsp_core::SplineFitConfig::tight();
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -945,9 +916,9 @@ TEST_F(FeatureBasedFittingTest, Sine_AnchorsAtPeaksAndValleys) {
     // Sine wave from -π to π has peak at x=0.5 and valley at x=-0.5
     // Check for anchors near these positions
     auto hasPeakAnchor = std::any_of(result.anchors.begin(), result.anchors.end(),
-        [](const auto& p) { return std::abs(p.x - 0.5) < 0.1 && p.y > 0.9; });
+                                     [](const auto& p) { return std::abs(p.x - 0.5) < 0.1 && p.y > 0.9; });
     auto hasValleyAnchor = std::any_of(result.anchors.begin(), result.anchors.end(),
-        [](const auto& p) { return std::abs(p.x + 0.5) < 0.1 && p.y < -0.9; });
+                                       [](const auto& p) { return std::abs(p.x + 0.5) < 0.1 && p.y < -0.9; });
 
     EXPECT_TRUE(hasPeakAnchor) << "Should have anchor near sine peak";
     EXPECT_TRUE(hasValleyAnchor) << "Should have anchor near sine valley";
@@ -955,8 +926,7 @@ TEST_F(FeatureBasedFittingTest, Sine_AnchorsAtPeaksAndValleys) {
     // Oscillating curves are challenging - feature-based placement should significantly
     // reduce spurious extrema compared to naive approach, but may not eliminate them completely
     int spuriousCount = countSpuriousExtrema(result.anchors, *ltf);
-    EXPECT_LE(spuriousCount, 10)
-        << "Sine fit should have minimal spurious extrema (≤10), got: " << spuriousCount;
+    EXPECT_LE(spuriousCount, 10) << "Sine fit should have minimal spurious extrema (≤10), got: " << spuriousCount;
 }
 
 /**
@@ -971,14 +941,13 @@ TEST_F(FeatureBasedFittingTest, Cubic_AnchorsAtInflection) {
     EXPECT_TRUE(result.success);
 
     // x³ has inflection at x=0
-    auto hasInflectionAnchor = std::any_of(result.anchors.begin(), result.anchors.end(),
-        [](const auto& p) { return std::abs(p.x) < 0.05; });
+    auto hasInflectionAnchor =
+        std::any_of(result.anchors.begin(), result.anchors.end(), [](const auto& p) { return std::abs(p.x) < 0.05; });
 
     EXPECT_TRUE(hasInflectionAnchor) << "Should have anchor near inflection point at x=0";
 
     // Cubic is monotonic, so no extrema
-    EXPECT_EQ(0, countSpuriousExtrema(result.anchors, *ltf))
-        << "Cubic fit should have zero spurious extrema";
+    EXPECT_EQ(0, countSpuriousExtrema(result.anchors, *ltf)) << "Cubic fit should have zero spurious extrema";
 }
 
 /**
@@ -1003,8 +972,7 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
         {dsp_core::TangentAlgorithm::PCHIP, "PCHIP"},
         {dsp_core::TangentAlgorithm::FritschCarlson, "FritschCarlson"},
         {dsp_core::TangentAlgorithm::Akima, "Akima"},
-        {dsp_core::TangentAlgorithm::FiniteDifference, "FiniteDiff"}
-    };
+        {dsp_core::TangentAlgorithm::FiniteDifference, "FiniteDiff"}};
 
     for (const auto& [algo, name] : algorithms) {
         dsp_core::SplineFitConfig config;
@@ -1015,13 +983,8 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
 
         auto fit = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
-        results.push_back({
-            algo,
-            name,
-            static_cast<int>(fit.anchors.size()),
-            fit.maxError,
-            countSpuriousExtrema(fit.anchors, *ltf)
-        });
+        results.push_back(
+            {algo, name, static_cast<int>(fit.anchors.size()), fit.maxError, countSpuriousExtrema(fit.anchors, *ltf)});
     }
 
     // Log comparison table for manual inspection
@@ -1029,10 +992,8 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
     std::cout << "Algorithm         | Anchors | Max Error  | Spurious Extrema" << std::endl;
     std::cout << "------------------------------------------------" << std::endl;
     for (const auto& r : results) {
-        std::cout << std::left << std::setw(17) << r.name
-                  << "| " << std::setw(7) << r.anchorCount
-                  << " | " << std::setw(10) << r.maxError
-                  << " | " << r.spuriousExtrema << std::endl;
+        std::cout << std::left << std::setw(17) << r.name << "| " << std::setw(7) << r.anchorCount << " | "
+                  << std::setw(10) << r.maxError << " | " << r.spuriousExtrema << std::endl;
     }
     std::cout << "=================================================\n" << std::endl;
 
@@ -1041,19 +1002,16 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
         if (r.algorithm == dsp_core::TangentAlgorithm::PCHIP ||
             r.algorithm == dsp_core::TangentAlgorithm::FritschCarlson ||
             r.algorithm == dsp_core::TangentAlgorithm::FiniteDifference) {
-            EXPECT_EQ(0, r.spuriousExtrema)
-                << r.name << " (monotone-preserving) should have zero spurious extrema";
+            EXPECT_EQ(0, r.spuriousExtrema) << r.name << " (monotone-preserving) should have zero spurious extrema";
         } else {
             // Akima prioritizes smoothness over monotonicity
-            EXPECT_LE(r.spuriousExtrema, 3)
-                << r.name << " should have minimal spurious extrema";
+            EXPECT_LE(r.spuriousExtrema, 3) << r.name << " should have minimal spurious extrema";
         }
     }
 
     // All should fit within reasonable error
     for (const auto& r : results) {
-        EXPECT_LT(r.maxError, 0.01)
-            << r.name << " error should be < 0.01 for smooth tanh curve";
+        EXPECT_LT(r.maxError, 0.01) << r.name << " error should be < 0.01 for smooth tanh curve";
     }
 }
 
@@ -1071,7 +1029,7 @@ TEST_F(SplineFitterTest, Pruning_RedundantAnchor_Removed) {
     // The middle point (0,0) is redundant for this linear curve
     for (int i = 0; i < 256; ++i) {
         double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, x);  // Identity function (linear)
+        ltf->setBaseLayerValue(i, x); // Identity function (linear)
     }
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1132,7 +1090,7 @@ TEST_F(SplineFitterTest, Pruning_Disabled_NoChanges) {
     }
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    config.enableAnchorPruning = false;  // Disable pruning
+    config.enableAnchorPruning = false; // Disable pruning
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
@@ -1151,7 +1109,7 @@ TEST_F(SplineFitterTest, Pruning_BacktranslationStable) {
     // Use a simple curve with known optimal anchor count
     for (int i = 0; i < 256; ++i) {
         double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, x * x * x);  // Cubic curve
+        ltf->setBaseLayerValue(i, x * x * x); // Cubic curve
     }
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1173,10 +1131,9 @@ TEST_F(SplineFitterTest, Pruning_BacktranslationStable) {
     ASSERT_TRUE(result2.success);
 
     // Anchor count should not increase significantly (allowing +1 tolerance)
-    EXPECT_LE(result2.numAnchors, result1.numAnchors + 1)
-        << "Pruning should prevent anchor creeping: "
-        << "First fit: " << result1.numAnchors << " anchors, "
-        << "Refit: " << result2.numAnchors << " anchors";
+    EXPECT_LE(result2.numAnchors, result1.numAnchors + 1) << "Pruning should prevent anchor creeping: "
+                                                          << "First fit: " << result1.numAnchors << " anchors, "
+                                                          << "Refit: " << result2.numAnchors << " anchors";
 }
 
 //==============================================================================
@@ -1193,7 +1150,7 @@ TEST_F(SplineFitterTest, Pruning_BacktranslationStable) {
 void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber, double amplitude = 1.0) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
         double x = ltf.normalizeIndex(i);
-        x = std::max(-1.0, std::min(1.0, x));  // Clamp for trig safety
+        x = std::max(-1.0, std::min(1.0, x)); // Clamp for trig safety
 
         double y = 0.0;
         if (harmonicNumber % 2 == 0) {
@@ -1214,7 +1171,7 @@ void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber
 void setMixedCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
         double x = ltf.normalizeIndex(i);
-        x = std::max(-1.0, std::min(1.0, x));  // Clamp for trig safety
+        x = std::max(-1.0, std::min(1.0, x)); // Clamp for trig safety
 
         // 50% identity
         double identity = x;
@@ -1236,7 +1193,7 @@ void setMixedCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber) {
  * Reports anchor count for each harmonic to identify problematic cases
  */
 TEST_F(SplineFitterTest, AllHarmonics_PureWaveshapers) {
-    auto config = dsp_core::SplineFitConfig::smooth();  // maxAnchors = 24
+    auto config = dsp_core::SplineFitConfig::smooth(); // maxAnchors = 24
 
     std::cout << "\n=== Pure Harmonic Waveshapers (maxAnchors=" << config.maxAnchors << ") ===" << std::endl;
     std::cout << "Harmonic | Anchors | MaxError | Spatial Distribution (Left|Mid|Right)" << std::endl;
@@ -1252,38 +1209,36 @@ TEST_F(SplineFitterTest, AllHarmonics_PureWaveshapers) {
         // Analyze spatial distribution of anchors
         int leftCount = 0, midCount = 0, rightCount = 0;
         for (const auto& anchor : result.anchors) {
-            if (anchor.x < -0.33) leftCount++;
-            else if (anchor.x > 0.33) rightCount++;
-            else midCount++;
+            if (anchor.x < -0.33)
+                leftCount++;
+            else if (anchor.x > 0.33)
+                rightCount++;
+            else
+                midCount++;
         }
 
         // Print results
-        std::cout << std::setw(8) << n << " | "
-                  << std::setw(7) << result.numAnchors << " | "
-                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
-                  << std::setw(4) << leftCount << " | "
-                  << std::setw(3) << midCount << " | "
-                  << std::setw(5) << rightCount << std::endl;
+        std::cout << std::setw(8) << n << " | " << std::setw(7) << result.numAnchors << " | " << std::setw(8)
+                  << std::fixed << std::setprecision(4) << result.maxError << " | " << std::setw(4) << leftCount
+                  << " | " << std::setw(3) << midCount << " | " << std::setw(5) << rightCount << std::endl;
 
         // CRITICAL: Check for asymmetric clustering
         // For symmetric harmonics, left and right should be roughly balanced
-        if (n >= 10) {  // High-frequency harmonics
+        if (n >= 10) { // High-frequency harmonics
             // Allow 2:1 ratio, but not 10:1 or infinite clustering
             int maxSide = std::max(leftCount, rightCount);
             int minSide = std::min(leftCount, rightCount);
 
-            if (minSide > 0) {  // Avoid divide by zero
+            if (minSide > 0) { // Avoid divide by zero
                 double asymmetryRatio = static_cast<double>(maxSide) / minSide;
-                EXPECT_LT(asymmetryRatio, 5.0)
-                    << "Harmonic " << n << " has severe asymmetric clustering: "
-                    << leftCount << " left vs " << rightCount << " right";
+                EXPECT_LT(asymmetryRatio, 5.0) << "Harmonic " << n << " has severe asymmetric clustering: " << leftCount
+                                               << " left vs " << rightCount << " right";
             }
         }
 
         // Sanity check: shouldn't exceed maxAnchors significantly
         // (allowing small buffer for mandatory feature anchors)
-        EXPECT_LE(result.numAnchors, config.maxAnchors * 2)
-            << "Harmonic " << n << " exceeded anchor limit by 2x!";
+        EXPECT_LE(result.numAnchors, config.maxAnchors * 2) << "Harmonic " << n << " exceeded anchor limit by 2x!";
     }
 }
 
@@ -1308,17 +1263,17 @@ TEST_F(SplineFitterTest, AllHarmonics_MixedWithIdentity) {
         // Analyze spatial distribution
         int leftCount = 0, midCount = 0, rightCount = 0;
         for (const auto& anchor : result.anchors) {
-            if (anchor.x < -0.33) leftCount++;
-            else if (anchor.x > 0.33) rightCount++;
-            else midCount++;
+            if (anchor.x < -0.33)
+                leftCount++;
+            else if (anchor.x > 0.33)
+                rightCount++;
+            else
+                midCount++;
         }
 
-        std::cout << std::setw(8) << n << " | "
-                  << std::setw(7) << result.numAnchors << " | "
-                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
-                  << std::setw(4) << leftCount << " | "
-                  << std::setw(3) << midCount << " | "
-                  << std::setw(5) << rightCount << std::endl;
+        std::cout << std::setw(8) << n << " | " << std::setw(7) << result.numAnchors << " | " << std::setw(8)
+                  << std::fixed << std::setprecision(4) << result.maxError << " | " << std::setw(4) << leftCount
+                  << " | " << std::setw(3) << midCount << " | " << std::setw(5) << rightCount << std::endl;
 
         // Mixed curves should have even better symmetry than pure harmonics
         if (n >= 10) {
@@ -1327,14 +1282,12 @@ TEST_F(SplineFitterTest, AllHarmonics_MixedWithIdentity) {
 
             if (minSide > 0) {
                 double asymmetryRatio = static_cast<double>(maxSide) / minSide;
-                EXPECT_LT(asymmetryRatio, 3.0)
-                    << "Mixed harmonic " << n << " has asymmetric clustering: "
-                    << leftCount << " left vs " << rightCount << " right";
+                EXPECT_LT(asymmetryRatio, 3.0) << "Mixed harmonic " << n << " has asymmetric clustering: " << leftCount
+                                               << " left vs " << rightCount << " right";
             }
         }
 
-        EXPECT_LE(result.numAnchors, config.maxAnchors * 2)
-            << "Mixed harmonic " << n << " exceeded anchor limit!";
+        EXPECT_LE(result.numAnchors, config.maxAnchors * 2) << "Mixed harmonic " << n << " exceeded anchor limit!";
     }
 }
 
@@ -1400,11 +1353,14 @@ TEST_F(SplineFitterTest, RegressionTest_EnhancementsComparison) {
     std::cout << "COMPARISON:" << std::endl;
     std::cout << "  Baseline (no enhancements):     " << std::setprecision(4) << resultWithout.maxError << std::endl;
     std::cout << "  Zero-crossing only:             " << std::setprecision(4) << resultZCOnly.maxError
-              << " (diff: " << std::showpos << (resultZCOnly.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+              << " (diff: " << std::showpos << (resultZCOnly.maxError - resultWithout.maxError) << ")" << std::noshowpos
+              << std::endl;
     std::cout << "  Symmetry only:                  " << std::setprecision(4) << resultSymOnly.maxError
-              << " (diff: " << std::showpos << (resultSymOnly.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+              << " (diff: " << std::showpos << (resultSymOnly.maxError - resultWithout.maxError) << ")"
+              << std::noshowpos << std::endl;
     std::cout << "  Both enhancements:              " << std::setprecision(4) << resultWith.maxError
-              << " (diff: " << std::showpos << (resultWith.maxError - resultWithout.maxError) << ")" << std::noshowpos << std::endl;
+              << " (diff: " << std::showpos << (resultWith.maxError - resultWithout.maxError) << ")" << std::noshowpos
+              << std::endl;
     std::cout << std::endl;
 
     if (resultWith.maxError > resultWithout.maxError * 1.1) {
@@ -1449,13 +1405,15 @@ TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
         int printCount = std::min(10, static_cast<int>(result.anchors.size()));
         for (int i = 0; i < printCount; ++i) {
             std::cout << std::fixed << std::setprecision(3) << result.anchors[i].x;
-            if (i < printCount - 1) std::cout << ", ";
+            if (i < printCount - 1)
+                std::cout << ", ";
         }
         if (result.anchors.size() > 20) {
             std::cout << " ... ";
             for (size_t i = result.anchors.size() - 10; i < result.anchors.size(); ++i) {
                 std::cout << std::fixed << std::setprecision(3) << result.anchors[i].x;
-                if (i < result.anchors.size() - 1) std::cout << ", ";
+                if (i < result.anchors.size() - 1)
+                    std::cout << ", ";
             }
         }
         std::cout << std::endl;
@@ -1464,12 +1422,13 @@ TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
         // relatively evenly. A sign of the bug is if most anchors cluster on left.
         int leftHalf = 0;
         for (const auto& anchor : result.anchors) {
-            if (anchor.x < 0.0) leftHalf++;
+            if (anchor.x < 0.0)
+                leftHalf++;
         }
 
         double leftRatio = static_cast<double>(leftHalf) / result.numAnchors;
-        std::cout << "  Left-side clustering: " << leftHalf << "/" << result.numAnchors
-                  << " (" << std::fixed << std::setprecision(1) << (leftRatio * 100) << "%)" << std::endl;
+        std::cout << "  Left-side clustering: " << leftHalf << "/" << result.numAnchors << " (" << std::fixed
+                  << std::setprecision(1) << (leftRatio * 100) << "%)" << std::endl;
 
         // Expect roughly 50/50 distribution for symmetric curves
         EXPECT_GE(leftRatio, 0.3) << "Harmonic " << n << " has too few left-side anchors";
@@ -1502,7 +1461,7 @@ TEST_F(SplineFitterTest, HighFrequencyHarmonics_DetailedAnalysis) {
  * information loss during bake/refit cycles
  */
 class BacktranslationTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // High resolution: 16384 samples to minimize quantization error
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
@@ -1521,7 +1480,7 @@ protected:
      * @return Number of anchors after backtranslation
      */
     dsp_core::SplineFitResult backtranslateAnchors(const std::vector<dsp_core::SplineAnchor>& originalAnchors,
-                             const dsp_core::SplineFitConfig& config) {
+                                                   const dsp_core::SplineFitConfig& config) {
         // Step 1: Evaluate original anchors to high-resolution samples
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             double x = ltf->normalizeIndex(i);
@@ -1548,8 +1507,8 @@ protected:
 TEST_F(BacktranslationTest, LinearCurve_TwoAnchors_RefitsToTwo) {
     // Original curve: Simple identity line (2 anchors)
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, -1.0, false, 1.0},  // Left endpoint, slope = 1
-        {1.0, 1.0, false, 1.0}     // Right endpoint, slope = 1
+        {-1.0, -1.0, false, 1.0}, // Left endpoint, slope = 1
+        {1.0, 1.0, false, 1.0}    // Right endpoint, slope = 1
     };
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1561,7 +1520,7 @@ TEST_F(BacktranslationTest, LinearCurve_TwoAnchors_RefitsToTwo) {
     // Actual (BUG): 15-20 anchors
     EXPECT_GE(result.numAnchors, 2) << "Should have at least endpoint anchors";
     EXPECT_LE(result.numAnchors, 3) << "Linear curve should not need more than 3 anchors. "
-                              << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
+                                    << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1575,9 +1534,9 @@ TEST_F(BacktranslationTest, SingleExtremum_ThreeAnchors_RefitsToThree) {
     // Original curve: Parabola with peak at x=0
     // y = 1 - x^2 (peak at (0, 1))
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 0.0},   // Left endpoint
-        {0.0, 1.0, false, 0.0},    // Peak (zero tangent)
-        {1.0, 0.0, false, 0.0}     // Right endpoint
+        {-1.0, 0.0, false, 0.0}, // Left endpoint
+        {0.0, 1.0, false, 0.0},  // Peak (zero tangent)
+        {1.0, 0.0, false, 0.0}   // Right endpoint
     };
 
     // Compute PCHIP tangents for the anchors
@@ -1591,7 +1550,7 @@ TEST_F(BacktranslationTest, SingleExtremum_ThreeAnchors_RefitsToThree) {
     // Expected: 3-5 anchors (peak + endpoints + small tolerance)
     EXPECT_GE(result.numAnchors, 3) << "Should have at least 3 anchors (peak + endpoints)";
     EXPECT_LE(result.numAnchors, 5) << "Simple parabola should need 3-5 anchors. "
-                              << "Got " << result.numAnchors << " (backtranslation instability)";
+                                    << "Got " << result.numAnchors << " (backtranslation instability)";
 }
 
 /**
@@ -1605,10 +1564,10 @@ TEST_F(BacktranslationTest, TwoExtrema_FourAnchors_RefitsToFour) {
     // Original curve: Sine-like wave with one peak and one valley
     // 4 anchors: left, valley, peak, right
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 1.0},    // Left endpoint
-        {-0.5, -0.8, false, 0.0},   // Valley
-        {0.5, 0.8, false, 0.0},     // Peak
-        {1.0, 0.0, false, -1.0}     // Right endpoint
+        {-1.0, 0.0, false, 1.0},  // Left endpoint
+        {-0.5, -0.8, false, 0.0}, // Valley
+        {0.5, 0.8, false, 0.0},   // Peak
+        {1.0, 0.0, false, -1.0}   // Right endpoint
     };
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1622,7 +1581,7 @@ TEST_F(BacktranslationTest, TwoExtrema_FourAnchors_RefitsToFour) {
     // PCHIP interpolation creates subtle curvature that requires a few extra anchors
     EXPECT_GE(result.numAnchors, 4) << "Should have at least 4 anchors (2 extrema + endpoints)";
     EXPECT_LE(result.numAnchors, 10) << "Curve with 2 extrema should need 4-10 anchors. "
-                              << "Got " << result.numAnchors << " (anchor creeping if much higher)";
+                                     << "Got " << result.numAnchors << " (anchor creeping if much higher)";
 }
 
 /**
@@ -1635,12 +1594,12 @@ TEST_F(BacktranslationTest, TwoExtrema_FourAnchors_RefitsToFour) {
 TEST_F(BacktranslationTest, FiveExtrema_SixAnchors_RefitsToSix) {
     // Original curve: Multiple oscillations (5 extrema)
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 0.0},    // Left endpoint
-        {-0.6, 0.5, false, 0.0},    // Peak 1
-        {-0.2, -0.5, false, 0.0},   // Valley 1
-        {0.2, 0.5, false, 0.0},     // Peak 2
-        {0.6, -0.5, false, 0.0},    // Valley 2
-        {1.0, 0.0, false, 0.0}      // Right endpoint
+        {-1.0, 0.0, false, 0.0},  // Left endpoint
+        {-0.6, 0.5, false, 0.0},  // Peak 1
+        {-0.2, -0.5, false, 0.0}, // Valley 1
+        {0.2, 0.5, false, 0.0},   // Peak 2
+        {0.6, -0.5, false, 0.0},  // Valley 2
+        {1.0, 0.0, false, 0.0}    // Right endpoint
     };
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1654,7 +1613,7 @@ TEST_F(BacktranslationTest, FiveExtrema_SixAnchors_RefitsToSix) {
     // Actual (BUG): 30-50 anchors
     EXPECT_GE(result.numAnchors, 6) << "Should have at least 6 anchors (5 extrema + endpoints)";
     EXPECT_LE(result.numAnchors, 10) << "Curve with 5 extrema should need 6-10 anchors. "
-                               << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
+                                     << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1668,15 +1627,15 @@ TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
     // Original curve: Sine wave sin(πx) over [-1, 1]
     // This creates ~1 full period with peak at x=0.5 and valley at x=-0.5
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 0.0},      // Left endpoint
-        {-0.75, -0.707, false, 0.0},  // Descending
-        {-0.5, -1.0, false, 0.0},     // Valley
-        {-0.25, -0.707, false, 0.0},  // Ascending
-        {0.0, 0.0, false, 1.0},       // Zero crossing
-        {0.25, 0.707, false, 0.0},    // Ascending
-        {0.5, 1.0, false, 0.0},       // Peak
-        {0.75, 0.707, false, 0.0},    // Descending
-        {1.0, 0.0, false, -1.0}       // Right endpoint
+        {-1.0, 0.0, false, 0.0},     // Left endpoint
+        {-0.75, -0.707, false, 0.0}, // Descending
+        {-0.5, -1.0, false, 0.0},    // Valley
+        {-0.25, -0.707, false, 0.0}, // Ascending
+        {0.0, 0.0, false, 1.0},      // Zero crossing
+        {0.25, 0.707, false, 0.0},   // Ascending
+        {0.5, 1.0, false, 0.0},      // Peak
+        {0.75, 0.707, false, 0.0},   // Descending
+        {1.0, 0.0, false, -1.0}      // Right endpoint
     };
 
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -1690,7 +1649,7 @@ TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
     // Actual (BUG): 25-40 anchors
     EXPECT_GE(result.numAnchors, 7) << "Should have at least 7 anchors for sine wave";
     EXPECT_LE(result.numAnchors, 12) << "Sine wave should need 7-12 anchors. "
-                               << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
+                                     << "Got " << result.numAnchors << " (ANCHOR CREEPING BUG)";
 }
 
 /**
@@ -1707,7 +1666,7 @@ TEST_F(BacktranslationTest, SineWave_BacktranslationStability) {
  * - Harmonic 10: 10-18 anchors (9 extrema)
  */
 TEST_F(BacktranslationTest, ProgressiveComplexity_AnchorCountScaling) {
-    auto config = dsp_core::SplineFitConfig::smooth();  // maxAnchors = 24
+    auto config = dsp_core::SplineFitConfig::smooth(); // maxAnchors = 24
 
     std::cout << "\n=== Progressive Complexity: Anchor Count Scaling ===" << std::endl;
     std::cout << "Harmonic | Extrema | Anchors | Status" << std::endl;
@@ -1727,10 +1686,8 @@ TEST_F(BacktranslationTest, ProgressiveComplexity_AnchorCountScaling) {
 
         std::string status = "OK";
 
-        std::cout << std::setw(8) << n << " | "
-                  << std::setw(7) << extremaCount << " | "
-                  << std::setw(7) << result.numAnchors << " | "
-                  << status << std::endl;
+        std::cout << std::setw(8) << n << " | " << std::setw(7) << extremaCount << " | " << std::setw(7)
+                  << result.numAnchors << " | " << status << std::endl;
     }
 
     // Verify expected anchor ranges for key harmonics
@@ -1758,7 +1715,7 @@ TEST_F(BacktranslationTest, ProgressiveComplexity_AnchorCountScaling) {
 
     // Verify monotonic increase or plateau (allowing small variations)
     for (size_t i = 1; i < anchorCounts.size(); ++i) {
-        EXPECT_GE(anchorCounts[i], anchorCounts[i-1] - 2)
+        EXPECT_GE(anchorCounts[i], anchorCounts[i - 1] - 2)
             << "Anchor count should generally increase or plateau with complexity";
     }
 }
@@ -1777,15 +1734,11 @@ TEST_F(BacktranslationTest, ProgressiveComplexity_ErrorQuality) {
     std::cout << "---------|----------|-----------|--------" << std::endl;
 
     // Test harmonics across complexity spectrum
-    std::vector<std::pair<int, double>> testCases = {
-        {1, 0.01},   // Low complexity: very tight error
-        {2, 0.01},
-        {3, 0.01},
-        {5, 0.05},   // Medium complexity: moderate error
-        {7, 0.05},
-        {9, 0.10},   // High complexity: relaxed error
-        {10, 0.10}
-    };
+    std::vector<std::pair<int, double>> testCases = {{1, 0.01}, // Low complexity: very tight error
+                                                     {2, 0.01}, {3, 0.01},
+                                                     {5, 0.05},            // Medium complexity: moderate error
+                                                     {7, 0.05}, {9, 0.10}, // High complexity: relaxed error
+                                                     {10, 0.10}};
 
     for (const auto& [harmonic, threshold] : testCases) {
         setHarmonicCurve(*ltf, harmonic);
@@ -1795,13 +1748,10 @@ TEST_F(BacktranslationTest, ProgressiveComplexity_ErrorQuality) {
 
         std::string status = result.maxError < threshold ? "PASS" : "FAIL";
 
-        std::cout << std::setw(8) << harmonic << " | "
-                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
-                  << std::setw(9) << threshold << " | "
-                  << status << std::endl;
+        std::cout << std::setw(8) << harmonic << " | " << std::setw(8) << std::fixed << std::setprecision(4)
+                  << result.maxError << " | " << std::setw(9) << threshold << " | " << status << std::endl;
 
-        EXPECT_LT(result.maxError, threshold)
-            << "Harmonic " << harmonic << " exceeds error threshold";
+        EXPECT_LT(result.maxError, threshold) << "Harmonic " << harmonic << " exceeds error threshold";
     }
 }
 
@@ -1868,10 +1818,7 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
     std::cout << "\n--- Test 1: Parabola Backtranslation ---" << std::endl;
     {
         std::vector<dsp_core::SplineAnchor> originalAnchors = {
-            {-1.0, 0.0, false, 0.0},
-            {0.0, 1.0, false, 0.0},
-            {1.0, 0.0, false, 0.0}
-        };
+            {-1.0, 0.0, false, 0.0}, {0.0, 1.0, false, 0.0}, {1.0, 0.0, false, 0.0}};
         dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
         auto result = backtranslateAnchors(originalAnchors, config);
@@ -1886,11 +1833,7 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
     std::cout << "\n--- Test 2: Two Extrema Backtranslation ---" << std::endl;
     {
         std::vector<dsp_core::SplineAnchor> originalAnchors = {
-            {-1.0, 0.0, false, 1.0},
-            {-0.5, -0.8, false, 0.0},
-            {0.5, 0.8, false, 0.0},
-            {1.0, 0.0, false, -1.0}
-        };
+            {-1.0, 0.0, false, 1.0}, {-0.5, -0.8, false, 0.0}, {0.5, 0.8, false, 0.0}, {1.0, 0.0, false, -1.0}};
         dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
         auto result = backtranslateAnchors(originalAnchors, config);
@@ -1916,8 +1859,7 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
         ASSERT_TRUE(result.success) << "Harmonic " << n << " fit failed with pruning";
         anchorCounts.push_back(result.numAnchors);
 
-        std::cout << std::setw(8) << n << " | "
-                  << std::setw(7) << result.numAnchors << " | "
+        std::cout << std::setw(8) << n << " | " << std::setw(7) << result.numAnchors << " | "
                   << "OK" << std::endl;
     }
 
@@ -1947,9 +1889,7 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
     std::cout << "Harmonic | MaxError | Threshold | Status" << std::endl;
     std::cout << "---------|----------|-----------|--------" << std::endl;
 
-    std::vector<std::pair<int, double>> errorTests = {
-        {1, 0.01}, {3, 0.01}, {5, 0.05}, {10, 0.10}
-    };
+    std::vector<std::pair<int, double>> errorTests = {{1, 0.01}, {3, 0.01}, {5, 0.05}, {10, 0.10}};
 
     for (const auto& [harmonic, threshold] : errorTests) {
         setHarmonicCurve(*ltf, harmonic);
@@ -1958,13 +1898,10 @@ TEST_F(BacktranslationTest, Pruning_NoRegressionInTasks4_5) {
         ASSERT_TRUE(result.success) << "Harmonic " << harmonic << " fit failed";
 
         std::string status = result.maxError < threshold ? "PASS" : "FAIL";
-        std::cout << std::setw(8) << harmonic << " | "
-                  << std::setw(8) << std::fixed << std::setprecision(4) << result.maxError << " | "
-                  << std::setw(9) << threshold << " | "
-                  << status << std::endl;
+        std::cout << std::setw(8) << harmonic << " | " << std::setw(8) << std::fixed << std::setprecision(4)
+                  << result.maxError << " | " << std::setw(9) << threshold << " | " << status << std::endl;
 
-        EXPECT_LT(result.maxError, threshold)
-            << "Harmonic " << harmonic << " exceeds error threshold with pruning";
+        EXPECT_LT(result.maxError, threshold) << "Harmonic " << harmonic << " exceeds error threshold with pruning";
     }
 
     std::cout << "\n✓ Pruning does not cause regression in Tasks 4-5" << std::endl;
@@ -1999,8 +1936,8 @@ TEST_F(BacktranslationTest, Scribble_HighFrequencyNoise_Simplified) {
     // Noise: sin(50 * 2π * x) with amplitude 0.05
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
-        double baseValue = x;  // Identity
-        double noise = 0.05 * std::sin(50.0 * 2.0 * M_PI * x);  // High-frequency, small amplitude
+        double baseValue = x;                                  // Identity
+        double noise = 0.05 * std::sin(50.0 * 2.0 * M_PI * x); // High-frequency, small amplitude
         ltf->setBaseLayerValue(i, baseValue + noise);
     }
 
@@ -2017,16 +1954,14 @@ TEST_F(BacktranslationTest, Scribble_HighFrequencyNoise_Simplified) {
     std::cout << "Processing time: " << duration.count() << " ms (expected <100ms)" << std::endl;
 
     // Should simplify to reasonable count (not follow every bump)
-    EXPECT_LT(result.numAnchors, 15)
-        << "High-frequency noise should simplify to <15 anchors, not " << result.numAnchors;
+    EXPECT_LT(result.numAnchors, 15) << "High-frequency noise should simplify to <15 anchors, not "
+                                     << result.numAnchors;
 
     // Should preserve overall shape despite noise
-    EXPECT_LT(result.maxError, 0.10)
-        << "Should have acceptable error despite simplification";
+    EXPECT_LT(result.maxError, 0.10) << "Should have acceptable error despite simplification";
 
     // Should complete in reasonable time (16k samples = higher baseline)
-    EXPECT_LT(duration.count(), 500)
-        << "High-frequency noise fit should complete in <500ms";
+    EXPECT_LT(duration.count(), 500) << "High-frequency noise fit should complete in <500ms";
 }
 
 /**
@@ -2051,17 +1986,17 @@ TEST_F(BacktranslationTest, Scribble_RandomWalk_Simplified) {
     std::cout << "\n=== Scribble Test 2: Random Walk ===" << std::endl;
 
     // Create random walk curve (100 random segments)
-    std::srand(12345);  // Fixed seed for reproducibility
+    std::srand(12345); // Fixed seed for reproducibility
 
-    double y = 0.0;  // Start at center
+    double y = 0.0; // Start at center
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
 
         // Random walk: add small random step every ~160 samples (16384/100)
         if (i % 164 == 0) {
-            double randomStep = (static_cast<double>(std::rand()) / RAND_MAX) * 0.2 - 0.1;  // [-0.1, 0.1]
+            double randomStep = (static_cast<double>(std::rand()) / RAND_MAX) * 0.2 - 0.1; // [-0.1, 0.1]
             y += randomStep;
-            y = std::max(-1.0, std::min(1.0, y));  // Clamp to valid range
+            y = std::max(-1.0, std::min(1.0, y)); // Clamp to valid range
         }
 
         ltf->setBaseLayerValue(i, y);
@@ -2081,16 +2016,14 @@ TEST_F(BacktranslationTest, Scribble_RandomWalk_Simplified) {
     std::cout << "Processing time: " << duration.count() << " ms (expected <100ms)" << std::endl;
 
     // Should dramatically simplify (not one anchor per segment)
-    EXPECT_LT(result.numAnchors, 30)
-        << "Random walk with 100 segments should simplify to <30 anchors, not " << result.numAnchors;
+    EXPECT_LT(result.numAnchors, 30) << "Random walk with 100 segments should simplify to <30 anchors, not "
+                                     << result.numAnchors;
 
     // Should preserve overall path
-    EXPECT_LT(result.maxError, 0.15)
-        << "Should have acceptable error for random walk";
+    EXPECT_LT(result.maxError, 0.15) << "Should have acceptable error for random walk";
 
     // Should complete in reasonable time (16k samples = higher baseline)
-    EXPECT_LT(duration.count(), 500)
-        << "Random walk fit should complete in <500ms";
+    EXPECT_LT(duration.count(), 500) << "Random walk fit should complete in <500ms";
 }
 
 /**
@@ -2167,28 +2100,22 @@ TEST_F(BacktranslationTest, Scribble_LocalizedNoise_DoesNotAffectStraightRegions
     std::cout << "Processing time: " << duration.count() << " ms (expected <500ms)" << std::endl;
 
     // Straight regions should have minimal anchors
-    EXPECT_LE(leftAnchors, 3)
-        << "Left straight region should need ≤3 anchors, not " << leftAnchors;
+    EXPECT_LE(leftAnchors, 3) << "Left straight region should need ≤3 anchors, not " << leftAnchors;
 
-    EXPECT_LE(rightAnchors, 3)
-        << "Right straight region should need ≤3 anchors, not " << rightAnchors;
+    EXPECT_LE(rightAnchors, 3) << "Right straight region should need ≤3 anchors, not " << rightAnchors;
 
     // Middle noisy region can have more, but should still be contained
     // Note: With excellent simplification, even noisy regions may need few anchors
-    EXPECT_GE(middleAnchors, 0)
-        << "Middle noisy region should have non-negative anchors";
+    EXPECT_GE(middleAnchors, 0) << "Middle noisy region should have non-negative anchors";
 
     // Overall anchor count should still be reasonable
-    EXPECT_LT(result.numAnchors, 20)
-        << "Total anchor count should be reasonable even with localized noise";
+    EXPECT_LT(result.numAnchors, 20) << "Total anchor count should be reasonable even with localized noise";
 
     // Should have acceptable error
-    EXPECT_LT(result.maxError, 0.15)
-        << "Should have acceptable error for localized noise";
+    EXPECT_LT(result.maxError, 0.15) << "Should have acceptable error for localized noise";
 
     // Should complete in reasonable time (16k samples = higher baseline)
-    EXPECT_LT(duration.count(), 500)
-        << "Localized noise fit should complete in <500ms";
+    EXPECT_LT(duration.count(), 500) << "Localized noise fit should complete in <500ms";
 }
 
 // ============================================================================
@@ -2222,49 +2149,43 @@ TEST_F(SplineFitterTest, Performance_AdaptiveAlgorithm_Baseline) {
         int maxTimeMs;
     };
 
-    std::vector<TestCase> testCases = {
-        {"Linear (y=x)", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
-            }
-        }, 50},
-        {"Parabola", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                double x = ltf.normalizeIndex(i);
-                ltf.setBaseLayerValue(i, x * x);
-            }
-        }, 50},
-        {"Sine Wave", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                double x = ltf.normalizeIndex(i);
-                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
-            }
-        }, 100},
-        {"Tanh (steep)", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                double x = ltf.normalizeIndex(i);
-                ltf.setBaseLayerValue(i, std::tanh(10.0 * x));
-            }
-        }, 100},
-        {"Harmonic 5", [](auto& ltf) {
-            setHarmonicCurve(ltf, 5);
-        }, 100},
-        {"Harmonic 10", [](auto& ltf) {
-            setHarmonicCurve(ltf, 10);
-        }, 100},
-        {"Harmonic 15", [](auto& ltf) {
-            setHarmonicCurve(ltf, 15);
-        }, 100},
-        {"Harmonic 20", [](auto& ltf) {
-            setHarmonicCurve(ltf, 20);
-        }, 100},
-        {"Harmonic 25", [](auto& ltf) {
-            setHarmonicCurve(ltf, 25);
-        }, 150},
-        {"Harmonic 30", [](auto& ltf) {
-            setHarmonicCurve(ltf, 30);
-        }, 150}
-    };
+    std::vector<TestCase> testCases = {{"Linear (y=x)",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
+                                            }
+                                        },
+                                        50},
+                                       {"Parabola",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                double x = ltf.normalizeIndex(i);
+                                                ltf.setBaseLayerValue(i, x * x);
+                                            }
+                                        },
+                                        50},
+                                       {"Sine Wave",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                double x = ltf.normalizeIndex(i);
+                                                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
+                                            }
+                                        },
+                                        100},
+                                       {"Tanh (steep)",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                double x = ltf.normalizeIndex(i);
+                                                ltf.setBaseLayerValue(i, std::tanh(10.0 * x));
+                                            }
+                                        },
+                                        100},
+                                       {"Harmonic 5", [](auto& ltf) { setHarmonicCurve(ltf, 5); }, 100},
+                                       {"Harmonic 10", [](auto& ltf) { setHarmonicCurve(ltf, 10); }, 100},
+                                       {"Harmonic 15", [](auto& ltf) { setHarmonicCurve(ltf, 15); }, 100},
+                                       {"Harmonic 20", [](auto& ltf) { setHarmonicCurve(ltf, 20); }, 100},
+                                       {"Harmonic 25", [](auto& ltf) { setHarmonicCurve(ltf, 25); }, 150},
+                                       {"Harmonic 30", [](auto& ltf) { setHarmonicCurve(ltf, 30); }, 150}};
 
     long long totalTime = 0;
     int passCount = 0;
@@ -2281,12 +2202,11 @@ TEST_F(SplineFitterTest, Performance_AdaptiveAlgorithm_Baseline) {
 
         bool passed = duration.count() <= test.maxTimeMs;
         totalTime += duration.count();
-        if (passed) passCount++;
+        if (passed)
+            passCount++;
 
-        std::cout << std::setw(20) << std::left << test.name << " | "
-                  << std::setw(9) << std::right << duration.count() << " | "
-                  << std::setw(7) << result.numAnchors << " | "
-                  << (passed ? "PASS" : "FAIL") << std::endl;
+        std::cout << std::setw(20) << std::left << test.name << " | " << std::setw(9) << std::right << duration.count()
+                  << " | " << std::setw(7) << result.numAnchors << " | " << (passed ? "PASS" : "FAIL") << std::endl;
 
         EXPECT_LE(duration.count(), test.maxTimeMs)
             << test.name << " took " << duration.count() << "ms (expected <" << test.maxTimeMs << "ms)";
@@ -2297,8 +2217,7 @@ TEST_F(SplineFitterTest, Performance_AdaptiveAlgorithm_Baseline) {
 
     // Overall average should be reasonable
     double avgTime = static_cast<double>(totalTime) / testCases.size();
-    EXPECT_LT(avgTime, 100.0)
-        << "Average time per curve should be <100ms, got " << avgTime << "ms";
+    EXPECT_LT(avgTime, 100.0) << "Average time per curve should be <100ms, got " << avgTime << "ms";
 }
 
 /**
@@ -2324,29 +2243,27 @@ TEST_F(SplineFitterTest, Performance_LargeDataset_16kSamples) {
     std::cout << "Curve Type     | Time (ms) | Anchors | Status" << std::endl;
     std::cout << "---------------|-----------|---------|--------" << std::endl;
 
-    const int maxTimeMs = 300;  // 16k samples need more time than 256 samples
+    const int maxTimeMs = 300; // 16k samples need more time than 256 samples
 
     struct TestCase {
         std::string name;
         std::function<void(dsp_core::LayeredTransferFunction&)> setupFunc;
     };
 
-    std::vector<TestCase> testCases = {
-        {"Linear", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
-            }
-        }},
-        {"Sine Wave", [](auto& ltf) {
-            for (int i = 0; i < ltf.getTableSize(); ++i) {
-                double x = ltf.normalizeIndex(i);
-                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
-            }
-        }},
-        {"Harmonic 10", [](auto& ltf) {
-            setHarmonicCurve(ltf, 10);
-        }}
-    };
+    std::vector<TestCase> testCases = {{"Linear",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                ltf.setBaseLayerValue(i, ltf.normalizeIndex(i));
+                                            }
+                                        }},
+                                       {"Sine Wave",
+                                        [](auto& ltf) {
+                                            for (int i = 0; i < ltf.getTableSize(); ++i) {
+                                                double x = ltf.normalizeIndex(i);
+                                                ltf.setBaseLayerValue(i, std::sin(x * M_PI));
+                                            }
+                                        }},
+                                       {"Harmonic 10", [](auto& ltf) { setHarmonicCurve(ltf, 10); }}};
 
     for (const auto& test : testCases) {
         test.setupFunc(*ltfHiRes);
@@ -2360,10 +2277,8 @@ TEST_F(SplineFitterTest, Performance_LargeDataset_16kSamples) {
 
         bool passed = duration.count() < maxTimeMs;
 
-        std::cout << std::setw(14) << std::left << test.name << " | "
-                  << std::setw(9) << std::right << duration.count() << " | "
-                  << std::setw(7) << result.numAnchors << " | "
-                  << (passed ? "PASS" : "FAIL") << std::endl;
+        std::cout << std::setw(14) << std::left << test.name << " | " << std::setw(9) << std::right << duration.count()
+                  << " | " << std::setw(7) << result.numAnchors << " | " << (passed ? "PASS" : "FAIL") << std::endl;
 
         EXPECT_LT(duration.count(), maxTimeMs)
             << test.name << " with 16k samples took " << duration.count() << "ms (expected <" << maxTimeMs << "ms)";
@@ -2404,16 +2319,13 @@ TEST_F(SplineFitterTest, Performance_WorstCase_ComplexHarmonic) {
     std::cout << "  Status: " << (duration.count() < 500 ? "PASS" : "FAIL") << std::endl;
 
     // Worst case should still complete in reasonable time
-    EXPECT_LT(duration.count(), 500)
-        << "Harmonic 25 worst-case took " << duration.count() << "ms (expected <500ms)";
+    EXPECT_LT(duration.count(), 500) << "Harmonic 25 worst-case took " << duration.count() << "ms (expected <500ms)";
 
     // Should still produce reasonable anchor count
-    EXPECT_LE(result.numAnchors, 24)
-        << "Harmonic 25 should fit within maxAnchors budget";
+    EXPECT_LE(result.numAnchors, 24) << "Harmonic 25 should fit within maxAnchors budget";
 
     // Should have acceptable error
-    EXPECT_LT(result.maxError, 0.01)
-        << "Harmonic 25 should have acceptable error";
+    EXPECT_LT(result.maxError, 0.01) << "Harmonic 25 should have acceptable error";
 }
 
 //==============================================================================
@@ -2424,7 +2336,7 @@ TEST_F(SplineFitterTest, Performance_WorstCase_ComplexHarmonic) {
  * Test fixture for zero-crossing tests
  */
 class ZeroCrossingTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
     }
@@ -2476,7 +2388,7 @@ TEST_F(ZeroCrossingTest, TanhNoAnchorsAtZero_AddsCorrectiveAnchor) {
     setTanhCurve(5.0);
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    config.maxAnchors = 6;  // Tight budget but allows room for corrective anchor
+    config.maxAnchors = 6; // Tight budget but allows room for corrective anchor
     config.enableZeroCrossingCheck = true;
     config.zeroCrossingTolerance = 0.01;
 
@@ -2534,8 +2446,7 @@ TEST_F(ZeroCrossingTest, SymmetricAnchors_NoInterventionNeeded) {
 
     // Verify drift at x=0 is minimal
     double fittedYAtZero = dsp_core::Services::SplineEvaluator::evaluate(result.anchors, 0.0);
-    EXPECT_LT(std::abs(fittedYAtZero), config.zeroCrossingTolerance)
-        << "Drift at x=0 should be minimal (< tolerance)";
+    EXPECT_LT(std::abs(fittedYAtZero), config.zeroCrossingTolerance) << "Drift at x=0 should be minimal (< tolerance)";
 }
 
 /**
@@ -2562,8 +2473,7 @@ TEST_F(ZeroCrossingTest, OffsetCurve_NoIntervention) {
     int centerIdx = ltf->getTableSize() / 2;
     double baseYAtZero = ltf->getBaseLayerValue(centerIdx);
 
-    EXPECT_GT(std::abs(baseYAtZero), config.zeroCrossingTolerance)
-        << "Offset curve should not have zero-crossing";
+    EXPECT_GT(std::abs(baseYAtZero), config.zeroCrossingTolerance) << "Offset curve should not have zero-crossing";
 }
 
 /**
@@ -2580,8 +2490,8 @@ TEST_F(ZeroCrossingTest, DisabledInConfig_NoIntervention) {
     setTanhCurve(5.0);
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    config.maxAnchors = 4;  // Sparse placement
-    config.enableZeroCrossingCheck = false;  // DISABLED
+    config.maxAnchors = 4;                  // Sparse placement
+    config.enableZeroCrossingCheck = false; // DISABLED
     config.zeroCrossingTolerance = 0.01;
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -2609,7 +2519,7 @@ TEST_F(ZeroCrossingTest, AnchorBudgetExceeded_SkipsCorrection) {
     setTanhCurve(5.0);
 
     auto config = dsp_core::SplineFitConfig::smooth();
-    config.maxAnchors = 3;  // Very tight budget
+    config.maxAnchors = 3; // Very tight budget
     config.enableZeroCrossingCheck = true;
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -2617,8 +2527,7 @@ TEST_F(ZeroCrossingTest, AnchorBudgetExceeded_SkipsCorrection) {
     ASSERT_TRUE(result.success) << "Tanh fit failed";
 
     // Should respect anchor budget
-    EXPECT_LE(result.numAnchors, config.maxAnchors)
-        << "Should respect maxAnchors budget";
+    EXPECT_LE(result.numAnchors, config.maxAnchors) << "Should respect maxAnchors budget";
 }
 
 /**
@@ -2641,19 +2550,14 @@ TEST_F(ZeroCrossingTest, InterpolationAccuracy_EvenTableSize) {
 
     // Create minimal anchors for testing analyzeZeroCrossing
     std::vector<dsp_core::SplineAnchor> anchors = {
-        {-1.0, -1.0, false, 0.0},
-        {0.0, 0.0, false, 0.0},
-        {1.0, 1.0, false, 0.0}
-    };
+        {-1.0, -1.0, false, 0.0}, {0.0, 0.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
 
     auto zcInfo = dsp_core::Services::SplineFitter::analyzeZeroCrossing(*ltf, anchors, config);
 
     // Verify interpolation accuracy
-    EXPECT_LT(std::abs(zcInfo.baseYAtZero), 1e-6)
-        << "Interpolated y(0) should be ≈ 0.0 for cubic curve";
+    EXPECT_LT(std::abs(zcInfo.baseYAtZero), 1e-6) << "Interpolated y(0) should be ≈ 0.0 for cubic curve";
 
-    EXPECT_TRUE(zcInfo.baseCurveHasZeroCrossing)
-        << "Should detect zero-crossing for cubic curve";
+    EXPECT_TRUE(zcInfo.baseCurveHasZeroCrossing) << "Should detect zero-crossing for cubic curve";
 }
 
 //==============================================================================
@@ -2687,17 +2591,17 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_CubicPolynomial_PairedAnchors) {
     int totalNonCenter = 0;
 
     for (const auto& anchor : result.anchors) {
-        if (std::abs(anchor.x) < 1e-4) continue;  // Skip near-center
+        if (std::abs(anchor.x) < 1e-4)
+            continue; // Skip near-center
 
         totalNonCenter++;
 
         // Find complementary anchor
         for (const auto& other : result.anchors) {
-            if (std::abs(other.x + anchor.x) < 1e-4) {  // other.x ≈ -anchor.x
+            if (std::abs(other.x + anchor.x) < 1e-4) { // other.x ≈ -anchor.x
                 pairedCount++;
                 // Verify reasonably symmetric y values
-                EXPECT_NEAR(anchor.y, -other.y, 0.1)
-                    << "Y values should be approximately symmetric";
+                EXPECT_NEAR(anchor.y, -other.y, 0.1) << "Y values should be approximately symmetric";
                 break;
             }
         }
@@ -2707,8 +2611,8 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_CubicPolynomial_PairedAnchors) {
     // (allows for feature anchors to be unpaired)
     if (totalNonCenter > 0) {
         double pairRatio = static_cast<double>(pairedCount) / totalNonCenter;
-        EXPECT_GE(pairRatio, 0.7)
-            << "Most anchors should be paired (got " << pairedCount << "/" << totalNonCenter << ")";
+        EXPECT_GE(pairRatio, 0.7) << "Most anchors should be paired (got " << pairedCount << "/" << totalNonCenter
+                                  << ")";
     }
 
     // Verify quality
@@ -2738,14 +2642,14 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_TanhCurve_AutoDetect) {
     int totalNonCenter = 0;
 
     for (const auto& anchor : result.anchors) {
-        if (std::abs(anchor.x) < 1e-4) continue;  // Skip near-center
+        if (std::abs(anchor.x) < 1e-4)
+            continue; // Skip near-center
 
         totalNonCenter++;
 
-        bool foundComplement = std::any_of(result.anchors.begin(), result.anchors.end(),
-            [&anchor](const dsp_core::SplineAnchor& other) {
-                return std::abs(other.x + anchor.x) < 1e-4;
-            });
+        bool foundComplement =
+            std::any_of(result.anchors.begin(), result.anchors.end(),
+                        [&anchor](const dsp_core::SplineAnchor& other) { return std::abs(other.x + anchor.x) < 1e-4; });
 
         if (foundComplement) {
             pairedCount++;
@@ -2756,9 +2660,8 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_TanhCurve_AutoDetect) {
     // (Auto mode should detect symmetry, but feature anchors may be unpaired)
     if (totalNonCenter > 0) {
         double pairRatio = static_cast<double>(pairedCount) / totalNonCenter;
-        EXPECT_GE(pairRatio, 0.7)
-            << "Auto mode should use mostly paired anchors for tanh (got "
-            << pairedCount << "/" << totalNonCenter << ")";
+        EXPECT_GE(pairRatio, 0.7) << "Auto mode should use mostly paired anchors for tanh (got " << pairedCount << "/"
+                                  << totalNonCenter << ")";
     }
 }
 
@@ -2821,7 +2724,7 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_LimitedAnchors_StopsWhenFull) {
     // Config: Force symmetric mode with odd maxAnchors
     auto config = dsp_core::SplineFitConfig::smooth();
     config.symmetryMode = dsp_core::SymmetryMode::Always;
-    config.maxAnchors = 5;  // Odd number - can't fit all pairs
+    config.maxAnchors = 5; // Odd number - can't fit all pairs
 
     // Execute
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
@@ -2840,7 +2743,7 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic3_Symmetric) {
     // Setup: Harmonic 3 (Chebyshev T₃, odd function)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = 4.0 * x * x * x - 3.0 * x;  // T₃(x)
+        double y = 4.0 * x * x * x - 3.0 * x; // T₃(x)
         ltf->setBaseLayerValue(i, y);
     }
     ltf->updateComposite();
@@ -2860,14 +2763,14 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic3_Symmetric) {
     int totalNonCenter = 0;
 
     for (const auto& anchor : result.anchors) {
-        if (std::abs(anchor.x) < 1e-4) continue;  // Skip near-center
+        if (std::abs(anchor.x) < 1e-4)
+            continue; // Skip near-center
 
         totalNonCenter++;
 
-        bool foundComplement = std::any_of(result.anchors.begin(), result.anchors.end(),
-            [&anchor](const dsp_core::SplineAnchor& other) {
-                return std::abs(other.x + anchor.x) < 1e-4;
-            });
+        bool foundComplement =
+            std::any_of(result.anchors.begin(), result.anchors.end(),
+                        [&anchor](const dsp_core::SplineAnchor& other) { return std::abs(other.x + anchor.x) < 1e-4; });
 
         if (foundComplement) {
             pairedCount++;
@@ -2878,9 +2781,8 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic3_Symmetric) {
     // (Auto mode should detect odd symmetry, but feature anchors may be unpaired)
     if (totalNonCenter > 0) {
         double pairRatio = static_cast<double>(pairedCount) / totalNonCenter;
-        EXPECT_GE(pairRatio, 0.7)
-            << "Harmonic 3 should use mostly paired anchors (got "
-            << pairedCount << "/" << totalNonCenter << ")";
+        EXPECT_GE(pairRatio, 0.7) << "Harmonic 3 should use mostly paired anchors (got " << pairedCount << "/"
+                                  << totalNonCenter << ")";
     }
 
     // Should capture extrema
@@ -2894,7 +2796,7 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic2_Asymmetric) {
     // Setup: Harmonic 2 (Chebyshev T₂, even function)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = 2.0 * x * x - 1.0;  // T₂(x)
+        double y = 2.0 * x * x - 1.0; // T₂(x)
         ltf->setBaseLayerValue(i, y);
     }
     ltf->updateComposite();
@@ -2940,20 +2842,19 @@ TEST_F(BacktranslationTest, UserWorkflow_IdentityPlusMiddleAnchor_RefitsToThree)
     // Original 3 anchors after user adds middle anchor
     // (Middle anchor creates "bump" away from identity line)
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, -1.0, false, 0.0},    // Left endpoint
+        {-1.0, -1.0, false, 0.0},     // Left endpoint
         {-0.321, -0.432, false, 0.0}, // User-added middle anchor (arbitrary position)
         {1.0, 1.0, false, 0.0}        // Right endpoint
     };
 
     // Compute tangents (simulates what happens in UI)
-    auto config = dsp_core::SplineFitConfig::tight();  // Production config
+    auto config = dsp_core::SplineFitConfig::tight(); // Production config
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
     // Print tangents to see PCHIP effect
     std::cout << "Original anchors with PCHIP tangents:" << std::endl;
     for (const auto& anchor : originalAnchors) {
-        std::cout << "  x=" << std::fixed << std::setprecision(3) << anchor.x
-                  << ", y=" << anchor.y
+        std::cout << "  x=" << std::fixed << std::setprecision(3) << anchor.x << ", y=" << anchor.y
                   << ", tangent=" << anchor.tangent << std::endl;
     }
 
@@ -2969,7 +2870,7 @@ TEST_F(BacktranslationTest, UserWorkflow_IdentityPlusMiddleAnchor_RefitsToThree)
     // Actual (BUG): 7-12 anchors
     EXPECT_GE(result.numAnchors, 3) << "Should have at least 3 anchors";
     EXPECT_LE(result.numAnchors, 5) << "Identity + middle anchor should need 3-5 anchors. "
-                              << "Got " << result.numAnchors << " (PCHIP-induced anchor creep)";
+                                    << "Got " << result.numAnchors << " (PCHIP-induced anchor creep)";
 }
 
 /**
@@ -2984,10 +2885,7 @@ TEST_F(BacktranslationTest, MultiIteration_ConvergesToStableCount) {
 
     // Start with simple parabola
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 0.0},
-        {0.0, 1.0, false, 0.0},
-        {1.0, 0.0, false, 0.0}
-    };
+        {-1.0, 0.0, false, 0.0}, {0.0, 1.0, false, 0.0}, {1.0, 0.0, false, 0.0}};
 
     auto config = dsp_core::SplineFitConfig::tight();
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
@@ -3014,7 +2912,7 @@ TEST_F(BacktranslationTest, MultiIteration_ConvergesToStableCount) {
     // Subsequent iterations should not significantly increase
     for (size_t i = 1; i < anchorCounts.size(); ++i) {
         EXPECT_LE(anchorCounts[i], anchorCounts[0] + 2)
-            << "Iteration " << (i+1) << " should not add many anchors. "
+            << "Iteration " << (i + 1) << " should not add many anchors. "
             << "Got " << anchorCounts[i] << " (expected ≤" << (anchorCounts[0] + 2) << ")";
     }
 }
@@ -3051,8 +2949,7 @@ TEST_F(BacktranslationTest, TanhCurve_SmoothBacktranslation) {
 
     // Anchor count should be similar or slightly reduced (adaptive tolerance working well)
     // Reducing anchor count on refit is GOOD (means algorithm recognizes smooth curve)
-    EXPECT_GE(refitResult.numAnchors, firstFit.numAnchors - 3)
-        << "Backtranslation should not lose many anchors";
+    EXPECT_GE(refitResult.numAnchors, firstFit.numAnchors - 3) << "Backtranslation should not lose many anchors";
     EXPECT_LE(refitResult.numAnchors, firstFit.numAnchors + 3)
         << "Backtranslation should not add many anchors. "
         << "First: " << firstFit.numAnchors << ", Refit: " << refitResult.numAnchors;
@@ -3069,10 +2966,10 @@ TEST_F(BacktranslationTest, ArbitraryPositions_StableBacktranslation) {
 
     // Realistic user-placed anchors (fractional coordinates)
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, -0.87, false, 0.0},     // Near but not at -1
-        {-0.412, -0.653, false, 0.0},  // Arbitrary mid-left
-        {0.234, 0.123, false, 0.0},    // Arbitrary mid-right
-        {1.0, 0.92, false, 0.0}        // Near but not at 1
+        {-1.0, -0.87, false, 0.0},    // Near but not at -1
+        {-0.412, -0.653, false, 0.0}, // Arbitrary mid-left
+        {0.234, 0.123, false, 0.0},   // Arbitrary mid-right
+        {1.0, 0.92, false, 0.0}       // Near but not at 1
     };
 
     auto config = dsp_core::SplineFitConfig::tight();
@@ -3086,7 +2983,7 @@ TEST_F(BacktranslationTest, ArbitraryPositions_StableBacktranslation) {
     // Expected: 4-7 anchors (fractional coords create more artifacts)
     EXPECT_GE(result.numAnchors, 4) << "Should have at least original anchor count";
     EXPECT_LE(result.numAnchors, 7) << "Arbitrary positions should need 4-7 anchors. "
-                              << "Got " << result.numAnchors << " (excessive for simple curve)";
+                                    << "Got " << result.numAnchors << " (excessive for simple curve)";
 }
 
 /**
@@ -3099,11 +2996,7 @@ TEST_F(BacktranslationTest, ProductionConfig_CompareToSmooth) {
     std::cout << "\n=== Production Config vs Smooth Config ===" << std::endl;
 
     std::vector<dsp_core::SplineAnchor> originalAnchors = {
-        {-1.0, 0.0, false, 0.0},
-        {-0.5, -0.8, false, 0.0},
-        {0.5, 0.8, false, 0.0},
-        {1.0, 0.0, false, 0.0}
-    };
+        {-1.0, 0.0, false, 0.0}, {-0.5, -0.8, false, 0.0}, {0.5, 0.8, false, 0.0}, {1.0, 0.0, false, 0.0}};
 
     // Test with tight config (production)
     auto tightConfig = dsp_core::SplineFitConfig::tight();
@@ -3148,7 +3041,7 @@ TEST_F(BacktranslationTest, ScribbleWithFeatures_Simplifies) {
 
     for (int i = 1; i <= 13; ++i) {
         double x = -1.0 + (2.0 * i / 14.0);
-        double y = std::sin(i * 0.8) * 0.3;  // Small amplitude oscillations
+        double y = std::sin(i * 0.8) * 0.3; // Small amplitude oscillations
         originalAnchors.push_back({x, y, false, 0.0});
     }
 
@@ -3156,7 +3049,7 @@ TEST_F(BacktranslationTest, ScribbleWithFeatures_Simplifies) {
 
     std::cout << "Original scribble: " << originalAnchors.size() << " anchors" << std::endl;
 
-    auto config = dsp_core::SplineFitConfig::smooth();  // Use smooth for scribbles
+    auto config = dsp_core::SplineFitConfig::smooth(); // Use smooth for scribbles
     dsp_core::Services::SplineFitter::computeTangents(originalAnchors, config);
 
     auto result = backtranslateAnchors(originalAnchors, config);
@@ -3167,8 +3060,8 @@ TEST_F(BacktranslationTest, ScribbleWithFeatures_Simplifies) {
     // Should simplify to far fewer anchors (adaptive tolerance should relax)
     EXPECT_GE(result.numAnchors, 8) << "Should preserve general shape (≥8 anchors)";
     EXPECT_LE(result.numAnchors, 20) << "Should simplify scribble. "
-                              << "Got " << result.numAnchors << " anchors from "
-                              << originalAnchors.size() << " original";
+                                     << "Got " << result.numAnchors << " anchors from " << originalAnchors.size()
+                                     << " original";
 }
 
 } // namespace dsp_core_test

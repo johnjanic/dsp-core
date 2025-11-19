@@ -9,7 +9,7 @@ namespace dsp_core {
 namespace Services {
 
 CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const LayeredTransferFunction& ltf,
-                                                                        const FeatureDetectionConfig& config) {
+                                                                         const FeatureDetectionConfig& config) {
     FeatureResult result;
     int tableSize = ltf.getTableSize();
 
@@ -29,8 +29,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     // 1. Find local extrema (dy/dx sign changes) with significance scores
     struct Feature {
         int index;
-        double significance;  // For extrema: |y|, for inflection: |d²y/dx²|
-        bool isExtremum;      // true = extremum, false = inflection point
+        double significance; // For extrema: |y|, for inflection: |d²y/dx²|
+        bool isExtremum;     // true = extremum, false = inflection point
     };
     std::vector<Feature> features;
 
@@ -42,8 +42,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
         // Note: At extrema, one derivative may be near zero, so we check if
         // at least one is significant OR if there's a clear sign change
         bool hasSignChange = (deriv_prev * deriv < 0.0);
-        bool atLeastOneSignificant = (std::abs(deriv_prev) > config.derivativeThreshold ||
-                                      std::abs(deriv) > config.derivativeThreshold);
+        bool atLeastOneSignificant =
+            (std::abs(deriv_prev) > config.derivativeThreshold || std::abs(deriv) > config.derivativeThreshold);
 
         if (hasSignChange && atLeastOneSignificant) {
             // Use base layer for testing (composite might have normalization issues)
@@ -66,7 +66,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
                 double neighborMin = std::numeric_limits<double>::max();
                 double neighborMax = std::numeric_limits<double>::lowest();
                 for (int j = windowStart; j <= windowEnd; ++j) {
-                    if (j == i) continue;  // Skip the extremum itself
+                    if (j == i)
+                        continue; // Skip the extremum itself
                     double y_j = ltf.getBaseLayerValue(j);
                     neighborMin = std::min(neighborMin, y_j);
                     neighborMax = std::max(neighborMax, y_j);
@@ -74,9 +75,9 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
 
                 // Prominence: how much does this extremum stand out from neighbors?
                 double prominence;
-                if (deriv_prev > 0.0) {  // Peak (derivative changes from + to -)
+                if (deriv_prev > 0.0) { // Peak (derivative changes from + to -)
                     prominence = y - neighborMax;
-                } else {  // Valley (derivative changes from - to +)
+                } else { // Valley (derivative changes from - to +)
                     prominence = neighborMin - y;
                 }
 
@@ -116,9 +117,8 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
             }
 
             // Only detect sign changes if both second derivatives are significant
-            if (std::abs(d2y_prev) > threshold &&
-                std::abs(d2y) > threshold &&
-                d2y_prev * d2y < 0.0) {  // Sign change = inflection point
+            if (std::abs(d2y_prev) > threshold && std::abs(d2y) > threshold &&
+                d2y_prev * d2y < 0.0) { // Sign change = inflection point
                 result.inflectionPoints.push_back(i);
 
                 // Significance = curvature magnitude
@@ -128,26 +128,27 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     }
 
     // 3. Prioritize and limit features if maxFeatures is set
-    result.mandatoryAnchors.push_back(0);  // Always include endpoints
+    result.mandatoryAnchors.push_back(0); // Always include endpoints
     result.mandatoryAnchors.push_back(tableSize - 1);
 
     if (config.maxFeatures > 0 && static_cast<int>(features.size()) + 2 > config.maxFeatures) {
         // Too many features - prioritize by significance
-        // Reserve extremaInflectionRatio for extrema (peaks/valleys are typically more important than inflection points)
+        // Reserve extremaInflectionRatio for extrema (peaks/valleys are typically more important than inflection
+        // points)
         int maxExtrema = static_cast<int>((config.maxFeatures - 2) * config.extremaInflectionRatio);
         int maxInflections = (config.maxFeatures - 2) - maxExtrema;
 
         // Separate extrema and inflections
         std::vector<Feature> extrema, inflections;
         for (const auto& f : features) {
-            if (f.isExtremum) extrema.push_back(f);
-            else inflections.push_back(f);
+            if (f.isExtremum)
+                extrema.push_back(f);
+            else
+                inflections.push_back(f);
         }
 
         // Sort by significance (descending)
-        auto bySignificance = [](const Feature& a, const Feature& b) {
-            return a.significance > b.significance;
-        };
+        auto bySignificance = [](const Feature& a, const Feature& b) { return a.significance > b.significance; };
         std::sort(extrema.begin(), extrema.end(), bySignificance);
         std::sort(inflections.begin(), inflections.end(), bySignificance);
 
@@ -160,24 +161,16 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
         }
     } else {
         // Not limited - add all features
-        result.mandatoryAnchors.insert(
-            result.mandatoryAnchors.end(),
-            result.localExtrema.begin(),
-            result.localExtrema.end()
-        );
-        result.mandatoryAnchors.insert(
-            result.mandatoryAnchors.end(),
-            result.inflectionPoints.begin(),
-            result.inflectionPoints.end()
-        );
+        result.mandatoryAnchors.insert(result.mandatoryAnchors.end(), result.localExtrema.begin(),
+                                       result.localExtrema.end());
+        result.mandatoryAnchors.insert(result.mandatoryAnchors.end(), result.inflectionPoints.begin(),
+                                       result.inflectionPoints.end());
     }
 
     // 4. Sort and deduplicate
     std::sort(result.mandatoryAnchors.begin(), result.mandatoryAnchors.end());
-    result.mandatoryAnchors.erase(
-        std::unique(result.mandatoryAnchors.begin(), result.mandatoryAnchors.end()),
-        result.mandatoryAnchors.end()
-    );
+    result.mandatoryAnchors.erase(std::unique(result.mandatoryAnchors.begin(), result.mandatoryAnchors.end()),
+                                  result.mandatoryAnchors.end());
 
     return result;
 }
@@ -217,7 +210,7 @@ double CurveFeatureDetector::estimateSecondDerivative(const LayeredTransferFunct
     if (idx < 1 || idx >= ltf.getTableSize() - 1)
         return 0.0;
 
-    double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0);  // Uniform spacing
+    double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0); // Uniform spacing
     // Use base layer for testing (composite might have normalization issues)
     double y_prev = ltf.getBaseLayerValue(idx - 1);
     double y = ltf.getBaseLayerValue(idx);

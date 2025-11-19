@@ -19,7 +19,7 @@ namespace dsp_core_test {
  * 2. Production harmonics with numerical extrema detection
  */
 class ExactExtremaTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Use larger table size for better extrema resolution
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(4096, -1.0, 1.0);
@@ -92,9 +92,7 @@ double findAnchorNear(const std::vector<dsp_core::SplineAnchor>& anchors, double
 /**
  * Check if an anchor exists near target position (within tolerance)
  */
-bool hasAnchorNear(const std::vector<dsp_core::SplineAnchor>& anchors,
-                   double target_x,
-                   double tolerance = 0.01) {
+bool hasAnchorNear(const std::vector<dsp_core::SplineAnchor>& anchors, double target_x, double tolerance = 0.01) {
     double closest_x = findAnchorNear(anchors, target_x);
     return std::abs(closest_x - target_x) < tolerance;
 }
@@ -145,7 +143,7 @@ void setSinCurve(dsp_core::LayeredTransferFunction& ltf, double frequency) {
 void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber, double amplitude = 1.0) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
         double x = ltf.normalizeIndex(i);
-        x = std::max(-1.0, std::min(1.0, x));  // Clamp for trig safety
+        x = std::max(-1.0, std::min(1.0, x)); // Clamp for trig safety
 
         double y = 0.0;
         if (harmonicNumber % 2 == 0) {
@@ -195,7 +193,7 @@ void setTanhCurve(dsp_core::LayeredTransferFunction& ltf, double steepness = 2.0
  *   - Minimum at x = -0.5 (f(-0.5) = -1.0)
  */
 TEST_F(ExactExtremaTest, SinX_SingleExtremum) {
-    setSinCurve(*ltf, 1.0);  // frequency = 1
+    setSinCurve(*ltf, 1.0); // frequency = 1
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -205,10 +203,8 @@ TEST_F(ExactExtremaTest, SinX_SingleExtremum) {
     ASSERT_TRUE(result.success) << "Fit failed: " << result.message.toStdString();
 
     // Verify extrema positions within ±0.01 (1% of domain)
-    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.5, 0.01))
-        << "Missing anchor at maximum (x=0.5)";
-    EXPECT_TRUE(hasAnchorNear(result.anchors, -0.5, 0.01))
-        << "Missing anchor at minimum (x=-0.5)";
+    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.5, 0.01)) << "Missing anchor at maximum (x=0.5)";
+    EXPECT_TRUE(hasAnchorNear(result.anchors, -0.5, 0.01)) << "Missing anchor at minimum (x=-0.5)";
 
     // Report position errors
     double max_error = std::abs(findAnchorNear(result.anchors, 0.5) - 0.5);
@@ -216,8 +212,7 @@ TEST_F(ExactExtremaTest, SinX_SingleExtremum) {
     double avg_error = (max_error + min_error) / 2.0;
 
     std::cout << "  sin(πx) extrema errors: "
-              << "max=" << std::fixed << std::setprecision(4) << max_error
-              << ", min=" << min_error
+              << "max=" << std::fixed << std::setprecision(4) << max_error << ", min=" << min_error
               << ", avg=" << avg_error << std::endl;
 }
 
@@ -230,7 +225,7 @@ TEST_F(ExactExtremaTest, SinX_SingleExtremum) {
  *   - Minima at x = -0.25, 0.75
  */
 TEST_F(ExactExtremaTest, Sin2X_ThreeExtrema) {
-    setSinCurve(*ltf, 2.0);  // frequency = 2
+    setSinCurve(*ltf, 2.0); // frequency = 2
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -244,14 +239,12 @@ TEST_F(ExactExtremaTest, Sin2X_ThreeExtrema) {
 
     // Verify all extrema have nearby anchors
     for (double extremum_x : expected_extrema) {
-        EXPECT_TRUE(hasAnchorNear(result.anchors, extremum_x, 0.01))
-            << "Missing anchor at extremum x=" << extremum_x;
+        EXPECT_TRUE(hasAnchorNear(result.anchors, extremum_x, 0.01)) << "Missing anchor at extremum x=" << extremum_x;
     }
 
     // Report average position error
     double avg_error = computeAveragePositionError(result.anchors, expected_extrema);
-    std::cout << "  sin(2πx) avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error << std::endl;
+    std::cout << "  sin(2πx) avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << std::endl;
 }
 
 /**
@@ -261,7 +254,7 @@ TEST_F(ExactExtremaTest, Sin2X_ThreeExtrema) {
  * 6 extrema total (3 peaks, 3 valleys)
  */
 TEST_F(ExactExtremaTest, Sin3X_FiveExtrema) {
-    setSinCurve(*ltf, 3.0);  // frequency = 3
+    setSinCurve(*ltf, 3.0); // frequency = 3
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -272,8 +265,8 @@ TEST_F(ExactExtremaTest, Sin3X_FiveExtrema) {
 
     // Expected extrema: ±(1/6), ±(3/6), ±(5/6)
     std::vector<double> expected_extrema = {
-        -5.0/6.0, -3.0/6.0, -1.0/6.0,  // Negative half
-        1.0/6.0, 3.0/6.0, 5.0/6.0       // Positive half
+        -5.0 / 6.0, -3.0 / 6.0, -1.0 / 6.0, // Negative half
+        1.0 / 6.0,  3.0 / 6.0,  5.0 / 6.0   // Positive half
     };
 
     // Verify all extrema
@@ -287,10 +280,8 @@ TEST_F(ExactExtremaTest, Sin3X_FiveExtrema) {
     EXPECT_GE(matched_count, 5) << "Expected at least 5 extrema matched";
 
     double avg_error = computeAveragePositionError(result.anchors, expected_extrema);
-    std::cout << "  sin(3πx) avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << expected_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  sin(3πx) avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " ("
+              << matched_count << "/" << expected_extrema.size() << " matched)" << std::endl;
 }
 
 /**
@@ -300,7 +291,7 @@ TEST_F(ExactExtremaTest, Sin3X_FiveExtrema) {
  * 10 extrema total (5 peaks, 5 valleys)
  */
 TEST_F(ExactExtremaTest, Sin5X_NineExtrema) {
-    setSinCurve(*ltf, 5.0);  // frequency = 5
+    setSinCurve(*ltf, 5.0); // frequency = 5
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -327,10 +318,8 @@ TEST_F(ExactExtremaTest, Sin5X_NineExtrema) {
     EXPECT_GE(matched_count, 8) << "Expected at least 8/10 extrema matched";
 
     double avg_error = computeAveragePositionError(result.anchors, expected_extrema);
-    std::cout << "  sin(5πx) avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << expected_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  sin(5πx) avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " ("
+              << matched_count << "/" << expected_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02) << "Average position error should be < 0.02";
 }
@@ -342,7 +331,7 @@ TEST_F(ExactExtremaTest, Sin5X_NineExtrema) {
  * 20 extrema total (10 peaks, 10 valleys)
  */
 TEST_F(ExactExtremaTest, Sin10X_NineteenExtrema) {
-    setSinCurve(*ltf, 10.0);  // frequency = 10
+    setSinCurve(*ltf, 10.0); // frequency = 10
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -369,10 +358,8 @@ TEST_F(ExactExtremaTest, Sin10X_NineteenExtrema) {
     EXPECT_GE(matched_count, 15) << "Expected at least 15/20 extrema matched";
 
     double avg_error = computeAveragePositionError(result.anchors, expected_extrema);
-    std::cout << "  sin(10πx) avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << expected_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  sin(10πx) avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " ("
+              << matched_count << "/" << expected_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02) << "Average position error should be < 0.02";
 }
@@ -386,7 +373,7 @@ TEST_F(ExactExtremaTest, Sin10X_NineteenExtrema) {
  * This is a challenging test case - high frequency requires many anchors.
  */
 TEST_F(ExactExtremaTest, Sin15X_TwentyNineExtrema) {
-    setSinCurve(*ltf, 15.0);  // frequency = 15
+    setSinCurve(*ltf, 15.0); // frequency = 15
 
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = true;
@@ -405,7 +392,7 @@ TEST_F(ExactExtremaTest, Sin15X_TwentyNineExtrema) {
     // Count matched extrema (be more lenient for high frequency)
     int matched_count = 0;
     for (double extremum_x : expected_extrema) {
-        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) {  // Wider tolerance
+        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) { // Wider tolerance
             matched_count++;
         }
     }
@@ -413,10 +400,8 @@ TEST_F(ExactExtremaTest, Sin15X_TwentyNineExtrema) {
     EXPECT_GE(matched_count, 20) << "Expected at least 20/30 extrema matched";
 
     double avg_error = computeAveragePositionError(result.anchors, expected_extrema);
-    std::cout << "  sin(15πx) avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << expected_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  sin(15πx) avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " ("
+              << matched_count << "/" << expected_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.03) << "Average position error should be < 0.03 (relaxed for high freq)";
 }
@@ -439,18 +424,14 @@ TEST_F(ExactExtremaTest, CubicPolynomial_InflectionPoint) {
     ASSERT_TRUE(result.success);
 
     // Should place anchor at inflection point (x = 0)
-    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01))
-        << "Expected anchor at inflection point x=0";
+    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01)) << "Expected anchor at inflection point x=0";
 
     // No local extrema in interior (monotonically increasing)
     auto numerical_extrema = findNumericalExtrema(*ltf);
-    EXPECT_EQ(numerical_extrema.size(), 0)
-        << "x³ should have no local extrema (monotonic)";
+    EXPECT_EQ(numerical_extrema.size(), 0) << "x³ should have no local extrema (monotonic)";
 
-    std::cout << "  x³ inflection point captured: "
-              << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
-              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0))
-              << ")" << std::endl;
+    std::cout << "  x³ inflection point captured: " << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
+              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0)) << ")" << std::endl;
 }
 
 /**
@@ -471,18 +452,14 @@ TEST_F(ExactExtremaTest, TanhCurve_InflectionPoint) {
     ASSERT_TRUE(result.success);
 
     // Should place anchor at inflection point (x = 0)
-    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01))
-        << "Expected anchor at inflection point x=0";
+    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01)) << "Expected anchor at inflection point x=0";
 
     // No local extrema
     auto numerical_extrema = findNumericalExtrema(*ltf);
-    EXPECT_EQ(numerical_extrema.size(), 0)
-        << "tanh(2x) should have no local extrema (monotonic)";
+    EXPECT_EQ(numerical_extrema.size(), 0) << "tanh(2x) should have no local extrema (monotonic)";
 
-    std::cout << "  tanh(2x) inflection point captured: "
-              << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
-              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0))
-              << ")" << std::endl;
+    std::cout << "  tanh(2x) inflection point captured: " << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
+              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0)) << ")" << std::endl;
 }
 
 //==============================================================================
@@ -513,14 +490,11 @@ TEST_F(ExactExtremaTest, Harmonic2_NumericalExtrema) {
         }
     }
 
-    EXPECT_GE(matched_count, numerical_extrema.size() * 0.8)
-        << "Expected at least 80% of extrema matched";
+    EXPECT_GE(matched_count, numerical_extrema.size() * 0.8) << "Expected at least 80% of extrema matched";
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H2 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H2 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02);
 }
@@ -550,10 +524,8 @@ TEST_F(ExactExtremaTest, Harmonic3_NumericalExtrema) {
     EXPECT_GE(matched_count, numerical_extrema.size() * 0.8);
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H3 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H3 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02);
 }
@@ -583,10 +555,8 @@ TEST_F(ExactExtremaTest, Harmonic5_NumericalExtrema) {
     EXPECT_GE(matched_count, numerical_extrema.size() * 0.8);
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H5 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H5 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02);
 }
@@ -613,14 +583,11 @@ TEST_F(ExactExtremaTest, Harmonic10_NumericalExtrema) {
         }
     }
 
-    EXPECT_GE(matched_count, numerical_extrema.size() * 0.75)
-        << "Expected at least 75% match for H10 (high frequency)";
+    EXPECT_GE(matched_count, numerical_extrema.size() * 0.75) << "Expected at least 75% match for H10 (high frequency)";
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H10 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H10 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.02);
 }
@@ -642,7 +609,7 @@ TEST_F(ExactExtremaTest, Harmonic15_NumericalExtrema) {
 
     int matched_count = 0;
     for (double extremum_x : numerical_extrema) {
-        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) {  // Wider tolerance
+        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) { // Wider tolerance
             matched_count++;
         }
     }
@@ -651,10 +618,8 @@ TEST_F(ExactExtremaTest, Harmonic15_NumericalExtrema) {
         << "Expected at least 70% match for H15 (very high frequency)";
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H15 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H15 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.03) << "Relaxed tolerance for very high frequency";
 }
@@ -676,7 +641,7 @@ TEST_F(ExactExtremaTest, Harmonic20_NumericalExtrema) {
 
     int matched_count = 0;
     for (double extremum_x : numerical_extrema) {
-        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) {  // Wider tolerance
+        if (hasAnchorNear(result.anchors, extremum_x, 0.02)) { // Wider tolerance
             matched_count++;
         }
     }
@@ -685,10 +650,8 @@ TEST_F(ExactExtremaTest, Harmonic20_NumericalExtrema) {
         << "Expected at least 70% match for H20 (very high frequency)";
 
     double avg_error = computeAveragePositionError(result.anchors, numerical_extrema);
-    std::cout << "  H20 avg extrema error: "
-              << std::fixed << std::setprecision(4) << avg_error
-              << " (" << matched_count << "/" << numerical_extrema.size() << " matched)"
-              << std::endl;
+    std::cout << "  H20 avg extrema error: " << std::fixed << std::setprecision(4) << avg_error << " (" << matched_count
+              << "/" << numerical_extrema.size() << " matched)" << std::endl;
 
     EXPECT_LT(avg_error, 0.03) << "Relaxed tolerance for very high frequency";
 }

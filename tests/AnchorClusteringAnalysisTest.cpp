@@ -21,9 +21,11 @@ namespace dsp_core_test {
  * 3. Cubic Hermite interpolation quality issues near boundaries
  */
 class AnchorClusteringAnalysisTest : public ::testing::Test {
-protected:
+  protected:
     // Helper: Sample struct for internal use
-    struct Sample { double x, y; };
+    struct Sample {
+        double x, y;
+    };
 
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
@@ -33,7 +35,7 @@ protected:
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             double x = ltf->normalizeIndex(i);
             x = std::clamp(x, -1.0, 1.0);
-            double y = std::sin(3.0 * std::asin(x));  // H3
+            double y = std::sin(3.0 * std::asin(x)); // H3
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -42,7 +44,7 @@ protected:
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             double x = ltf->normalizeIndex(i);
             x = std::clamp(x, -1.0, 1.0);
-            double y = std::sin(5.0 * std::asin(x));  // H5
+            double y = std::sin(5.0 * std::asin(x)); // H5
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -53,17 +55,15 @@ protected:
         dsp_core::SplineAnchor addedAnchor;
         double maxErrorBefore;
         double maxErrorAfter;
-        double maxErrorLocationBefore;  // x coordinate
+        double maxErrorLocationBefore; // x coordinate
         double maxErrorLocationAfter;
         double errorReductionPercent;
-        bool errorSwitchedSides;  // For symmetric functions
-        std::map<std::string, double> regionMaxErrors;  // By region after addition
+        bool errorSwitchedSides;                       // For symmetric functions
+        std::map<std::string, double> regionMaxErrors; // By region after addition
     };
 
     // Instrumented greedy fitting - simplified version that logs each step
-    std::vector<AnchorAdditionRecord> performInstrumentedGreedyFit(
-        const dsp_core::SplineFitConfig& config
-    ) {
+    std::vector<AnchorAdditionRecord> performInstrumentedGreedyFit(const dsp_core::SplineFitConfig& config) {
         std::vector<AnchorAdditionRecord> records;
 
         // Sample the curve (same as SplineFitter does)
@@ -84,7 +84,7 @@ protected:
         for (size_t i = 0; i < samples.size(); ++i) {
             densified.push_back(samples[i]);
             if (i < samples.size() - 1) {
-                double midX = (samples[i].x + samples[i+1].x) / 2.0;
+                double midX = (samples[i].x + samples[i + 1].x) / 2.0;
                 double midY = ltf->evaluateBaseAndHarmonics(midX);
                 densified.push_back({midX, midY});
             }
@@ -92,10 +92,8 @@ protected:
         samples = std::move(densified);
 
         // Initialize with endpoints
-        std::vector<dsp_core::SplineAnchor> anchors = {
-            {samples.front().x, samples.front().y, false, 0.0},
-            {samples.back().x, samples.back().y, false, 0.0}
-        };
+        std::vector<dsp_core::SplineAnchor> anchors = {{samples.front().x, samples.front().y, false, 0.0},
+                                                       {samples.back().x, samples.back().y, false, 0.0}};
 
         // Greedy iterations
         for (int iter = 0; iter < config.maxAnchors - 2; ++iter) {
@@ -122,17 +120,10 @@ protected:
             }
 
             // Add anchor at worst location
-            auto insertPos = std::lower_bound(
-                anchors.begin(), anchors.end(), worstX,
-                [](const dsp_core::SplineAnchor& a, double x) { return a.x < x; }
-            );
+            auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstX,
+                                              [](const dsp_core::SplineAnchor& a, double x) { return a.x < x; });
 
-            dsp_core::SplineAnchor newAnchor = {
-                samples[worstIdx].x,
-                samples[worstIdx].y,
-                false,
-                0.0
-            };
+            dsp_core::SplineAnchor newAnchor = {samples[worstIdx].x, samples[worstIdx].y, false, 0.0};
 
             anchors.insert(insertPos, newAnchor);
 
@@ -177,19 +168,15 @@ protected:
         return records;
     }
 
-    std::map<std::string, double> computeRegionalErrors(
-        const std::vector<Sample>& samples,
-        const std::vector<dsp_core::SplineAnchor>& anchors
-    ) {
+    std::map<std::string, double> computeRegionalErrors(const std::vector<Sample>& samples,
+                                                        const std::vector<dsp_core::SplineAnchor>& anchors) {
         std::map<std::string, double> regionErrors;
 
-        std::map<std::string, std::pair<double, double>> regions = {
-            {"x<-0.9", {-1.0, -0.9}},
-            {"[-0.9,-0.3]", {-0.9, -0.3}},
-            {"[-0.3,0.3]", {-0.3, 0.3}},
-            {"[0.3,0.9]", {0.3, 0.9}},
-            {"x>0.9", {0.9, 1.0}}
-        };
+        std::map<std::string, std::pair<double, double>> regions = {{"x<-0.9", {-1.0, -0.9}},
+                                                                    {"[-0.9,-0.3]", {-0.9, -0.3}},
+                                                                    {"[-0.3,0.3]", {-0.3, 0.3}},
+                                                                    {"[0.3,0.9]", {0.3, 0.9}},
+                                                                    {"x>0.9", {0.9, 1.0}}};
 
         for (const auto& [name, range] : regions) {
             double maxErr = 0.0;
@@ -220,7 +207,7 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
     setH3Curve();
 
     auto config = dsp_core::SplineFitConfig::tight();
-    config.enableFeatureDetection = false;  // Pure greedy for analysis
+    config.enableFeatureDetection = false; // Pure greedy for analysis
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "H3 GREEDY FITTING STEP-BY-STEP ANALYSIS" << std::endl;
@@ -237,12 +224,10 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
         const auto& rec = records[i];
 
         std::cout << "--- Iteration " << rec.iteration << " ---" << std::endl;
-        std::cout << "  Max error BEFORE: " << std::fixed << std::setprecision(6)
-                  << rec.maxErrorBefore << " at x=" << rec.maxErrorLocationBefore << std::endl;
-        std::cout << "  Added anchor: x=" << rec.addedAnchor.x
-                  << ", y=" << rec.addedAnchor.y << std::endl;
-        std::cout << "  Max error AFTER:  " << rec.maxErrorAfter
-                  << " at x=" << rec.maxErrorLocationAfter << std::endl;
+        std::cout << "  Max error BEFORE: " << std::fixed << std::setprecision(6) << rec.maxErrorBefore
+                  << " at x=" << rec.maxErrorLocationBefore << std::endl;
+        std::cout << "  Added anchor: x=" << rec.addedAnchor.x << ", y=" << rec.addedAnchor.y << std::endl;
+        std::cout << "  Max error AFTER:  " << rec.maxErrorAfter << " at x=" << rec.maxErrorLocationAfter << std::endl;
         std::cout << "  Error reduction: " << std::setprecision(1) << rec.errorReductionPercent << "%" << std::endl;
 
         // CRITICAL CHECK: For symmetric function, did error switch sides?
@@ -251,8 +236,8 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
 
         if (anchorOnLeft && errorStillOnLeft) {
             std::cout << "  ⚠️  SYMMETRY VIOLATION: Added anchor on LEFT, max error STILL on LEFT" << std::endl;
-            std::cout << "      Expected: Max error should switch to RIGHT side (x="
-                      << -rec.addedAnchor.x << ")" << std::endl;
+            std::cout << "      Expected: Max error should switch to RIGHT side (x=" << -rec.addedAnchor.x << ")"
+                      << std::endl;
             std::cout << "      Actual: Max error at x=" << rec.maxErrorLocationAfter << std::endl;
             std::cout << "      → Anchor has POOR radius of influence OR tangent artifact" << std::endl;
         } else if (rec.errorSwitchedSides) {
@@ -262,8 +247,8 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
         // Print regional errors
         std::cout << "  Regional errors:" << std::endl;
         for (const auto& [region, error] : rec.regionMaxErrors) {
-            std::cout << "    " << std::setw(15) << std::left << region
-                      << ": " << std::fixed << std::setprecision(6) << error << std::endl;
+            std::cout << "    " << std::setw(15) << std::left << region << ": " << std::fixed << std::setprecision(6)
+                      << error << std::endl;
         }
         std::cout << std::endl;
     }

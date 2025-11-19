@@ -31,7 +31,7 @@ namespace Services {
  *   - Deterministic output
  */
 class AdaptiveToleranceCalculator {
-public:
+  public:
     /**
      * Configuration for adaptive tolerance calculation
      */
@@ -67,13 +67,11 @@ public:
      * @param config Configuration parameters (optional)
      * @return Adaptive tolerance value
      */
-    static double computeTolerance(double verticalRange,
-                                   int currentAnchors,
-                                   int maxAnchors,
+    static double computeTolerance(double verticalRange, int currentAnchors, int maxAnchors,
                                    const Config& config = Config{});
 
-private:
-    AdaptiveToleranceCalculator() = delete;  // Pure static service
+  private:
+    AdaptiveToleranceCalculator() = delete; // Pure static service
 };
 
 } // namespace Services

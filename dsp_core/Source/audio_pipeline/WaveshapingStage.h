@@ -10,7 +10,7 @@ namespace dsp_core::audio_pipeline {
  * Optimized for stereo processing (no threading overhead).
  */
 class WaveshapingStage : public AudioProcessingStage {
-public:
+  public:
     /**
      * @param ltf Reference to transfer function model
      */
@@ -19,9 +19,11 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "Waveshaping"; }
+    juce::String getName() const override {
+        return "Waveshaping";
+    }
 
-private:
+  private:
     dsp_core::LayeredTransferFunction& ltf_;
 };
 

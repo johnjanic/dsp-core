@@ -18,10 +18,10 @@ namespace dsp_core {
  *   coefficients[1..N] = harmonic amplitudes (used by evaluate())
  */
 class HarmonicLayer {
-public:
+  public:
     enum class Algorithm {
-        Trig,       // Default: sin(n*asin(x)) for odd, cos(n*acos(x)) for even
-        Polynomial  // Alternative: Clenshaw's algorithm for Chebyshev polynomials
+        Trig,      // Default: sin(n*asin(x)) for odd, cos(n*acos(x)) for even
+        Polynomial // Alternative: Clenshaw's algorithm for Chebyshev polynomials
     };
 
     explicit HarmonicLayer(int numHarmonics = 40);
@@ -30,10 +30,14 @@ public:
     // Configuration
     //==========================================================================
 
-    int getNumHarmonics() const { return numHarmonics; }
+    int getNumHarmonics() const {
+        return numHarmonics;
+    }
 
     void setAlgorithm(Algorithm algo);
-    Algorithm getAlgorithm() const { return algorithm; }
+    Algorithm getAlgorithm() const {
+        return algorithm;
+    }
 
     //==========================================================================
     // Evaluation (thread-safe read)
@@ -76,7 +80,7 @@ public:
 
     bool operator==(const HarmonicLayer& other) const;
 
-private:
+  private:
     int numHarmonics;
     Algorithm algorithm = Algorithm::Trig;
 

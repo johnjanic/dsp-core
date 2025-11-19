@@ -19,7 +19,7 @@ namespace Services {
  *   - No side effects
  */
 class CoordinateSnapper {
-public:
+  public:
     /**
      * Snap single value to nearest grid multiple
      *
@@ -38,12 +38,8 @@ public:
      * @param snapY Enable snapping on Y axis
      * @return Snapped point with selected axes snapped to grid
      */
-    static juce::Point<double> snapPoint(
-        const juce::Point<double>& point,
-        double gridStep,
-        bool snapX = true,
-        bool snapY = true
-    );
+    static juce::Point<double> snapPoint(const juce::Point<double>& point, double gridStep, bool snapX = true,
+                                         bool snapY = true);
 
     /**
      * Check if value is within threshold of a grid line
@@ -53,11 +49,7 @@ public:
      * @param thresholdWorldSpace Maximum distance to grid line (in world units)
      * @return true if value is within threshold of nearest grid line
      */
-    static bool isNearGridLine(
-        double value,
-        double gridStep,
-        double thresholdWorldSpace
-    );
+    static bool isNearGridLine(double value, double gridStep, double thresholdWorldSpace);
 
     /**
      * Get nearest grid line value
@@ -68,8 +60,8 @@ public:
      */
     static double nearestGridLine(double value, double gridStep);
 
-private:
-    CoordinateSnapper() = delete;  // Pure static utility
+  private:
+    CoordinateSnapper() = delete; // Pure static utility
 };
 
 } // namespace Services

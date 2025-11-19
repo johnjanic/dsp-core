@@ -9,7 +9,7 @@ namespace dsp_core_test {
  * Tests geometric feature detection for spline anchor placement
  */
 class CurveFeatureDetectorTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
     }
@@ -17,7 +17,7 @@ protected:
     // Helper: Create tanh curve (monotonic with inflection)
     void createTanhCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i);  // [-1, 1]
+            double x = ltf->normalizeIndex(i); // [-1, 1]
             double y = std::tanh(3.0 * x);
             ltf->setBaseLayerValue(i, y);
         }
@@ -26,7 +26,7 @@ protected:
     // Helper: Create sine curve (multiple extrema)
     void createSineCurve(int numPeriods = 2) {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i);  // [-1, 1]
+            double x = ltf->normalizeIndex(i); // [-1, 1]
             double y = std::sin(numPeriods * M_PI * x);
             ltf->setBaseLayerValue(i, y);
         }
@@ -35,7 +35,7 @@ protected:
     // Helper: Create cubic curve (monotonic with inflection at x=0)
     void createCubicCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i);  // [-1, 1]
+            double x = ltf->normalizeIndex(i); // [-1, 1]
             double y = x * x * x;
             ltf->setBaseLayerValue(i, y);
         }
@@ -44,7 +44,7 @@ protected:
     // Helper: Create linear curve (no features)
     void createLinearCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i);  // [-1, 1]
+            double x = ltf->normalizeIndex(i); // [-1, 1]
             ltf->setBaseLayerValue(i, x);
         }
     }
@@ -65,7 +65,7 @@ TEST_F(CurveFeatureDetectorTest, DetectsNoExtremaInMonotonicTanh) {
 }
 
 TEST_F(CurveFeatureDetectorTest, DetectsSineExtrema) {
-    createSineCurve(2);  // 2 full periods
+    createSineCurve(2); // 2 full periods
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf);
 
     // 2 periods of sine have 4 extrema (2 peaks + 2 valleys)
@@ -108,7 +108,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsAreSorted) {
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf);
 
     for (size_t i = 1; i < features.mandatoryAnchors.size(); ++i) {
-        EXPECT_LT(features.mandatoryAnchors[i-1], features.mandatoryAnchors[i])
+        EXPECT_LT(features.mandatoryAnchors[i - 1], features.mandatoryAnchors[i])
             << "Mandatory anchors should be in ascending order";
     }
 }
@@ -118,7 +118,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsAreUnique) {
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf);
 
     for (size_t i = 1; i < features.mandatoryAnchors.size(); ++i) {
-        EXPECT_NE(features.mandatoryAnchors[i-1], features.mandatoryAnchors[i])
+        EXPECT_NE(features.mandatoryAnchors[i - 1], features.mandatoryAnchors[i])
             << "Mandatory anchors should not have duplicates";
     }
 }
@@ -129,9 +129,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsIncludeAllExtrema) {
 
     // All local extrema should be in mandatory anchors
     for (int extremumIdx : features.localExtrema) {
-        auto it = std::find(features.mandatoryAnchors.begin(),
-                           features.mandatoryAnchors.end(),
-                           extremumIdx);
+        auto it = std::find(features.mandatoryAnchors.begin(), features.mandatoryAnchors.end(), extremumIdx);
         EXPECT_NE(it, features.mandatoryAnchors.end())
             << "Extremum at index " << extremumIdx << " should be in mandatory anchors";
     }
@@ -143,9 +141,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsIncludeAllInflectionPoints) {
 
     // All inflection points should be in mandatory anchors
     for (int inflectionIdx : features.inflectionPoints) {
-        auto it = std::find(features.mandatoryAnchors.begin(),
-                           features.mandatoryAnchors.end(),
-                           inflectionIdx);
+        auto it = std::find(features.mandatoryAnchors.begin(), features.mandatoryAnchors.end(), inflectionIdx);
         EXPECT_NE(it, features.mandatoryAnchors.end())
             << "Inflection point at index " << inflectionIdx << " should be in mandatory anchors";
     }
@@ -222,7 +218,7 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_NoisyScribble_FiltersMinorBu
     // Create curve: identity + many tiny bumps + 3 major peaks
     for (int i = 0; i < 256; ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = x;  // Base identity
+        double y = x; // Base identity
 
         // Add 50 tiny bumps (±0.002 amplitude = 0.1% of vertical range)
         y += 0.002 * std::sin(50.0 * M_PI * x);
@@ -243,7 +239,7 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_NoisyScribble_FiltersMinorBu
 
     // Apply significance filtering: 2% threshold (should filter out 0.1% bumps but keep 15% peaks)
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.02;  // 2% of vertical range
+    config.significanceThreshold = 0.02; // 2% of vertical range
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Should detect only the 3 major peaks (each has 2 extrema = 6 total)
@@ -262,11 +258,10 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_SmoothCurve_NoFalsePositives
     createTanhCurve();
 
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.01;  // Even with low threshold
+    config.significanceThreshold = 0.01; // Even with low threshold
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
-    EXPECT_EQ(0, features.localExtrema.size())
-        << "Smooth monotonic tanh should have no extrema";
+    EXPECT_EQ(0, features.localExtrema.size()) << "Smooth monotonic tanh should have no extrema";
 }
 
 /**
@@ -274,20 +269,18 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_SmoothCurve_NoFalsePositives
  * Expected: All significant extrema detected
  */
 TEST_F(CurveFeatureDetectorTest, SignificanceFilter_LargeExtrema_AllPreserved) {
-    createSineCurve(2);  // 2 periods = 4 extrema
+    createSineCurve(2); // 2 periods = 4 extrema
 
     // Apply very low significance threshold to ensure all extrema are detected
     // Note: With 256 samples over 2 periods, local amplitude at peaks is relatively small
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.001;  // 0.1% of range (very permissive)
+    config.significanceThreshold = 0.001; // 0.1% of range (very permissive)
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Sine wave has full amplitude (2.0 range), so all extrema should be preserved
     // 2 periods = 2 peaks + 2 valleys = 4 extrema
-    EXPECT_GE(features.localExtrema.size(), 3)
-        << "Should detect all major extrema in sine wave";
-    EXPECT_LE(features.localExtrema.size(), 5)
-        << "Should not detect spurious extrema";
+    EXPECT_GE(features.localExtrema.size(), 3) << "Should detect all major extrema in sine wave";
+    EXPECT_LE(features.localExtrema.size(), 5) << "Should not detect spurious extrema";
 }
 
 /**
@@ -301,8 +294,7 @@ TEST_F(CurveFeatureDetectorTest, LegacyOverload_WorksCorrectly) {
 
     EXPECT_LE(features.mandatoryAnchors.size(), static_cast<size_t>(5))
         << "Legacy overload should respect maxMandatoryAnchors limit";
-    EXPECT_GE(features.mandatoryAnchors.size(), 2)
-        << "Should always have at least endpoints";
+    EXPECT_GE(features.mandatoryAnchors.size(), 2) << "Should always have at least endpoints";
 }
 
 // ============================================================================
@@ -314,7 +306,7 @@ TEST_F(CurveFeatureDetectorTest, LegacyOverload_WorksCorrectly) {
  * Uses production table size (16384) to test real-world behavior
  */
 class ExactExtremaPositioningTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Use production resolution: 16384 samples
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
@@ -356,12 +348,11 @@ TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
 
     // Disable significance filtering to test raw extrema detection
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.0;  // Disable filtering
+    config.significanceThreshold = 0.0; // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Should detect 2 extrema (peaks at x = ±0.5)
-    EXPECT_EQ(2, features.localExtrema.size())
-        << "Harmonic 3 has exactly 2 extrema";
+    EXPECT_EQ(2, features.localExtrema.size()) << "Harmonic 3 has exactly 2 extrema";
 
     auto positions = getExtremaPositions(features);
 
@@ -374,8 +365,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
     // This test will FAIL initially, exposing discretization issue
     for (size_t i = 0; i < expected.size(); ++i) {
         EXPECT_NEAR(positions[i], expected[i], 1e-4)
-            << "Extremum " << i << " should be at x = " << expected[i]
-            << " but got x = " << positions[i]
+            << "Extremum " << i << " should be at x = " << expected[i] << " but got x = " << positions[i]
             << " (error: " << std::abs(positions[i] - expected[i]) << ")";
     }
 }
@@ -395,21 +385,20 @@ TEST_F(ExactExtremaPositioningTest, Harmonic5_ExactExtremaPositions) {
     }
 
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.0;  // Disable filtering
+    config.significanceThreshold = 0.0; // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Should detect 4 extrema
-    EXPECT_EQ(4, features.localExtrema.size())
-        << "Harmonic 5 has exactly 4 extrema";
+    EXPECT_EQ(4, features.localExtrema.size()) << "Harmonic 5 has exactly 4 extrema";
 
     auto positions = getExtremaPositions(features);
 
     // Mathematical truth: extrema at x = cos(kπ/5) for k=1,2,3,4
     std::vector<double> expected = {
-        std::cos(4.0 * M_PI / 5.0),  // -0.809...
-        std::cos(3.0 * M_PI / 5.0),  // -0.309...
-        std::cos(2.0 * M_PI / 5.0),  //  0.309...
-        std::cos(1.0 * M_PI / 5.0)   //  0.809...
+        std::cos(4.0 * M_PI / 5.0), // -0.809...
+        std::cos(3.0 * M_PI / 5.0), // -0.309...
+        std::cos(2.0 * M_PI / 5.0), //  0.309...
+        std::cos(1.0 * M_PI / 5.0)  //  0.809...
     };
 
     ASSERT_EQ(4, positions.size()) << "Should have 4 extrema positions";
@@ -417,8 +406,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic5_ExactExtremaPositions) {
     // Verify exact positions
     for (size_t i = 0; i < expected.size(); ++i) {
         EXPECT_NEAR(positions[i], expected[i], 1e-4)
-            << "Extremum " << i << " at x = " << positions[i]
-            << " should be at " << expected[i]
+            << "Extremum " << i << " at x = " << positions[i] << " should be at " << expected[i]
             << " (error: " << std::abs(positions[i] - expected[i]) << ")";
     }
 }
@@ -441,12 +429,11 @@ TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
     }
 
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.0;  // Disable filtering
+    config.significanceThreshold = 0.0; // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Should detect 1 extremum (peak)
-    EXPECT_EQ(1, features.localExtrema.size())
-        << "Parabola has exactly 1 extremum";
+    EXPECT_EQ(1, features.localExtrema.size()) << "Parabola has exactly 1 extremum";
 
     auto positions = getExtremaPositions(features);
 
@@ -454,8 +441,7 @@ TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
 
     // Vertex is at EXACTLY x = 0.3
     EXPECT_NEAR(positions[0], vertexX, 1e-4)
-        << "Parabola extremum should be at vertex x = " << vertexX
-        << " but got x = " << positions[0]
+        << "Parabola extremum should be at vertex x = " << vertexX << " but got x = " << positions[0]
         << " (error: " << std::abs(positions[0] - vertexX) << ")";
 }
 
@@ -474,21 +460,19 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
     }
 
     dsp_core::FeatureDetectionConfig config;
-    config.significanceThreshold = 0.0;  // Disable filtering
+    config.significanceThreshold = 0.0; // Disable filtering
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
 
     // Should detect 39 extrema (Chebyshev T_n has n-1 extrema)
     // Note: May detect 40 if boundary is included - accept 39-40
-    EXPECT_GE(features.localExtrema.size(), 39)
-        << "Harmonic 40 has at least 39 extrema";
-    EXPECT_LE(features.localExtrema.size(), 40)
-        << "Harmonic 40 has at most 40 extrema (39 + possible boundary)";
+    EXPECT_GE(features.localExtrema.size(), 39) << "Harmonic 40 has at least 39 extrema";
+    EXPECT_LE(features.localExtrema.size(), 40) << "Harmonic 40 has at most 40 extrema (39 + possible boundary)";
 
     auto positions = getExtremaPositions(features);
 
     // Generate expected positions: x = cos(kπ/40) for k=1..39
     std::vector<double> expected;
-    for (int k = 39; k >= 1; --k) {  // Reverse order for ascending x
+    for (int k = 39; k >= 1; --k) { // Reverse order for ascending x
         expected.push_back(std::cos(k * M_PI / 40.0));
     }
 
@@ -502,10 +486,8 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
             numWithinTolerance++;
         }
 
-        EXPECT_NEAR(positions[i], expected[i], 1e-4)
-            << "Extremum " << i << " at x = " << positions[i]
-            << " should be at " << expected[i]
-            << " (error: " << error << ")";
+        EXPECT_NEAR(positions[i], expected[i], 1e-4) << "Extremum " << i << " at x = " << positions[i]
+                                                     << " should be at " << expected[i] << " (error: " << error << ")";
     }
 
     // Summary metric: what percentage are exact?
@@ -549,10 +531,7 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
     // Compute coarse discretization error
     double coarseError = 0.0;
     if (positionsCoarse.size() >= 2) {
-        coarseError = std::max(
-            std::abs(positionsCoarse[0] - (-0.5)),
-            std::abs(positionsCoarse[1] - 0.5)
-        );
+        coarseError = std::max(std::abs(positionsCoarse[0] - (-0.5)), std::abs(positionsCoarse[1] - 0.5));
     }
 
     // Test with FINE resolution (production)
@@ -568,10 +547,7 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
 
     double fineError = 0.0;
     if (positionsFine.size() >= 2) {
-        fineError = std::max(
-            std::abs(positionsFine[0] - (-0.5)),
-            std::abs(positionsFine[1] - 0.5)
-        );
+        fineError = std::max(std::abs(positionsFine[0] - (-0.5)), std::abs(positionsFine[1] - 0.5));
     }
 
     std::cout << "Coarse (256 samples) discretization error: " << coarseError << " (" << (coarseError * 100) << "%)\n";
@@ -580,8 +556,7 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
 
     // Fine resolution should have much smaller error
     // But even 0.0001 (0.01%) is visible when you have 39 extrema aligned
-    EXPECT_LT(fineError, coarseError / 10.0)
-        << "Fine resolution should have <10% of coarse error";
+    EXPECT_LT(fineError, coarseError / 10.0) << "Fine resolution should have <10% of coarse error";
 }
 
 } // namespace dsp_core_test

@@ -84,13 +84,11 @@ struct FeatureDetectionConfig {
      * Increase threshold (e.g., 2-5%) for noise filtering
      */
     FeatureDetectionConfig()
-        : significanceThreshold(0.001)
-        , maxFeatures(100)
-        , derivativeThreshold(1e-06)
-        , secondDerivativeThreshold(0.002)  // Phase 4 v3: Filters artifact inflections (20× higher than 0.0001 default)
-        , extremaInflectionRatio(0.8)
-        , enableSignificanceFiltering(false)
-        , enableInflectionDetection(false)   // Phase 4 v5: Disabled by default - saves CPU with no quality impact
+        : significanceThreshold(0.001), maxFeatures(100), derivativeThreshold(1e-06),
+          secondDerivativeThreshold(0.002) // Phase 4 v3: Filters artifact inflections (20× higher than 0.0001 default)
+          ,
+          extremaInflectionRatio(0.8), enableSignificanceFiltering(false),
+          enableInflectionDetection(false) // Phase 4 v5: Disabled by default - saves CPU with no quality impact
     {}
 
     bool operator==(const FeatureDetectionConfig&) const = default;
@@ -121,11 +119,11 @@ namespace Services {
  *   - Reusable across modules
  */
 class CurveFeatureDetector {
-public:
+  public:
     struct FeatureResult {
-        std::vector<int> localExtrema;       // peaks and valleys (dy/dx sign changes)
-        std::vector<int> inflectionPoints;   // d²y/dx² sign changes
-        std::vector<int> mandatoryAnchors;   // merged + sorted (always include these)
+        std::vector<int> localExtrema;     // peaks and valleys (dy/dx sign changes)
+        std::vector<int> inflectionPoints; // d²y/dx² sign changes
+        std::vector<int> mandatoryAnchors; // merged + sorted (always include these)
     };
 
     /**
@@ -136,7 +134,7 @@ public:
      * @return Feature indices (table indices, not normalized coordinates)
      */
     static FeatureResult detectFeatures(const LayeredTransferFunction& ltf,
-                                       const FeatureDetectionConfig& config = FeatureDetectionConfig{});
+                                        const FeatureDetectionConfig& config = FeatureDetectionConfig{});
 
     /**
      * Legacy overload for backward compatibility
@@ -144,8 +142,8 @@ public:
      */
     static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors);
 
-private:
-    CurveFeatureDetector() = delete;  // Pure static service
+  private:
+    CurveFeatureDetector() = delete; // Pure static service
 
     /**
      * Estimate first derivative at index using central difference

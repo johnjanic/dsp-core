@@ -9,24 +9,24 @@
 using namespace dsp_core::audio_pipeline;
 
 class DryWetMixStageTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Create a simple pipeline with a gain stage
         auto pipeline = std::make_unique<AudioPipeline>();
         auto gainStage = std::make_unique<GainStage>();
-        gainStage_ = gainStage.get();  // Save pointer for later access
+        gainStage_ = gainStage.get(); // Save pointer for later access
         pipeline->addStage(std::move(gainStage), "gain");
 
         dryWetMix_ = std::make_unique<DryWetMixStage>(std::move(pipeline));
-        dryWetMix_->prepareToPlay(44100.0, 1024);  // Larger buffer for edge case tests
+        dryWetMix_->prepareToPlay(44100.0, 1024); // Larger buffer for edge case tests
     }
 
     std::unique_ptr<DryWetMixStage> dryWetMix_;
-    GainStage* gainStage_ = nullptr;  // Non-owning pointer
+    GainStage* gainStage_ = nullptr; // Non-owning pointer
 };
 
 TEST_F(DryWetMixStageTest, FullyDry_OutputEqualsInput) {
-    dryWetMix_->setMixAmount(0.0);  // 100% dry
+    dryWetMix_->setMixAmount(0.0); // 100% dry
 
     juce::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
@@ -54,7 +54,7 @@ TEST_F(DryWetMixStageTest, FullyDry_OutputEqualsInput) {
 
 TEST_F(DryWetMixStageTest, FullyWet_OutputEqualsProcessed) {
     // Use default gain (1.0) and mix to 100% wet to avoid gain smoothing issues
-    dryWetMix_->setMixAmount(1.0);  // 100% wet
+    dryWetMix_->setMixAmount(1.0); // 100% wet
 
     juce::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
@@ -69,15 +69,14 @@ TEST_F(DryWetMixStageTest, FullyWet_OutputEqualsProcessed) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             double expected = static_cast<double>(i) / 64.0;
-            EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
 
 TEST_F(DryWetMixStageTest, FiftyFiftyMix_CorrectBlend) {
     // Use default gain (1.0) and mix to 50/50 to avoid gain smoothing issues
-    dryWetMix_->setMixAmount(0.5);  // 50% dry, 50% wet
+    dryWetMix_->setMixAmount(0.5); // 50% dry, 50% wet
 
     juce::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
@@ -92,9 +91,8 @@ TEST_F(DryWetMixStageTest, FiftyFiftyMix_CorrectBlend) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             double input = static_cast<double>(i) / 64.0;
-            double expected = input;  // 0.5 * input + 0.5 * input
-            EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expected = input; // 0.5 * input + 0.5 * input
+            EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -147,9 +145,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_Unaligned63Samples) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 63; ++i) {
             double input = static_cast<double>(i) / 63.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -171,9 +168,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_Aligned64Samples) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             double input = static_cast<double>(i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -195,9 +191,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_LargeBuffer512Samples) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             double input = static_cast<double>(i) / 512.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -219,9 +214,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_513Samples) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 513; ++i) {
             double input = static_cast<double>(i) / 513.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -232,7 +226,7 @@ TEST_F(DryWetMixStageTest, NegativeValues_HandledCorrectly) {
     juce::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            buffer.setSample(ch, i, -static_cast<double>(i) / 64.0);  // Negative values
+            buffer.setSample(ch, i, -static_cast<double>(i) / 64.0); // Negative values
         }
     }
 
@@ -242,9 +236,8 @@ TEST_F(DryWetMixStageTest, NegativeValues_HandledCorrectly) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             double input = -static_cast<double>(i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -265,9 +258,8 @@ TEST_F(DryWetMixStageTest, MultiChannel_8Channels) {
     for (int ch = 0; ch < 8; ++ch) {
         for (int i = 0; i < 64; ++i) {
             double input = static_cast<double>(ch + i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input;  // Gain=1.0
-            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10)
-                << "Channel " << ch << ", sample " << i;
+            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
 }
@@ -277,7 +269,7 @@ TEST_F(DryWetMixStageTest, MultiChannel_8Channels) {
 // =============================================================================
 
 class DryWetMixWithLatencyTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Will be set up in individual tests with different oversampling factors
     }
@@ -289,10 +281,7 @@ protected:
         gainStage_ = gainStage.get();
 
         // Wrap gain in oversampling (introduces latency)
-        auto oversamplingWrapper = std::make_unique<OversamplingWrapper>(
-            std::move(gainStage),
-            oversamplingOrder
-        );
+        auto oversamplingWrapper = std::make_unique<OversamplingWrapper>(std::move(gainStage), oversamplingOrder);
         oversamplingWrapper_ = oversamplingWrapper.get();
         pipeline->addStage(std::move(oversamplingWrapper), "oversampled_gain");
 
@@ -306,7 +295,7 @@ protected:
 };
 
 TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_2xOversampling) {
-    createDryWetMixWithOversampling(1);  // 2x oversampling
+    createDryWetMixWithOversampling(1); // 2x oversampling
 
     const int latency = dryWetMix_->getLatencySamples();
     EXPECT_GT(latency, 0) << "Oversampling should introduce latency";
@@ -317,7 +306,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_2xOversampling) {
     // Create impulse signal
     juce::AudioBuffer<double> buffer(2, 512);
     buffer.clear();
-    buffer.setSample(0, 100, 1.0);  // Impulse at sample 100
+    buffer.setSample(0, 100, 1.0); // Impulse at sample 100
     buffer.setSample(1, 100, 1.0);
 
     // Process multiple blocks to fill the delay buffer
@@ -339,7 +328,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_2xOversampling) {
 }
 
 TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_4xOversampling) {
-    createDryWetMixWithOversampling(2);  // 4x oversampling
+    createDryWetMixWithOversampling(2); // 4x oversampling
 
     const int latency = dryWetMix_->getLatencySamples();
     EXPECT_GT(latency, 0) << "Oversampling should introduce latency";
@@ -390,7 +379,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_4xOversampling) {
 }
 
 TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_8xOversampling) {
-    createDryWetMixWithOversampling(3);  // 8x oversampling
+    createDryWetMixWithOversampling(3); // 8x oversampling
 
     const int latency = dryWetMix_->getLatencySamples();
     EXPECT_GT(latency, 0) << "Oversampling should introduce latency";
@@ -431,14 +420,13 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_8xOversampling) {
 }
 
 TEST_F(DryWetMixWithLatencyTest, LatencyReporting_MatchesPipeline) {
-    createDryWetMixWithOversampling(2);  // 4x oversampling
+    createDryWetMixWithOversampling(2); // 4x oversampling
 
     // DryWetMixStage should report the same latency as its internal pipeline
     const int dryWetLatency = dryWetMix_->getLatencySamples();
     const int pipelineLatency = dryWetMix_->getEffectsPipeline()->getLatencySamples();
 
-    EXPECT_EQ(dryWetLatency, pipelineLatency)
-        << "DryWetMixStage should report pipeline latency for DAW compensation";
+    EXPECT_EQ(dryWetLatency, pipelineLatency) << "DryWetMixStage should report pipeline latency for DAW compensation";
 }
 
 TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
@@ -448,8 +436,7 @@ TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
     dryWetMix_ = std::make_unique<DryWetMixStage>(std::move(pipeline));
     dryWetMix_->prepareToPlay(44100.0, 512);
 
-    EXPECT_EQ(dryWetMix_->getLatencySamples(), 0)
-        << "No oversampling should have zero latency";
+    EXPECT_EQ(dryWetMix_->getLatencySamples(), 0) << "No oversampling should have zero latency";
 
     // Set to 50/50 mix
     dryWetMix_->setMixAmount(0.5);
@@ -467,7 +454,7 @@ TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             double input = static_cast<double>(i) / 512.0;
-            expected.setSample(ch, i, 0.5 * input + 0.5 * input);  // 50/50 mix
+            expected.setSample(ch, i, 0.5 * input + 0.5 * input); // 50/50 mix
         }
     }
 

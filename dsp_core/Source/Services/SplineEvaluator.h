@@ -25,49 +25,31 @@ namespace Services {
  *   - Reusable across modules
  */
 class SplineEvaluator {
-public:
+  public:
     // Evaluate PCHIP spline at position x
-    static double evaluate(
-        const std::vector<SplineAnchor>& anchors,
-        double x
-    );
+    static double evaluate(const std::vector<SplineAnchor>& anchors, double x);
 
     // Batch evaluate for array of X values (avoids repeated binary searches)
     // Much faster than calling evaluate() in a loop (3-5x speedup)
     // ASSUMES: xValues are sorted in ascending order
-    static void evaluateBatch(
-        const std::vector<SplineAnchor>& anchors,
-        const double* xValues,
-        double* yValues,
-        int count
-    );
+    static void evaluateBatch(const std::vector<SplineAnchor>& anchors, const double* xValues, double* yValues,
+                              int count);
 
     // Evaluate derivative at position x
-    static double evaluateDerivative(
-        const std::vector<SplineAnchor>& anchors,
-        double x
-    );
+    static double evaluateDerivative(const std::vector<SplineAnchor>& anchors, double x);
 
     // Evaluate Hermite polynomial on segment [i, i+1]
     // Made public for use by SplineFitter's overshoot detection
-    static double evaluateSegment(
-        const SplineAnchor& p0,
-        const SplineAnchor& p1,
-        double x
-    );
+    static double evaluateSegment(const SplineAnchor& p0, const SplineAnchor& p1, double x);
 
-private:
+  private:
     // Find segment containing x (binary search)
     static int findSegment(const std::vector<SplineAnchor>& anchors, double x);
 
     // Evaluate Hermite derivative on segment [i, i+1]
-    static double evaluateSegmentDerivative(
-        const SplineAnchor& p0,
-        const SplineAnchor& p1,
-        double x
-    );
+    static double evaluateSegmentDerivative(const SplineAnchor& p0, const SplineAnchor& p1, double x);
 
-    SplineEvaluator() = delete;  // Pure static utility
+    SplineEvaluator() = delete; // Pure static utility
 };
 
 } // namespace Services

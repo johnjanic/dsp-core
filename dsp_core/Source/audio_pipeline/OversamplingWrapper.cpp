@@ -2,23 +2,17 @@
 
 namespace dsp_core::audio_pipeline {
 
-OversamplingWrapper::OversamplingWrapper(
-    std::unique_ptr<AudioProcessingStage> wrappedStage,
-    int oversamplingOrder
-)
-    : wrappedStage_(std::move(wrappedStage))
-    , currentOrder_(oversamplingOrder)
-{
+OversamplingWrapper::OversamplingWrapper(std::unique_ptr<AudioProcessingStage> wrappedStage, int oversamplingOrder)
+    : wrappedStage_(std::move(wrappedStage)), currentOrder_(oversamplingOrder) {
     jassert(wrappedStage_ != nullptr);
     jassert(oversamplingOrder >= 0 && oversamplingOrder <= 4);
 
     // Pre-create all oversamplers
     for (int i = 0; i < 5; ++i) {
         oversamplers_[i] = std::make_unique<juce::dsp::Oversampling<double>>(
-            2,  // 2 channels (stereo)
-            i,  // Oversampling order
-            juce::dsp::Oversampling<double>::filterHalfBandPolyphaseIIR
-        );
+            2, // 2 channels (stereo)
+            i, // Oversampling order
+            juce::dsp::Oversampling<double>::filterHalfBandPolyphaseIIR);
     }
 }
 
@@ -38,7 +32,7 @@ void OversamplingWrapper::prepareToPlay(double sampleRate, int samplesPerBlock) 
     }
 
     // Prepare wrapped stage at oversampled rate
-    const int factor = 1 << currentOrder_;  // 2^order
+    const int factor = 1 << currentOrder_; // 2^order
     const int oversampledBlockSize = samplesPerBlock * factor;
     wrappedStage_->prepareToPlay(sampleRate * factor, oversampledBlockSize);
 }
@@ -59,11 +53,8 @@ void OversamplingWrapper::process(juce::AudioBuffer<double>& buffer) {
         channelPointers_[ch] = oversampledBlock.getChannelPointer(ch);
     }
 
-    juce::AudioBuffer<double> oversampledBuffer(
-        channelPointers_.data(),
-        static_cast<int>(numChannels),
-        static_cast<int>(oversampledBlock.getNumSamples())
-    );
+    juce::AudioBuffer<double> oversampledBuffer(channelPointers_.data(), static_cast<int>(numChannels),
+                                                static_cast<int>(oversampledBlock.getNumSamples()));
 
     // 3. Process wrapped stage at high sample rate
     wrappedStage_->process(oversampledBuffer);
@@ -96,7 +87,8 @@ int OversamplingWrapper::getLatencySamples() const {
 
 void OversamplingWrapper::setOversamplingOrder(int order) {
     jassert(order >= 0 && order <= 4);
-    if (order == currentOrder_) return;
+    if (order == currentOrder_)
+        return;
 
     currentOrder_ = order;
 

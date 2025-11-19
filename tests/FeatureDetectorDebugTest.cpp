@@ -32,8 +32,8 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
         if (idx >= 0 && idx < ltf->getTableSize()) {
             double x = ltf->normalizeIndex(idx);
             double y = ltf->getBaseLayerValue(idx);
-            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x
-                      << ", y=" << y << std::endl;
+            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x << ", y=" << y
+                      << std::endl;
         }
     }
 
@@ -58,8 +58,8 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
                   << ", significanceThreshold=" << config.significanceThreshold << std::endl;
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
-        std::cout << "Result: " << features.localExtrema.size() << " extrema, "
-                  << features.inflectionPoints.size() << " inflections" << std::endl;
+        std::cout << "Result: " << features.localExtrema.size() << " extrema, " << features.inflectionPoints.size()
+                  << " inflections" << std::endl;
     }
 
     // Try with NO thresholds
@@ -98,8 +98,8 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
             double y1 = ltf->getBaseLayerValue(idx + 1);
             double deriv = (y1 - y0) / (x1 - x0);
 
-            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x
-                      << ", y=" << y << ", dy/dx=" << std::setprecision(8) << deriv << std::endl;
+            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x << ", y=" << y
+                      << ", dy/dx=" << std::setprecision(8) << deriv << std::endl;
         }
     }
 
@@ -118,8 +118,8 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
             double y1 = ltf->getBaseLayerValue(idx + 1);
             double deriv = (y1 - y0) / (x1 - x0);
 
-            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x
-                      << ", y=" << y << ", dy/dx=" << std::setprecision(8) << deriv << std::endl;
+            std::cout << "  idx=" << idx << ", x=" << std::fixed << std::setprecision(6) << x << ", y=" << y
+                      << ", dy/dx=" << std::setprecision(8) << deriv << std::endl;
         }
     }
 }

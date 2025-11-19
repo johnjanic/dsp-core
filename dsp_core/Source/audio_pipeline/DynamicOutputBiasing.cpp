@@ -2,15 +2,10 @@
 
 namespace dsp_core::audio_pipeline {
 
-DynamicOutputBiasing::DynamicOutputBiasing(
-    LayeredTransferFunction& ltf,
-    SilenceDetector& silenceDetector
-)
-    : ltf_(ltf)
-    , silenceDetector_(silenceDetector)
-    , lastBiasUpdate_()  // Default-constructed (epoch), allows first update immediately
-{
-}
+DynamicOutputBiasing::DynamicOutputBiasing(LayeredTransferFunction& ltf, SilenceDetector& silenceDetector)
+    : ltf_(ltf), silenceDetector_(silenceDetector),
+      lastBiasUpdate_() // Default-constructed (epoch), allows first update immediately
+{}
 
 void DynamicOutputBiasing::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
@@ -64,7 +59,7 @@ void DynamicOutputBiasing::updateBias() {
     // Rate limiting: max 20 updates/sec (avoid excessive evaluations during rapid editing)
     auto now = std::chrono::steady_clock::now();
     if (now - lastBiasUpdate_ < std::chrono::milliseconds(kDebounceMs)) {
-        return;  // Debounce
+        return; // Debounce
     }
     lastBiasUpdate_ = now;
 

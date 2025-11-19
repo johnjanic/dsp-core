@@ -4,10 +4,7 @@
 
 namespace dsp_core::Services {
 
-ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
-    const LayeredTransferFunction& ltf,
-    double epsilon)
-{
+ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(const LayeredTransferFunction& ltf, double epsilon) {
     const int tableSize = ltf.getTableSize();
 
     double minAbsOutput = std::numeric_limits<double>::max();
@@ -34,13 +31,7 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
 
     // If we found a value close to zero, refine with bisection
     if (minAbsOutput < kRefinementThreshold) {
-        auto refinedResult = refineBisection(
-            ltf,
-            bestInputValue,
-            kSearchRadius,
-            epsilon,
-            10
-        );
+        auto refinedResult = refineBisection(ltf, bestInputValue, kSearchRadius, epsilon, 10);
 
         return refinedResult;
     }
@@ -48,13 +39,9 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(
     return {false, bestInputValue, bestOutputValue};
 }
 
-ZeroCrossingSolver::SolveResult ZeroCrossingSolver::refineBisection(
-    const LayeredTransferFunction& ltf,
-    double initialGuess,
-    double searchRadius,
-    double epsilon,
-    int maxIterations)
-{
+ZeroCrossingSolver::SolveResult ZeroCrossingSolver::refineBisection(const LayeredTransferFunction& ltf,
+                                                                    double initialGuess, double searchRadius,
+                                                                    double epsilon, int maxIterations) {
     const double minSignal = ltf.getMinSignalValue();
     const double maxSignal = ltf.getMaxSignalValue();
 

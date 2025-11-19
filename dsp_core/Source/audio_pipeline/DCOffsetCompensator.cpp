@@ -4,33 +4,29 @@
 
 namespace dsp_core::audio_pipeline {
 
-DCOffsetCompensator::DCOffsetCompensator(LayeredTransferFunction& ltf)
-    : ltf_(ltf)
-{
+DCOffsetCompensator::DCOffsetCompensator(LayeredTransferFunction& ltf) : ltf_(ltf) {
     lastBiasUpdate_ = std::chrono::steady_clock::now();
 }
 
-void DCOffsetCompensator::prepareToPlay(double sampleRate, int samplesPerBlock)
-{
+void DCOffsetCompensator::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
 
     // Configure fade controller with proper attack/release times
     fade_.configure(sampleRate);
 
     // Resize and configure per-channel envelopes (assume stereo by default)
-    const int numChannels = 2;  // Will be resized in process() if needed
+    const int numChannels = 2; // Will be resized in process() if needed
     channelEnvelopes_.resize(numChannels);
 
     for (auto& envelope : channelEnvelopes_) {
-        envelope.configure(sampleRate, 100.0);  // 100ms decay time
+        envelope.configure(sampleRate, 100.0); // 100ms decay time
     }
 
     // Compute initial bias (non-interactive)
     notifyTransferFunctionChanged(false);
 }
 
-void DCOffsetCompensator::process(juce::AudioBuffer<double>& buffer)
-{
+void DCOffsetCompensator::process(juce::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
@@ -84,8 +80,7 @@ void DCOffsetCompensator::process(juce::AudioBuffer<double>& buffer)
     }
 }
 
-void DCOffsetCompensator::reset()
-{
+void DCOffsetCompensator::reset() {
     // Reset all envelope detectors
     for (auto& envelope : channelEnvelopes_) {
         envelope.peakLevel = 0.0;
@@ -95,8 +90,7 @@ void DCOffsetCompensator::reset()
     fade_.fadeAmount.setCurrentAndTargetValue(0.0);
 }
 
-void DCOffsetCompensator::notifyTransferFunctionChanged(bool isInteractiveEdit)
-{
+void DCOffsetCompensator::notifyTransferFunctionChanged(bool isInteractiveEdit) {
     // Rate limiting check
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastBiasUpdate_).count();

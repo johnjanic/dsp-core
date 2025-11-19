@@ -42,9 +42,9 @@ struct PeakEnvelopeDetector {
         // Instant attack (max): zero latency for transients
         // Exponential decay: smooth release for musical envelope
         if (absInput > peakLevel) {
-            peakLevel = absInput;  // Attack
+            peakLevel = absInput; // Attack
         } else {
-            peakLevel *= decayCoeff;  // Decay
+            peakLevel *= decayCoeff; // Decay
         }
     }
 
@@ -59,7 +59,7 @@ struct PeakEnvelopeDetector {
      * @return true if peak level is below silence threshold
      */
     bool isNearSilence() const {
-        return peakLevel < 0.002;  // -54 dBFS
+        return peakLevel < 0.002; // -54 dBFS
     }
 
     /**

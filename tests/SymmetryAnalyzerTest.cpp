@@ -10,9 +10,9 @@ using namespace dsp_core::Services;
 //==============================================================================
 
 class SymmetryAnalyzerTest : public ::testing::Test {
-protected:
+  protected:
     std::unique_ptr<LayeredTransferFunction> ltf;
-    const int tableSize = 16384;  // Power-of-2 for FFT/SIMD
+    const int tableSize = 16384; // Power-of-2 for FFT/SIMD
 
     void SetUp() override {
         ltf = std::make_unique<LayeredTransferFunction>(tableSize, -1.0, 1.0);
@@ -43,10 +43,14 @@ protected:
             double y = 0.0;
 
             // Chebyshev polynomial evaluation
-            if (n == 1) y = x;
-            else if (n == 2) y = 2.0 * x * x - 1.0;
-            else if (n == 3) y = 4.0 * x * x * x - 3.0 * x;
-            else if (n == 5) y = 16.0 * std::pow(x, 5) - 20.0 * std::pow(x, 3) + 5.0 * x;
+            if (n == 1)
+                y = x;
+            else if (n == 2)
+                y = 2.0 * x * x - 1.0;
+            else if (n == 3)
+                y = 4.0 * x * x * x - 3.0 * x;
+            else if (n == 5)
+                y = 16.0 * std::pow(x, 5) - 20.0 * std::pow(x, 3) + 5.0 * x;
 
             ltf->setBaseLayerValue(i, y);
         }
@@ -119,7 +123,7 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_TanhWithBump_ApproximateSymmetry) {
         double x = ltf->normalizeIndex(i);
         if (x > 0.4 && x < 0.6) {
             double currentY = ltf->getBaseLayerValue(i);
-            ltf->setBaseLayerValue(i, currentY + 0.15);  // Larger bump to break perfect symmetry
+            ltf->setBaseLayerValue(i, currentY + 0.15); // Larger bump to break perfect symmetry
         }
     }
     ltf->updateComposite();
@@ -131,8 +135,7 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_TanhWithBump_ApproximateSymmetry) {
     EXPECT_GE(result.score, 0.85) << "Should still detect approximate symmetry";
     EXPECT_LT(result.score, 0.99) << "But not perfect due to asymmetric bump";
     // Classification could be Approximate or Asymmetric depending on bump size
-    EXPECT_TRUE(result.score >= 0.90 ||
-                result.classification == SymmetryAnalyzer::Result::Classification::Asymmetric);
+    EXPECT_TRUE(result.score >= 0.90 || result.classification == SymmetryAnalyzer::Result::Classification::Asymmetric);
 }
 
 //==============================================================================
@@ -200,7 +203,7 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_ConfigThresholds_AffectClassification) {
         double x = ltf->normalizeIndex(i);
         if (x > 0.7) {
             double currentY = ltf->getBaseLayerValue(i);
-            ltf->setBaseLayerValue(i, currentY + 0.01);  // Tiny bump
+            ltf->setBaseLayerValue(i, currentY + 0.01); // Tiny bump
         }
     }
     ltf->updateComposite();

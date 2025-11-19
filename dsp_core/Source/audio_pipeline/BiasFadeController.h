@@ -43,7 +43,7 @@ struct BiasFadeController {
         // Calculate exponential smoothing coefficients
         // Target: reach 99% of target value in specified time
         // Formula: coeff = exp(-ln(100) / (time * sampleRate))
-        attackCoeff_ = std::exp(-4.605 / (attackTimeSeconds * sampleRate));  // ln(100) ≈ 4.605
+        attackCoeff_ = std::exp(-4.605 / (attackTimeSeconds * sampleRate)); // ln(100) ≈ 4.605
         releaseCoeff_ = std::exp(-4.605 / (releaseTimeSeconds * sampleRate));
     }
 

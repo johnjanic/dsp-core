@@ -32,8 +32,8 @@ TEST(ZeroCrossingSolverTest, NoZeroCrossing) {
     auto result = dsp_core::Services::ZeroCrossingSolver::solve(ltf);
 
     EXPECT_FALSE(result.hasExactZero);
-    EXPECT_LT(result.inputValue, -0.9);  // Near left boundary
-    EXPECT_GT(std::abs(result.outputValue), 0.05);  // Residual DC remains
+    EXPECT_LT(result.inputValue, -0.9);            // Near left boundary
+    EXPECT_GT(std::abs(result.outputValue), 0.05); // Residual DC remains
 }
 
 TEST(ZeroCrossingSolverTest, MultipleZeros) {

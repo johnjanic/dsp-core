@@ -11,14 +11,14 @@ using namespace dsp_core::Services;
 TEST(CoordinateSnapperTest, SnapValue_PositiveValues) {
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.47, 0.1), 0.5);
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.44, 0.1), 0.4);
-    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.45, 0.1), 0.5);  // Midpoint rounds up
+    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.45, 0.1), 0.5); // Midpoint rounds up
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.51, 0.1), 0.5);
 }
 
 TEST(CoordinateSnapperTest, SnapValue_NegativeValues) {
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(-0.47, 0.1), -0.5);
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(-0.44, 0.1), -0.4);
-    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(-0.45, 0.1), -0.5);  // Midpoint rounds to even
+    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(-0.45, 0.1), -0.5); // Midpoint rounds to even
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(-0.51, 0.1), -0.5);
 }
 
@@ -109,25 +109,25 @@ TEST(CoordinateSnapperTest, SnapPoint_DefaultParameters) {
 TEST(CoordinateSnapperTest, IsNearGridLine_WithinThreshold) {
     EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.48, 0.1, 0.05));
     EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.52, 0.1, 0.05));
-    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.50, 0.1, 0.05));  // Exactly on line
+    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.50, 0.1, 0.05)); // Exactly on line
 }
 
 TEST(CoordinateSnapperTest, IsNearGridLine_OutsideThreshold) {
-    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.36, 0.1, 0.03));  // nearest=0.4, distance=0.04 > 0.03
-    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.64, 0.1, 0.03));  // nearest=0.6, distance=0.04 > 0.03
-    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.35, 0.1, 0.04));  // nearest=0.4, distance=0.05 > 0.04
+    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.36, 0.1, 0.03)); // nearest=0.4, distance=0.04 > 0.03
+    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.64, 0.1, 0.03)); // nearest=0.6, distance=0.04 > 0.03
+    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(0.35, 0.1, 0.04)); // nearest=0.4, distance=0.05 > 0.04
 }
 
 TEST(CoordinateSnapperTest, IsNearGridLine_ExactlyOnBoundary) {
     // Exactly at threshold distance - should be true (<=)
-    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.45, 0.1, 0.05));  // nearest=0.5, distance=0.05
-    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.35, 0.1, 0.05));  // nearest=0.4, distance=0.05
+    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.45, 0.1, 0.05)); // nearest=0.5, distance=0.05
+    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(0.35, 0.1, 0.05)); // nearest=0.4, distance=0.05
 }
 
 TEST(CoordinateSnapperTest, IsNearGridLine_NegativeValues) {
-    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(-0.48, 0.1, 0.05));   // nearest=-0.5, distance=0.02
-    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(-0.52, 0.1, 0.05));   // nearest=-0.5, distance=0.02
-    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(-0.36, 0.1, 0.03));  // nearest=-0.4, distance=0.04 > 0.03
+    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(-0.48, 0.1, 0.05));  // nearest=-0.5, distance=0.02
+    EXPECT_TRUE(CoordinateSnapper::isNearGridLine(-0.52, 0.1, 0.05));  // nearest=-0.5, distance=0.02
+    EXPECT_FALSE(CoordinateSnapper::isNearGridLine(-0.36, 0.1, 0.03)); // nearest=-0.4, distance=0.04 > 0.03
 }
 
 TEST(CoordinateSnapperTest, IsNearGridLine_InvalidGridStep) {
@@ -180,14 +180,8 @@ TEST(CoordinateSnapperTest, NearestGridLine_FractionalGridStep) {
 TEST(CoordinateSnapperTest, Symmetry_PositiveAndNegative) {
     // Verify symmetric behavior for positive and negative values
     double gridStep = 0.1;
-    EXPECT_DOUBLE_EQ(
-        CoordinateSnapper::snapValue(0.47, gridStep),
-        -CoordinateSnapper::snapValue(-0.47, gridStep)
-    );
-    EXPECT_DOUBLE_EQ(
-        CoordinateSnapper::snapValue(0.23, gridStep),
-        -CoordinateSnapper::snapValue(-0.23, gridStep)
-    );
+    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.47, gridStep), -CoordinateSnapper::snapValue(-0.47, gridStep));
+    EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.23, gridStep), -CoordinateSnapper::snapValue(-0.23, gridStep));
 }
 
 TEST(CoordinateSnapperTest, ZeroValue) {

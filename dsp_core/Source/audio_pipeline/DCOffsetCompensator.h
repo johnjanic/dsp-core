@@ -29,7 +29,7 @@ namespace dsp_core::audio_pipeline {
  * CPU Cost: ~1-2% overhead (envelope detection + bias addition)
  */
 class DCOffsetCompensator : public AudioProcessingStage {
-public:
+  public:
     /**
      * Peak envelope detector with instant attack and exponential decay.
      * Used for silence detection (threshold: -60 dBFS).
@@ -50,7 +50,7 @@ public:
         }
 
         bool isNearSilence() const {
-            return peakLevel < 0.001;  // -60 dBFS
+            return peakLevel < 0.001; // -60 dBFS
         }
 
         double getPeakLevel() const {
@@ -67,7 +67,7 @@ public:
         juce::LinearSmoothedValue<double> fadeAmount;
 
         void configure(double sampleRate) {
-            fadeAmount.reset(sampleRate, 0.010);  // 10ms ramp for reset
+            fadeAmount.reset(sampleRate, 0.010); // 10ms ramp for reset
         }
 
         void process(bool isNearSilence) {
@@ -110,11 +110,17 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "DCOffsetCompensator"; }
+    juce::String getName() const override {
+        return "DCOffsetCompensator";
+    }
 
     // Control interface (thread-safe)
-    void setEnabled(bool shouldBeEnabled) { enabled_.store(shouldBeEnabled, std::memory_order_release); }
-    bool isEnabled() const { return enabled_.load(std::memory_order_acquire); }
+    void setEnabled(bool shouldBeEnabled) {
+        enabled_.store(shouldBeEnabled, std::memory_order_release);
+    }
+    bool isEnabled() const {
+        return enabled_.load(std::memory_order_acquire);
+    }
 
     /**
      * Notify that transfer function has changed.
@@ -131,18 +137,22 @@ public:
      * Get current bias value (for UI display/debugging).
      * Thread-safe: uses atomic load.
      */
-    double getCurrentBias() const { return currentBias_.load(std::memory_order_acquire); }
+    double getCurrentBias() const {
+        return currentBias_.load(std::memory_order_acquire);
+    }
 
     /**
      * Check if compensation is currently active (faded in).
      * Used for UI indicators (e.g., show "COMP" light when active).
      */
-    bool isCompensating() const { return fade_.getCurrentValue() > 0.01; }
+    bool isCompensating() const {
+        return fade_.getCurrentValue() > 0.01;
+    }
 
-private:
+  private:
     LayeredTransferFunction& ltf_;
-    std::atomic<bool> enabled_{true};  // Default: ON (safety feature)
-    std::atomic<double> currentBias_{0.0};  // UI writes, audio reads
+    std::atomic<bool> enabled_{true};      // Default: ON (safety feature)
+    std::atomic<double> currentBias_{0.0}; // UI writes, audio reads
 
     // Per-channel state (audio thread only, no synchronization needed)
     std::vector<PeakEnvelopeDetector> channelEnvelopes_;
@@ -151,8 +161,8 @@ private:
 
     // Rate limiting for bias updates (UI thread only)
     std::chrono::steady_clock::time_point lastBiasUpdate_;
-    static constexpr int kDebounceInteractiveMs = 16;   // ~60 Hz for paint strokes
-    static constexpr int kDebounceAutomationMs = 50;    // ~20 Hz for automation
+    static constexpr int kDebounceInteractiveMs = 16; // ~60 Hz for paint strokes
+    static constexpr int kDebounceAutomationMs = 50;  // ~20 Hz for automation
 };
 
 } // namespace dsp_core::audio_pipeline

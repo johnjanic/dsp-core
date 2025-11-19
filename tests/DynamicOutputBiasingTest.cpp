@@ -11,9 +11,9 @@ using namespace dsp_core::audio_pipeline;
 // ============================================================================
 
 class PeakEnvelopeDetectorTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
-        detector_.configure(48000.0, 100.0);  // 100ms decay at 48kHz
+        detector_.configure(48000.0, 100.0); // 100ms decay at 48kHz
     }
 
     PeakEnvelopeDetector detector_;
@@ -25,10 +25,10 @@ TEST_F(PeakEnvelopeDetectorTest, InstantAttack) {
     EXPECT_DOUBLE_EQ(detector_.getPeakLevel(), 0.0);
 
     detector_.process(0.5);
-    EXPECT_DOUBLE_EQ(detector_.getPeakLevel(), 0.5);  // Instant attack
+    EXPECT_DOUBLE_EQ(detector_.getPeakLevel(), 0.5); // Instant attack
 
     detector_.process(1.0);
-    EXPECT_DOUBLE_EQ(detector_.getPeakLevel(), 1.0);  // Higher peak
+    EXPECT_DOUBLE_EQ(detector_.getPeakLevel(), 1.0); // Higher peak
 }
 
 TEST_F(PeakEnvelopeDetectorTest, ExponentialDecay) {
@@ -41,7 +41,7 @@ TEST_F(PeakEnvelopeDetectorTest, ExponentialDecay) {
     for (int i = 0; i < 100; ++i) {
         detector_.process(0.0);
         double currentLevel = detector_.getPeakLevel();
-        EXPECT_LT(currentLevel, previousLevel);  // Should decay
+        EXPECT_LT(currentLevel, previousLevel); // Should decay
         previousLevel = currentLevel;
     }
 
@@ -54,14 +54,14 @@ TEST_F(PeakEnvelopeDetectorTest, ExponentialDecay) {
 
 TEST_F(PeakEnvelopeDetectorTest, SilenceThreshold) {
     // Below threshold
-    detector_.process(0.0005);  // -66 dBFS
+    detector_.process(0.0005); // -66 dBFS
     for (int i = 0; i < 1000; ++i) {
         detector_.process(0.0);
     }
     EXPECT_TRUE(detector_.isNearSilence());
 
     // Above threshold
-    detector_.process(0.005);  // -46 dBFS
+    detector_.process(0.005); // -46 dBFS
     EXPECT_FALSE(detector_.isNearSilence());
 }
 
@@ -78,7 +78,7 @@ TEST_F(PeakEnvelopeDetectorTest, Reset) {
 // ============================================================================
 
 class BiasFadeControllerTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         controller_.configure(48000.0);
     }
@@ -92,14 +92,14 @@ TEST_F(BiasFadeControllerTest, InitialState) {
 
 TEST_F(BiasFadeControllerTest, SlowAttackToSilence) {
     // Transition to silence (should use 300ms attack)
-    controller_.process(true);  // isNearSilence = true
+    controller_.process(true); // isNearSilence = true
 
     // After a few samples, should be ramping up slowly
     double previousValue = controller_.getCurrentValue();
     for (int i = 0; i < 1000; ++i) {
         controller_.process(true);
         double currentValue = controller_.getNextValue();
-        EXPECT_GE(currentValue, previousValue);  // Should increase
+        EXPECT_GE(currentValue, previousValue); // Should increase
         previousValue = currentValue;
     }
 
@@ -120,7 +120,7 @@ TEST_F(BiasFadeControllerTest, FastReleaseFromSilence) {
     EXPECT_GT(controller_.getCurrentValue(), 0.95);
 
     // Now transition to signal (should use 10ms release)
-    controller_.process(false);  // isNearSilence = false
+    controller_.process(false); // isNearSilence = false
 
     // After 10ms (480 samples at 48kHz), should be close to 0.0
     for (int i = 0; i < 480; ++i) {
@@ -147,7 +147,7 @@ TEST_F(BiasFadeControllerTest, Reset) {
 // ============================================================================
 
 class SilenceDetectorTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         detector_ = std::make_unique<SilenceDetector>();
         detector_->prepareToPlay(48000.0, 512);
@@ -157,7 +157,7 @@ protected:
 };
 
 TEST_F(SilenceDetectorTest, DetectsSilence) {
-    juce::AudioBuffer<double> buffer(2, 48000);  // 1 second of silence
+    juce::AudioBuffer<double> buffer(2, 48000); // 1 second of silence
     buffer.clear();
 
     detector_->process(buffer);
@@ -185,7 +185,7 @@ TEST_F(SilenceDetectorTest, AllChannelsMustBeSilent) {
     buffer.clear();
 
     // Only one channel has signal
-    buffer.setSample(0, 0, 0.5);  // Left: signal
+    buffer.setSample(0, 0, 0.5); // Left: signal
     // Right: silence
 
     detector_->process(buffer);
@@ -245,7 +245,7 @@ TEST_F(SilenceDetectorTest, Reset) {
 // ============================================================================
 
 class DynamicOutputBiasingTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf_ = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
         silenceDetector_ = std::make_unique<SilenceDetector>();
@@ -264,7 +264,7 @@ TEST_F(DynamicOutputBiasingTest, ComputesBiasCorrectly) {
     // Set up transfer function with DC offset
     // Create asymmetric function that has f(0) ≠ 0
     for (int i = 0; i < 256; ++i) {
-        double x = ltf_->normalizeIndex(i);  // Map to [-1, 1]
+        double x = ltf_->normalizeIndex(i); // Map to [-1, 1]
         // Asymmetric tanh-like function
         ltf_->setBaseLayerValue(i, std::tanh(x + 0.5));
     }
@@ -283,7 +283,7 @@ TEST_F(DynamicOutputBiasingTest, CompensatesDuringSlowFade) {
     // Set up transfer function with DC offset
     for (int i = 0; i < 256; ++i) {
         double x = ltf_->normalizeIndex(i);
-        ltf_->setBaseLayerValue(i, std::tanh(x + 0.5));  // Asymmetric function
+        ltf_->setBaseLayerValue(i, std::tanh(x + 0.5)); // Asymmetric function
     }
     ltf_->updateComposite();
 
@@ -302,7 +302,7 @@ TEST_F(DynamicOutputBiasingTest, CompensatesDuringSlowFade) {
     juce::AudioBuffer<double> outputBuffer(2, 48000);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 48000; ++i) {
-            outputBuffer.setSample(ch, i, bias);  // DC offset from waveshaper
+            outputBuffer.setSample(ch, i, bias); // DC offset from waveshaper
         }
     }
 
@@ -312,13 +312,13 @@ TEST_F(DynamicOutputBiasingTest, CompensatesDuringSlowFade) {
     // After fade-in (300ms = 14400 samples), output should be close to zero
     double finalMean = 0.0;
     for (int ch = 0; ch < 2; ++ch) {
-        for (int i = 40000; i < 48000; ++i) {  // Check last 8000 samples
+        for (int i = 40000; i < 48000; ++i) { // Check last 8000 samples
             finalMean += outputBuffer.getSample(ch, i);
         }
     }
     finalMean /= (2 * 8000);
 
-    EXPECT_NEAR(finalMean, 0.0, 0.05);  // Should compensate most of the DC
+    EXPECT_NEAR(finalMean, 0.0, 0.05); // Should compensate most of the DC
 }
 
 TEST_F(DynamicOutputBiasingTest, TransientDisablesCompensation) {
@@ -330,7 +330,7 @@ TEST_F(DynamicOutputBiasingTest, TransientDisablesCompensation) {
     biasing_->prepareToPlay(48000.0, 512);
 
     // First: silence (fade should ramp up)
-    juce::AudioBuffer<double> silenceBuffer(2, 24000);  // 0.5s
+    juce::AudioBuffer<double> silenceBuffer(2, 24000); // 0.5s
     silenceBuffer.clear();
     silenceDetector_->process(silenceBuffer);
 
@@ -347,7 +347,7 @@ TEST_F(DynamicOutputBiasingTest, TransientDisablesCompensation) {
     // Then: sharp transient
     juce::AudioBuffer<double> transientInputBuffer(2, 512);
     transientInputBuffer.clear();
-    transientInputBuffer.setSample(0, 0, 1.0);  // Sharp transient
+    transientInputBuffer.setSample(0, 0, 1.0); // Sharp transient
     transientInputBuffer.setSample(1, 0, 1.0);
     silenceDetector_->process(transientInputBuffer);
 
@@ -366,7 +366,7 @@ TEST_F(DynamicOutputBiasingTest, TransientDisablesCompensation) {
         biasing_->process(buf);
     }
 
-    EXPECT_LT(biasing_->getCurrentFade(), 0.2);  // Should be near 0
+    EXPECT_LT(biasing_->getCurrentFade(), 0.2); // Should be near 0
 }
 
 TEST_F(DynamicOutputBiasingTest, CanBeDisabled) {
@@ -418,7 +418,7 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
 
     // Immediate second call (should be debounced, bias should not change)
     for (int i = 0; i < 256; ++i) {
-        ltf_->setBaseLayerValue(i, -0.5);  // Change to -0.5
+        ltf_->setBaseLayerValue(i, -0.5); // Change to -0.5
     }
     ltf_->updateComposite();
     biasing_->notifyTransferFunctionChanged();
@@ -432,7 +432,7 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
 
     // Now should update
     for (int i = 0; i < 256; ++i) {
-        ltf_->setBaseLayerValue(i, -0.8);  // Change to -0.8
+        ltf_->setBaseLayerValue(i, -0.8); // Change to -0.8
     }
     ltf_->updateComposite();
 
@@ -441,5 +441,5 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
 
     // Should have updated (should be -1.0 now, constant negative normalizes to -1.0)
     EXPECT_NEAR(std::abs(bias3), 1.0, 0.01);
-    EXPECT_NE(bias1, bias3);  // Should have opposite sign
+    EXPECT_NE(bias1, bias3); // Should have opposite sign
 }

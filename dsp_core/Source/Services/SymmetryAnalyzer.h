@@ -26,7 +26,7 @@ namespace Services {
  * Service Pattern: Pure static methods (no state)
  */
 class SymmetryAnalyzer {
-public:
+  public:
     /**
      * Configuration for symmetry analysis
      */
@@ -66,9 +66,9 @@ public:
          * Classification based on thresholds
          */
         enum class Classification {
-            Perfect,      // score >= perfectThreshold
-            Approximate,  // score >= approximateThreshold
-            Asymmetric    // score < approximateThreshold
+            Perfect,     // score >= perfectThreshold
+            Approximate, // score >= approximateThreshold
+            Asymmetric   // score < approximateThreshold
         };
         Classification classification = Classification::Asymmetric;
 
@@ -93,10 +93,7 @@ public:
      * @param config Analysis configuration
      * @return Symmetry analysis result
      */
-    static Result analyzeOddSymmetry(
-        const LayeredTransferFunction& ltf,
-        const Config& config
-    );
+    static Result analyzeOddSymmetry(const LayeredTransferFunction& ltf, const Config& config);
 
     /**
      * Analyze curve symmetry with default configuration
@@ -106,16 +103,13 @@ public:
      */
     static Result analyzeOddSymmetry(const LayeredTransferFunction& ltf);
 
-private:
-    SymmetryAnalyzer() = delete;  // Pure static service
+  private:
+    SymmetryAnalyzer() = delete; // Pure static service
 
     /**
      * Compute Pearson correlation between f(x) and -f(-x)
      */
-    static double computeSymmetryScore(
-        const std::vector<double>& fPositive,
-        const std::vector<double>& fNegative
-    );
+    static double computeSymmetryScore(const std::vector<double>& fPositive, const std::vector<double>& fNegative);
 };
 
 } // namespace Services

@@ -13,7 +13,7 @@ namespace dsp_core_test {
  * Tests typical waveshaping curves to inform default algorithm selection
  */
 class AlgorithmBenchmark : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // Use production table size (16384) for realistic benchmarks
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
@@ -29,22 +29,15 @@ protected:
         int spuriousExtrema;
 
         void print() const {
-            std::cout << std::left
-                      << std::setw(20) << curveName
-                      << std::setw(18) << algorithmName
-                      << std::setw(10) << std::fixed << std::setprecision(3) << fittingTimeMs << " ms"
-                      << std::setw(12) << numAnchors
-                      << std::setw(15) << std::scientific << std::setprecision(4) << maxError
-                      << std::setw(15) << avgError
-                      << std::setw(10) << spuriousExtrema
-                      << std::endl;
+            std::cout << std::left << std::setw(20) << curveName << std::setw(18) << algorithmName << std::setw(10)
+                      << std::fixed << std::setprecision(3) << fittingTimeMs << " ms" << std::setw(12) << numAnchors
+                      << std::setw(15) << std::scientific << std::setprecision(4) << maxError << std::setw(15)
+                      << avgError << std::setw(10) << spuriousExtrema << std::endl;
         }
     };
 
-    BenchmarkResult benchmarkAlgorithm(
-        dsp_core::TangentAlgorithm algo,
-        const std::string& algoName,
-        const std::string& curveName) {
+    BenchmarkResult benchmarkAlgorithm(dsp_core::TangentAlgorithm algo, const std::string& algoName,
+                                       const std::string& curveName) {
 
         BenchmarkResult result;
         result.algorithmName = algoName;
@@ -54,7 +47,7 @@ protected:
         dsp_core::SplineFitConfig config;
         config.positionTolerance = 0.01;
         config.derivativeTolerance = 0.02;
-        config.maxAnchors = 64;  // Generous limit for fair comparison
+        config.maxAnchors = 64; // Generous limit for fair comparison
         config.tangentAlgorithm = algo;
 
         // Time the fitting operation
@@ -79,7 +72,8 @@ protected:
     // Simplified extrema count - just count sign changes in fitted spline derivative
     // This is a proxy metric (not perfect, but good enough for comparison)
     int countSpuriousExtrema(const std::vector<dsp_core::SplineAnchor>& anchors) {
-        if (anchors.size() < 3) return 0;
+        if (anchors.size() < 3)
+            return 0;
 
         const int NUM_SAMPLES = 1000;
         int extremaCount = 0;
@@ -123,15 +117,9 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
     std::cout << "  ALGORITHM PERFORMANCE BENCHMARK (Production Table Size: 16384)\n";
     std::cout << std::string(110, '=') << "\n\n";
 
-    std::cout << std::left
-              << std::setw(20) << "Curve Type"
-              << std::setw(18) << "Algorithm"
-              << std::setw(10) << "Time"
-              << std::setw(12) << "Anchors"
-              << std::setw(15) << "Max Error"
-              << std::setw(15) << "Avg Error"
-              << std::setw(10) << "Extrema"
-              << std::endl;
+    std::cout << std::left << std::setw(20) << "Curve Type" << std::setw(18) << "Algorithm" << std::setw(10) << "Time"
+              << std::setw(12) << "Anchors" << std::setw(15) << "Max Error" << std::setw(15) << "Avg Error"
+              << std::setw(10) << "Extrema" << std::endl;
     std::cout << std::string(110, '-') << std::endl;
 
     struct TestCurve {
@@ -153,11 +141,14 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
         {"Asymmetric Dist", [](double x) { return std::tanh(3.0 * x) + 0.2 * x * x; }},
 
         // 5. Cubic Soft Clip
-        {"Cubic Soft Clip", [](double x) {
-            if (x < -1.0) return -2.0/3.0;
-            if (x > 1.0) return 2.0/3.0;
-            return x - (x*x*x)/3.0;
-        }},
+        {"Cubic Soft Clip",
+         [](double x) {
+             if (x < -1.0)
+                 return -2.0 / 3.0;
+             if (x > 1.0)
+                 return 2.0 / 3.0;
+             return x - (x * x * x) / 3.0;
+         }},
 
         // 6. S-Curve (tube-like)
         {"Tube S-Curve", [](double x) { return x * x * x * 0.7 + x * 0.3; }},
@@ -166,10 +157,7 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
         {"Gentle Wavefolder", [](double x) { return std::sin(1.5 * M_PI * x); }},
 
         // 8. Complex Transfer Function (multiple features)
-        {"Complex Multi", [](double x) {
-            return std::tanh(2.0 * x) * (1.0 + 0.3 * std::sin(3.0 * M_PI * x));
-        }}
-    };
+        {"Complex Multi", [](double x) { return std::tanh(2.0 * x) * (1.0 + 0.3 * std::sin(3.0 * M_PI * x)); }}};
 
     std::vector<BenchmarkResult> allResults;
 
@@ -177,20 +165,12 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
         setupCurve(curve.func);
 
         // Benchmark Akima
-        auto akimaResult = benchmarkAlgorithm(
-            dsp_core::TangentAlgorithm::Akima,
-            "Akima",
-            curve.name
-        );
+        auto akimaResult = benchmarkAlgorithm(dsp_core::TangentAlgorithm::Akima, "Akima", curve.name);
         akimaResult.print();
         allResults.push_back(akimaResult);
 
         // Benchmark Fritsch-Carlson
-        auto fcResult = benchmarkAlgorithm(
-            dsp_core::TangentAlgorithm::FritschCarlson,
-            "Fritsch-Carlson",
-            curve.name
-        );
+        auto fcResult = benchmarkAlgorithm(dsp_core::TangentAlgorithm::FritschCarlson, "Fritsch-Carlson", curve.name);
         fcResult.print();
         allResults.push_back(fcResult);
 
@@ -218,9 +198,7 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
             }
         }
 
-        auto avg = [](const std::vector<double>& v) {
-            return std::accumulate(v.begin(), v.end(), 0.0) / v.size();
-        };
+        auto avg = [](const std::vector<double>& v) { return std::accumulate(v.begin(), v.end(), 0.0) / v.size(); };
         auto avgInt = [](const std::vector<int>& v) {
             return std::accumulate(v.begin(), v.end(), 0) / static_cast<double>(v.size());
         };
@@ -239,7 +217,8 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
     std::cout << "\n" << std::string(110, '=') << "\n";
     std::cout << "  CONCLUSION\n";
     std::cout << std::string(110, '=') << "\n";
-    std::cout << "\nBenchmark complete. Review timing, anchor count, and extrema metrics to inform default algorithm.\n\n";
+    std::cout
+        << "\nBenchmark complete. Review timing, anchor count, and extrema metrics to inform default algorithm.\n\n";
 }
 
 /**
@@ -250,13 +229,8 @@ TEST_F(AlgorithmBenchmark, SteepCurveStressTest) {
     std::cout << "  STRESS TEST: Extremely Steep Curves (tanh(Nx))\n";
     std::cout << std::string(100, '=') << "\n\n";
 
-    std::cout << std::left
-              << std::setw(20) << "Steepness (N)"
-              << std::setw(18) << "Algorithm"
-              << std::setw(10) << "Time"
-              << std::setw(12) << "Anchors"
-              << std::setw(15) << "Max Error"
-              << std::setw(10) << "Extrema"
+    std::cout << std::left << std::setw(20) << "Steepness (N)" << std::setw(18) << "Algorithm" << std::setw(10)
+              << "Time" << std::setw(12) << "Anchors" << std::setw(15) << "Max Error" << std::setw(10) << "Extrema"
               << std::endl;
     std::cout << std::string(100, '-') << std::endl;
 
@@ -265,33 +239,22 @@ TEST_F(AlgorithmBenchmark, SteepCurveStressTest) {
     for (double N : steepness) {
         setupCurve([N](double x) { return std::tanh(N * x); });
 
-        auto akima = benchmarkAlgorithm(
-            dsp_core::TangentAlgorithm::Akima,
-            "Akima",
-            "tanh(" + std::to_string(static_cast<int>(N)) + "x)"
-        );
+        auto akima = benchmarkAlgorithm(dsp_core::TangentAlgorithm::Akima, "Akima",
+                                        "tanh(" + std::to_string(static_cast<int>(N)) + "x)");
 
-        auto fc = benchmarkAlgorithm(
-            dsp_core::TangentAlgorithm::FritschCarlson,
-            "Fritsch-Carlson",
-            "tanh(" + std::to_string(static_cast<int>(N)) + "x)"
-        );
+        auto fc = benchmarkAlgorithm(dsp_core::TangentAlgorithm::FritschCarlson, "Fritsch-Carlson",
+                                     "tanh(" + std::to_string(static_cast<int>(N)) + "x)");
 
         std::cout << std::left << std::setw(20) << ("tanh(" + std::to_string(static_cast<int>(N)) + "x)")
-                  << std::setw(18) << akima.algorithmName
-                  << std::setw(10) << std::fixed << std::setprecision(3) << akima.fittingTimeMs << " ms"
-                  << std::setw(12) << akima.numAnchors
-                  << std::setw(15) << std::scientific << std::setprecision(4) << akima.maxError
-                  << std::setw(10) << akima.spuriousExtrema
+                  << std::setw(18) << akima.algorithmName << std::setw(10) << std::fixed << std::setprecision(3)
+                  << akima.fittingTimeMs << " ms" << std::setw(12) << akima.numAnchors << std::setw(15)
+                  << std::scientific << std::setprecision(4) << akima.maxError << std::setw(10) << akima.spuriousExtrema
                   << std::endl;
 
-        std::cout << std::left << std::setw(20) << ""
-                  << std::setw(18) << fc.algorithmName
-                  << std::setw(10) << std::fixed << std::setprecision(3) << fc.fittingTimeMs << " ms"
-                  << std::setw(12) << fc.numAnchors
-                  << std::setw(15) << std::scientific << std::setprecision(4) << fc.maxError
-                  << std::setw(10) << fc.spuriousExtrema
-                  << std::endl;
+        std::cout << std::left << std::setw(20) << "" << std::setw(18) << fc.algorithmName << std::setw(10)
+                  << std::fixed << std::setprecision(3) << fc.fittingTimeMs << " ms" << std::setw(12) << fc.numAnchors
+                  << std::setw(15) << std::scientific << std::setprecision(4) << fc.maxError << std::setw(10)
+                  << fc.spuriousExtrema << std::endl;
         std::cout << std::string(100, '-') << std::endl;
     }
 
@@ -338,11 +301,9 @@ TEST_F(AlgorithmBenchmark, RepeatedFittingTest) {
     auto fcEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> fcDuration = fcEnd - fcStart;
 
-    std::cout << "Akima:            " << std::fixed << std::setprecision(2)
-              << akimaDuration.count() << " ms total, "
+    std::cout << "Akima:            " << std::fixed << std::setprecision(2) << akimaDuration.count() << " ms total, "
               << akimaDuration.count() / NUM_ITERATIONS << " ms per fit\n";
-    std::cout << "Fritsch-Carlson:  " << std::fixed << std::setprecision(2)
-              << fcDuration.count() << " ms total, "
+    std::cout << "Fritsch-Carlson:  " << std::fixed << std::setprecision(2) << fcDuration.count() << " ms total, "
               << fcDuration.count() / NUM_ITERATIONS << " ms per fit\n";
     std::cout << "\nSpeedup factor:   " << std::fixed << std::setprecision(2)
               << fcDuration.count() / akimaDuration.count() << "x\n";

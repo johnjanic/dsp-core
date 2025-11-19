@@ -15,7 +15,7 @@ namespace dsp_core_test {
  * errors in a format that can be parsed.
  */
 class ExtremaQualityMetrics : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
     }
@@ -76,8 +76,9 @@ protected:
      * Compute average position error for a set of extrema
      */
     double computeAveragePositionError(const std::vector<dsp_core::SplineAnchor>& anchors,
-                                      const std::vector<double>& extrema) {
-        if (extrema.empty()) return 0.0;
+                                       const std::vector<double>& extrema) {
+        if (extrema.empty())
+            return 0.0;
 
         double total_error = 0.0;
         for (double extremum_x : extrema) {
@@ -116,8 +117,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic3_PositionError) {
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
     // Output in parseable format
-    std::cout << "METRIC: Harmonic3_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic3_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     // Still assert for test pass/fail
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
@@ -142,8 +142,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic5_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic5_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic5_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -167,8 +166,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic10_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic10_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic10_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -192,8 +190,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic20_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic20_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic20_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -217,8 +214,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic40_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic40_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic40_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.15) << "Position error should be reasonable (relaxed for H40)";
 }
@@ -244,8 +240,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic2_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic2_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic2_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -266,8 +261,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic4_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic4_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic4_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -288,8 +282,7 @@ TEST_F(ExtremaQualityMetrics, Harmonic6_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Harmonic6_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Harmonic6_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -317,8 +310,7 @@ TEST_F(ExtremaQualityMetrics, Sigmoid5_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Sigmoid5_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Sigmoid5_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -340,8 +332,7 @@ TEST_F(ExtremaQualityMetrics, Sigmoid10_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Sigmoid10_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Sigmoid10_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -363,8 +354,7 @@ TEST_F(ExtremaQualityMetrics, Sigmoid15_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: Sigmoid15_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: Sigmoid15_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -391,8 +381,7 @@ TEST_F(ExtremaQualityMetrics, MixedXSin5X_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: MixedXSin5X_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: MixedXSin5X_PositionError = " << std::fixed << std::setprecision(6) << avg_error << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -414,8 +403,8 @@ TEST_F(ExtremaQualityMetrics, MixedXSin10X_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: MixedXSin10X_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: MixedXSin10X_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -430,7 +419,7 @@ TEST_F(ExtremaQualityMetrics, PolynomialX4_PositionError) {
     // Has 2 inflection points at x=±1/√6
     for (int i = 0; i < 16384; ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = x*x*x*x - 2.0*x*x;
+        double y = x * x * x * x - 2.0 * x * x;
         // Normalize to approximate [-1, 1] range
         y = y / 1.0; // Max value is ~0 at x=0, min is ~-1 at x=±1
         ltf->setBaseLayerValue(i, std::clamp(y, -1.0, 1.0));
@@ -444,8 +433,8 @@ TEST_F(ExtremaQualityMetrics, PolynomialX4_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: PolynomialX4_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: PolynomialX4_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -455,7 +444,7 @@ TEST_F(ExtremaQualityMetrics, PolynomialX5_PositionError) {
     // More complex polynomial with multiple extrema and inflections
     for (int i = 0; i < 16384; ++i) {
         double x = ltf->normalizeIndex(i);
-        double y = x*x*x*x*x - 5.0*x*x*x + 4.0*x;
+        double y = x * x * x * x * x - 5.0 * x * x * x + 4.0 * x;
         // Normalize
         double max_val = 2.0; // Approximate max value in [-1,1]
         y = y / max_val;
@@ -470,8 +459,8 @@ TEST_F(ExtremaQualityMetrics, PolynomialX5_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: PolynomialX5_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: PolynomialX5_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -496,7 +485,7 @@ TEST_F(ExtremaQualityMetrics, SuperpositionOddHarmonics_PositionError) {
 
         // Add odd harmonics with decreasing coefficients
         for (int n = 0; n < 8; ++n) {
-            int harmonic = 2*n + 1;  // 1, 3, 5, 7, 9, 11, 13, 15
+            int harmonic = 2 * n + 1; // 1, 3, 5, 7, 9, 11, 13, 15
             double coeff = 2.0 / std::pow(2.0, n);
             y += coeff * std::sin(harmonic * std::asin(std::clamp(x, -1.0, 1.0)));
         }
@@ -519,8 +508,8 @@ TEST_F(ExtremaQualityMetrics, SuperpositionOddHarmonics_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: SuperpositionOddHarmonics_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: SuperpositionOddHarmonics_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -547,8 +536,8 @@ TEST_F(ExtremaQualityMetrics, ExtremeTanh9_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: ExtremeTanh9_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: ExtremeTanh9_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -570,8 +559,8 @@ TEST_F(ExtremaQualityMetrics, ExtremeTanh15_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: ExtremeTanh15_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: ExtremeTanh15_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.1) << "Position error should be reasonable";
 }
@@ -593,8 +582,8 @@ TEST_F(ExtremaQualityMetrics, ExtremeTanh20_PositionError) {
 
     double avg_error = computeAveragePositionError(result.anchors, extrema);
 
-    std::cout << "METRIC: ExtremeTanh20_PositionError = "
-              << std::fixed << std::setprecision(6) << avg_error << std::endl;
+    std::cout << "METRIC: ExtremeTanh20_PositionError = " << std::fixed << std::setprecision(6) << avg_error
+              << std::endl;
 
     EXPECT_LT(avg_error, 0.15) << "Position error should be reasonable (relaxed for extreme steepness)";
 }

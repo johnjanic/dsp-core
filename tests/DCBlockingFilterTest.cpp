@@ -6,7 +6,7 @@
 using namespace dsp_core::audio_pipeline;
 
 class DCBlockingFilterTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         filter_ = std::make_unique<DCBlockingFilter>();
         filter_->prepareToPlay(44100.0, 512);
@@ -24,7 +24,8 @@ protected:
     }
 
     // Helper: Fill buffer with sine wave
-    void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate, double amplitude = 1.0, double dcOffset = 0.0) {
+    void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate, double amplitude = 1.0,
+                      double dcOffset = 0.0) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
                 double phase = 2.0 * M_PI * frequency * i / sampleRate;
@@ -83,8 +84,7 @@ TEST_F(DCBlockingFilterTest, RemovesPureDC) {
     // 5Hz HPF won't completely remove DC instantly, but should reduce it
     double meanAfterFiltering = std::abs(measureMean(buffer));
 
-    EXPECT_LT(meanAfterFiltering, 0.05)
-        << "DC blocking filter should significantly reduce DC offset after convergence";
+    EXPECT_LT(meanAfterFiltering, 0.05) << "DC blocking filter should significantly reduce DC offset after convergence";
 
     // Verify each channel
     for (int ch = 0; ch < 2; ++ch) {
@@ -94,8 +94,7 @@ TEST_F(DCBlockingFilterTest, RemovesPureDC) {
         }
         channelMean = std::abs(channelMean) / 512;
 
-        EXPECT_LT(channelMean, 0.05)
-            << "Channel " << ch << " should have significantly reduced DC after filtering";
+        EXPECT_LT(channelMean, 0.05) << "Channel " << ch << " should have significantly reduced DC after filtering";
     }
 }
 
@@ -144,16 +143,15 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     // So we expect ~97% amplitude preservation at 20Hz
     double attenuationRatio = rmsAfterFiltering / rmsBeforeFiltering;
 
-    EXPECT_GT(attenuationRatio, 0.90)
-        << "20Hz sine should pass through with minimal attenuation (ratio: "
-        << attenuationRatio << ")";
+    EXPECT_GT(attenuationRatio, 0.90) << "20Hz sine should pass through with minimal attenuation (ratio: "
+                                      << attenuationRatio << ")";
 }
 
 // Test 3: Harmonic preservation - verify no even harmonic distortion
 TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     const double fundamental = 100.0;
     const double sampleRate = 44100.0;
-    const int numSamples = 4410;  // 0.1 second for FFT analysis
+    const int numSamples = 4410; // 0.1 second for FFT analysis
     const int warmupSamples = 2000;
 
     // Create buffer with 100Hz sine (odd harmonic structure)
@@ -214,9 +212,8 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     // Even harmonic should be much smaller than fundamental
     double harmonicRatio = evenHarmonicEnergy / fundamentalEnergy;
 
-    EXPECT_LT(harmonicRatio, 0.01)
-        << "DC blocking filter should not introduce even harmonics (ratio: "
-        << harmonicRatio << ")";
+    EXPECT_LT(harmonicRatio, 0.01) << "DC blocking filter should not introduce even harmonics (ratio: " << harmonicRatio
+                                   << ")";
 }
 
 // Test 4: Verify enabled/disabled state
@@ -259,17 +256,17 @@ TEST_F(DCBlockingFilterTest, CutoffFrequencyAdjustment) {
     EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 10.0);
 
     // Set to edge cases
-    filter_->setCutoffFrequency(1.0);  // Min
+    filter_->setCutoffFrequency(1.0); // Min
     EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 1.0);
 
-    filter_->setCutoffFrequency(20.0);  // Max
+    filter_->setCutoffFrequency(20.0); // Max
     EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 20.0);
 
     // Test clamping (values outside 1-20Hz range)
-    filter_->setCutoffFrequency(0.5);  // Below min
+    filter_->setCutoffFrequency(0.5); // Below min
     EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 1.0);
 
-    filter_->setCutoffFrequency(50.0);  // Above max
+    filter_->setCutoffFrequency(50.0); // Above max
     EXPECT_DOUBLE_EQ(filter_->getCutoffFrequency(), 20.0);
 }
 
@@ -296,8 +293,7 @@ TEST_F(DCBlockingFilterTest, ResetClearsState) {
     double meanAfterReset = std::abs(measureMean(buffer));
 
     // Should be closer to input DC than fully converged state
-    EXPECT_GT(meanAfterReset, 0.1)
-        << "Reset filter should not immediately remove DC (needs convergence)";
+    EXPECT_GT(meanAfterReset, 0.1) << "Reset filter should not immediately remove DC (needs convergence)";
 }
 
 // Test 7: Multi-channel processing
@@ -326,14 +322,13 @@ TEST_F(DCBlockingFilterTest, MultiChannelProcessing) {
         }
         channelMean = std::abs(channelMean) / 512;
 
-        EXPECT_LT(channelMean, 0.05)
-            << "Channel " << ch << " should have DC significantly reduced";
+        EXPECT_LT(channelMean, 0.05) << "Channel " << ch << " should have DC significantly reduced";
     }
 }
 
 // Test 8: Sine wave with DC offset - remove DC, preserve AC
 TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
-    const double frequency = 440.0;  // A4
+    const double frequency = 440.0; // A4
     const double sampleRate = 44100.0;
     const double amplitude = 0.5;
     const double dcOffset = 0.3;
@@ -360,15 +355,13 @@ TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
 
     // Check that DC is significantly reduced
     double mean = std::abs(measureMean(buffer));
-    EXPECT_LT(mean, 0.1)
-        << "DC component should be significantly reduced";
+    EXPECT_LT(mean, 0.1) << "DC component should be significantly reduced";
 
     // Check that AC is preserved (RMS should be close to amplitude/sqrt(2))
     double rms = measureRMS(buffer);
     double expectedRMS = amplitude / std::sqrt(2.0);
 
     // Allow some tolerance for filter transient and phase shift
-    EXPECT_NEAR(rms, expectedRMS, 0.15)
-        << "AC component should be preserved (RMS: " << rms
-        << " expected: " << expectedRMS << ")";
+    EXPECT_NEAR(rms, expectedRMS, 0.15) << "AC component should be preserved (RMS: " << rms
+                                        << " expected: " << expectedRMS << ")";
 }

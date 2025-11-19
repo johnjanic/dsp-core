@@ -17,11 +17,11 @@ namespace dsp_core::Services {
  * Thread Safety: UI thread only (not real-time safe due to function evaluations)
  */
 class ZeroCrossingSolver {
-public:
+  public:
     struct SolveResult {
-        bool hasExactZero;      // True if |f(x)| < epsilon
-        double inputValue;      // x* where f(x*) ≈ 0 (the bias)
-        double outputValue;     // Actual f(x*) (residual DC offset)
+        bool hasExactZero;  // True if |f(x)| < epsilon
+        double inputValue;  // x* where f(x*) ≈ 0 (the bias)
+        double outputValue; // Actual f(x*) (residual DC offset)
     };
 
     /**
@@ -31,25 +31,17 @@ public:
      * @param epsilon Threshold for "exact zero" detection (default: 1e-9)
      * @return SolveResult containing bias and residual DC
      */
-    static SolveResult solve(
-        const LayeredTransferFunction& ltf,
-        double epsilon = 1e-9
-    );
+    static SolveResult solve(const LayeredTransferFunction& ltf, double epsilon = 1e-9);
 
-private:
-    ZeroCrossingSolver() = delete;  // Pure static service
+  private:
+    ZeroCrossingSolver() = delete; // Pure static service
 
     /**
      * Refine zero-crossing estimate using bisection.
      * Only called if brute-force finds |f(x)| < refinementThreshold.
      */
-    static SolveResult refineBisection(
-        const LayeredTransferFunction& ltf,
-        double initialGuess,
-        double searchRadius,
-        double epsilon,
-        int maxIterations = 10
-    );
+    static SolveResult refineBisection(const LayeredTransferFunction& ltf, double initialGuess, double searchRadius,
+                                       double epsilon, int maxIterations = 10);
 
     static constexpr double kRefinementThreshold = 0.01;
     static constexpr double kSearchRadius = 0.01;

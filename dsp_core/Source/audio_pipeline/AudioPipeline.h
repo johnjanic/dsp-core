@@ -23,7 +23,7 @@ namespace dsp_core::audio_pipeline {
  * - process() is thread-safe after setup
  */
 class AudioPipeline : public AudioProcessingStage {
-public:
+  public:
     AudioPipeline() = default;
 
     /**
@@ -62,12 +62,16 @@ public:
     /**
      * Get total latency of all stages combined (legacy name).
      */
-    int getTotalLatencySamples() const { return getLatencySamples(); }
+    int getTotalLatencySamples() const {
+        return getLatencySamples();
+    }
 
     /**
      * Get number of stages in pipeline.
      */
-    int getNumStages() const { return static_cast<int>(stages_.size()); }
+    int getNumStages() const {
+        return static_cast<int>(stages_.size());
+    }
 
     /**
      * Clear all stages (for reconstruction).
@@ -87,15 +91,14 @@ public:
      * @param tag Tag used when adding the stage
      * @return Non-owning pointer to stage, or nullptr if not found or type mismatch
      */
-    template<typename StageType>
-    StageType* getStage(const std::string& tag) {
+    template <typename StageType> StageType* getStage(const std::string& tag) {
         auto* stage = getStage(tag);
         return dynamic_cast<StageType*>(stage);
     }
 
-private:
+  private:
     std::vector<std::unique_ptr<AudioProcessingStage>> stages_;
-    std::unordered_map<std::string, size_t> tagToIndex_;  // Tag -> stages_ index
+    std::unordered_map<std::string, size_t> tagToIndex_; // Tag -> stages_ index
     int autoTagCounter_ = 0;
     double sampleRate_ = 44100.0;
     int maxBlockSize_ = 512;

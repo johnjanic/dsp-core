@@ -6,7 +6,7 @@ using namespace dsp_core;
 using namespace dsp_core::audio_pipeline;
 
 class DCOffsetCompensatorTest : public ::testing::Test {
-protected:
+  protected:
     std::unique_ptr<LayeredTransferFunction> ltf;
     std::unique_ptr<DCOffsetCompensator> compensator;
 
@@ -30,14 +30,14 @@ TEST_F(DCOffsetCompensatorTest, TransientPreservation) {
     // Create sharp transient: silence → 0.8 in 1 sample
     juce::AudioBuffer<double> buffer(1, 512);
     buffer.clear();
-    buffer.setSample(0, 0, 0.8);  // Sharp transient
+    buffer.setSample(0, 0, 0.8); // Sharp transient
 
     compensator->process(buffer);
 
     // Assert: Peak preserved (no attenuation from bias)
     double peakOutput = buffer.getSample(0, 0);
     double expectedPeak = ltf->applyTransferFunction(0.8);
-    EXPECT_NEAR(peakOutput, expectedPeak, 0.05);  // Within 5%
+    EXPECT_NEAR(peakOutput, expectedPeak, 0.05); // Within 5%
 }
 
 TEST_F(DCOffsetCompensatorTest, SilenceDecayCompensation) {
@@ -64,7 +64,7 @@ TEST_F(DCOffsetCompensatorTest, SilenceDecayCompensation) {
     // Check final 100ms for DC offset
     // After 2 seconds of exponential decay, the compensator should have kicked in
     // Note: The fade implementation may need tuning - testing basic functionality here
-    int finalSamples = 4800;  // 100ms at 48kHz
+    int finalSamples = 4800; // 100ms at 48kHz
     double dcSum = 0.0;
     for (int i = buffer.getNumSamples() - finalSamples; i < buffer.getNumSamples(); ++i) {
         dcSum += data[i];
@@ -73,7 +73,7 @@ TEST_F(DCOffsetCompensatorTest, SilenceDecayCompensation) {
 
     // The DC offset should be reduced compared to uncompensated (0.5)
     // V1 acceptance: compensation is active, even if not fully optimized
-    EXPECT_LT(std::abs(dcOffset), 0.45);  // Should show some improvement
+    EXPECT_LT(std::abs(dcOffset), 0.45); // Should show some improvement
 }
 
 TEST_F(DCOffsetCompensatorTest, BypassMode) {
@@ -86,7 +86,7 @@ TEST_F(DCOffsetCompensatorTest, BypassMode) {
 
     compensator->prepareToPlay(48000.0, 512);
     compensator->notifyTransferFunctionChanged(false);
-    compensator->setEnabled(false);  // Bypass
+    compensator->setEnabled(false); // Bypass
 
     // Create test signal
     juce::AudioBuffer<double> buffer(1, 512);
@@ -116,7 +116,7 @@ TEST_F(DCOffsetCompensatorTest, StereoIndependence) {
     compensator->notifyTransferFunctionChanged(false);
 
     // Create stereo buffer: L=silence, R=loud signal
-    juce::AudioBuffer<double> buffer(2, 4800);  // 100ms
+    juce::AudioBuffer<double> buffer(2, 4800); // 100ms
     buffer.clear();
 
     // Right channel: sustained tone
@@ -136,10 +136,10 @@ TEST_F(DCOffsetCompensatorTest, StereoIndependence) {
 
     // Left should be compensated (reduced DC offset compared to uncompensated 0.4)
     // With 100ms duration, compensation should be partially active
-    EXPECT_LT(std::abs(leftFinal), 0.35);  // Less than uncompensated
+    EXPECT_LT(std::abs(leftFinal), 0.35); // Less than uncompensated
 
     // Right should be near f(right_input) with no bias
-    double rightInput = 0.8 * std::sin(2 * M_PI * 440 * (buffer.getNumSamples()-1) / 48000.0);
+    double rightInput = 0.8 * std::sin(2 * M_PI * 440 * (buffer.getNumSamples() - 1) / 48000.0);
     double expectedRight = ltf->applyTransferFunction(rightInput);
     EXPECT_NEAR(rightFinal, expectedRight, 0.1);
 }
