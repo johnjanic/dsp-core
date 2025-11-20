@@ -563,3 +563,28 @@ else()
 endif()
 
 add_test(NAME AnchorClusteringAnalysisTests COMMAND anchor_clustering_analysis_tests)
+
+# TransferFunctionOperations tests
+add_executable(transfer_function_operations_tests
+    TransferFunctionOperationsTest.cpp
+)
+
+target_include_directories(transfer_function_operations_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(transfer_function_operations_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(transfer_function_operations_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(transfer_function_operations_tests)
+endif()
+
+add_test(NAME TransferFunctionOperationsTests COMMAND transfer_function_operations_tests)

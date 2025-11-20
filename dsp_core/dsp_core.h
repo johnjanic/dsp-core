@@ -41,6 +41,7 @@
 #include "Source/Services/SplineFitter.h"
 #include "Source/Services/SplineEvaluator.h"
 #include "Source/Services/SymmetryAnalyzer.h"
+#include "Source/Services/TransferFunctionOperations.h"
 #include "Source/Services/ZeroCrossingSolver.h"
 #include "Source/audio_pipeline/AudioProcessingStage.h"
 #include "Source/audio_pipeline/AudioPipeline.h"

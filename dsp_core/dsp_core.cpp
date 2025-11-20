@@ -20,6 +20,7 @@
 #include "Source/Services/SplineFitter.cpp"
 #include "Source/Services/SplineEvaluator.cpp"
 #include "Source/Services/SymmetryAnalyzer.cpp"
+#include "Source/Services/TransferFunctionOperations.cpp"
 #include "Source/Services/ZeroCrossingSolver.cpp"
 #include "Source/audio_pipeline/AudioPipeline.cpp"
 #include "Source/audio_pipeline/GainStage.cpp"
