@@ -25,14 +25,13 @@ namespace dsp_core::audio_pipeline {
  *   mainPipeline.addStage(std::move(wrapped));
  */
 class OversamplingWrapper : public AudioProcessingStage {
-public:
+  public:
     /**
      * @param wrappedStage Stage to process at oversampled rate
      * @param oversamplingOrder 0=1x, 1=2x, 2=4x, 3=8x, 4=16x
      */
-    OversamplingWrapper(
-        std::unique_ptr<AudioProcessingStage> wrappedStage,
-        int oversamplingOrder = 3  // 8x default
+    OversamplingWrapper(std::unique_ptr<AudioProcessingStage> wrappedStage,
+                        int oversamplingOrder = 3 // 8x default
     );
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -47,18 +46,20 @@ public:
      */
     void setOversamplingOrder(int order);
 
-    int getOversamplingOrder() const { return currentOrder_; }
+    int getOversamplingOrder() const {
+        return currentOrder_;
+    }
 
-private:
+  private:
     std::unique_ptr<AudioProcessingStage> wrappedStage_;
 
     // Pre-allocated oversamplers (1x, 2x, 4x, 8x, 16x)
     std::array<std::unique_ptr<juce::dsp::Oversampling<double>>, 5> oversamplers_;
 
     // Pre-allocated channel pointers array (avoid std::vector allocation per process call)
-    std::array<double*, 8> channelPointers_;  // Max 8 channels (7.1 surround)
+    std::array<double*, 8> channelPointers_; // Max 8 channels (7.1 surround)
 
-    int currentOrder_ = 0;  // 1x default (no oversampling)
+    int currentOrder_ = 0; // 1x default (no oversampling)
     double sampleRate_ = 44100.0;
     int maxBlockSize_ = 512;
 };

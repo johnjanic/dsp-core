@@ -5,9 +5,7 @@
 
 namespace dsp_core {
 
-HarmonicLayer::HarmonicLayer(int numHarmonics_)
-    : numHarmonics(numHarmonics_) {
-}
+HarmonicLayer::HarmonicLayer(int numHarmonics_) : numHarmonics(numHarmonics_) {}
 
 void HarmonicLayer::setAlgorithm(Algorithm algo) {
     algorithm = algo;
@@ -16,7 +14,6 @@ void HarmonicLayer::setAlgorithm(Algorithm algo) {
 double HarmonicLayer::evaluate(double x, const std::vector<double>& coefficients, int tableSize) const {
     // Validate coefficient array size
     if (static_cast<int>(coefficients.size()) < numHarmonics + 1) {
-        jassertfalse;  // Coefficient array too small
         return 0.0;
     }
 
@@ -42,7 +39,7 @@ double HarmonicLayer::evaluate(double x, const std::vector<double>& coefficients
 
 void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, double maxVal) {
     if (precomputed && lastTableSize == tableSize) {
-        return;  // Already computed
+        return; // Already computed
     }
 
     basisFunctions.clear();
@@ -55,10 +52,10 @@ void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, doubl
             // Map table index to x ∈ [minVal, maxVal]
             // Uses same formula as TransferFunction::normalizeIndex()
             double x = juce::jmap(static_cast<double>(i), 0.0, static_cast<double>(tableSize - 1), minVal, maxVal);
-            x = std::max(-1.0, std::min(1.0, x));  // Clamp to valid domain
+            x = std::max(-1.0, std::min(1.0, x)); // Clamp to valid domain
 
             if (n == 0) {
-                basisFunctions[n][i] = 0.0;  // Reserved for WT (handled in compositor)
+                basisFunctions[n][i] = 0.0; // Reserved for WT (handled in compositor)
             } else if (n % 2 == 0) {
                 // Even harmonics: cos(n * acos(x))
                 basisFunctions[n][i] = std::cos(n * std::acos(x));
@@ -77,7 +74,7 @@ void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, doubl
 double HarmonicLayer::evaluateChebyshevTrig(double x, const std::vector<double>& coeffs) {
     double result = 0.0;
     const int N = static_cast<int>(coeffs.size());
-    x = std::max(-1.0, std::min(1.0, x));  // Clamp to valid domain
+    x = std::max(-1.0, std::min(1.0, x)); // Clamp to valid domain
 
     for (int n = 1; n < N; ++n) {
         double term = 0.0;
@@ -95,7 +92,8 @@ double HarmonicLayer::evaluateChebyshevTrig(double x, const std::vector<double>&
 
 // Polynomial evaluation using Clenshaw's algorithm (future support)
 double HarmonicLayer::evaluateChebyshevPolynomial(double x, const std::vector<double>& coeffs) {
-    if (coeffs.size() <= 1) return 0.0;
+    if (coeffs.size() <= 1)
+        return 0.0;
 
     // Clenshaw's algorithm for numerical stability
     double b_kplus1 = 0.0;
@@ -126,7 +124,7 @@ void HarmonicLayer::fromValueTree(const juce::ValueTree& vt) {
     if (vt.hasProperty("numHarmonics")) {
         int loadedNumHarmonics = vt.getProperty("numHarmonics");
         if (loadedNumHarmonics != numHarmonics) {
-            jassertfalse;  // Mismatch in harmonic count
+            jassertfalse; // Mismatch in harmonic count
         }
     }
 

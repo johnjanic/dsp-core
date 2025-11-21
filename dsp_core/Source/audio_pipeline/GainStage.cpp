@@ -6,7 +6,7 @@ void GainStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
     maxBlockSize_ = samplesPerBlock;
 
-    smoothedGain_.reset(sampleRate, 0.01);  // 10ms ramp time
+    smoothedGain_.reset(sampleRate, 0.01); // 10ms ramp time
 
     // CRITICAL: Prepare gainProcessor ONCE in prepareToPlay, NOT in process()
     // Calling prepare() in audio thread causes allocations!
@@ -21,7 +21,7 @@ void GainStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
 
 void GainStage::process(juce::AudioBuffer<double>& buffer) {
     if (!isPrepared_) {
-        jassertfalse;  // Must call prepareToPlay() first
+        jassertfalse; // Must call prepareToPlay() first
         return;
     }
 

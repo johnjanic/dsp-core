@@ -19,7 +19,7 @@ namespace dsp_core::audio_pipeline {
  * - reset() can be called from either thread (use atomics if stateful)
  */
 class AudioProcessingStage {
-public:
+  public:
     virtual ~AudioProcessingStage() = default;
 
     /**
@@ -54,7 +54,9 @@ public:
      * Get latency introduced by this stage (in samples).
      * Default: 0 (no latency)
      */
-    virtual int getLatencySamples() const { return 0; }
+    virtual int getLatencySamples() const {
+        return 0;
+    }
 };
 
 } // namespace dsp_core::audio_pipeline

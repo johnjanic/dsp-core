@@ -7,27 +7,26 @@
 // Branch prediction hints (improve CPU branch predictor performance)
 // GCC/Clang support __builtin_expect for optimization
 #if defined(__GNUC__) || defined(__clang__)
-  #define juce_likely(x)    __builtin_expect(!!(x), 1)
-  #define juce_unlikely(x)  __builtin_expect(!!(x), 0)
+#define juce_likely(x) __builtin_expect(!!(x), 1)
+#define juce_unlikely(x) __builtin_expect(!!(x), 0)
 #else
-  #define juce_likely(x)    (x)
-  #define juce_unlikely(x)  (x)
+#define juce_likely(x) (x)
+#define juce_unlikely(x) (x)
 #endif
 
 namespace dsp_core {
 
 LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double maxVal)
-    : tableSize(size), minValue(minVal), maxValue(maxVal),
-      harmonicLayer(std::make_unique<HarmonicLayer>(40)),
-      coefficients(41, 0.0),  // 41 coefficients: [0] = WT, [1..40] = harmonics
-      baseTable(size),
-      compositeTable(size) {
+    : tableSize(size), minValue(minVal), maxValue(maxVal), harmonicLayer(std::make_unique<HarmonicLayer>(40)),
+      splineLayer(std::make_unique<SplineLayer>()), // NEW: Initialize spline layer
+      coefficients(41, 0.0),                        // 41 coefficients: [0] = WT, [1..40] = harmonics
+      baseTable(size), compositeTable(size) {
 
     // Pre-allocate scratch buffer for updateComposite() (eliminates heap allocation)
     unnormalizedMixBuffer.resize(size);
 
     // Initialize coefficients
-    coefficients[0] = 1.0;  // Default WT mix = 1.0 (full base layer)
+    coefficients[0] = 1.0; // Default WT mix = 1.0 (full base layer)
     // coefficients[1..40] already initialized to 0.0
 
     // Initialize base layer to identity: y = x
@@ -53,6 +52,9 @@ double LayeredTransferFunction::getBaseLayerValue(int index) const {
 void LayeredTransferFunction::setBaseLayerValue(int index, double value) {
     if (index >= 0 && index < tableSize) {
         baseTable[index].store(value, std::memory_order_release);
+
+        // NEW: Invalidate cache on base layer changes
+        invalidateCompositeCache();
     }
 }
 
@@ -70,9 +72,20 @@ const HarmonicLayer& LayeredTransferFunction::getHarmonicLayer() const {
     return *harmonicLayer;
 }
 
+SplineLayer& LayeredTransferFunction::getSplineLayer() {
+    return *splineLayer;
+}
+
+const SplineLayer& LayeredTransferFunction::getSplineLayer() const {
+    return *splineLayer;
+}
+
 void LayeredTransferFunction::setCoefficient(int index, double value) {
     if (index >= 0 && index < static_cast<int>(coefficients.size())) {
         coefficients[index] = value;
+
+        // NEW: Invalidate cache on coefficient changes
+        invalidateCompositeCache();
     }
 }
 
@@ -91,6 +104,27 @@ double LayeredTransferFunction::getCompositeValue(int index) const {
 }
 
 void LayeredTransferFunction::updateComposite() {
+    if (splineLayerEnabled.load(std::memory_order_acquire)) {
+        updateCompositeSplineMode();
+    } else {
+        updateCompositeHarmonicMode();
+    }
+
+    // Mark cache as valid after rebuild
+    compositeCacheValid.store(true, std::memory_order_release);
+}
+
+void LayeredTransferFunction::updateCompositeSplineMode() {
+    // Spline mode: Cache spline evaluation results
+    // No normalization (normScalar locked to 1.0 in spline mode)
+    for (int i = 0; i < tableSize; ++i) {
+        double x = normalizeIndex(i);
+        double value = splineLayer->evaluate(x);
+        compositeTable[i].store(value, std::memory_order_release);
+    }
+}
+
+void LayeredTransferFunction::updateCompositeHarmonicMode() {
     // Ensure buffer is correct size (handles edge case of table resize)
     if (static_cast<int>(unnormalizedMixBuffer.size()) != tableSize) {
         unnormalizedMixBuffer.resize(tableSize);
@@ -105,7 +139,7 @@ void LayeredTransferFunction::updateComposite() {
         // Get layer values (NEVER modified by this function)
         double baseValue = baseTable[i].load(std::memory_order_acquire);
         double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-        double wavetableCoeff = coefficients[0];  // WT mix coefficient
+        double wavetableCoeff = coefficients[0]; // WT mix coefficient
 
         // Compute unnormalized mix: UnNorm = wtCoeff*Base + HarmonicSum
         // Note: harmonicLayer->evaluate() already sums harmonicCoeff[n] * Harmonic_n(x)
@@ -120,24 +154,35 @@ void LayeredTransferFunction::updateComposite() {
         }
     }
 
-    // Step 2: Compute normalization scalar (or use frozen scalar if deferred)
-    double normScalar = normalizationScalar.load(std::memory_order_acquire);  // Default to existing scalar
-
-    if (!deferNormalization) {
-        // Normal mode: recalculate normalization scalar
-        normScalar = 1.0;
-        if (maxAbsValue > 1e-12) {  // Avoid division by zero
-            normScalar = 1.0 / maxAbsValue;
-        }
-        normalizationScalar.store(normScalar, std::memory_order_release);
-    }
-    // else: deferred mode - keep using existing normScalar
+    // Step 2: Compute normalization scalar (or use frozen/disabled scalar)
+    double normScalar = computeNormalizationScalar(maxAbsValue);
 
     // Step 3: Store normalized composite
     for (int i = 0; i < tableSize; ++i) {
         double normalized = normScalar * unnormalizedMixBuffer[i];
         compositeTable[i].store(normalized, std::memory_order_release);
     }
+}
+
+double LayeredTransferFunction::computeNormalizationScalar(double maxAbsValue) {
+    if (!normalizationEnabled) {
+        // Normalization disabled: bypass scaling (allow values > ±1.0)
+        normalizationScalar.store(1.0, std::memory_order_release);
+        return 1.0;
+    }
+
+    if (!deferNormalization) {
+        // Normal mode: recalculate normalization scalar
+        double normScalar = 1.0;
+        if (maxAbsValue > 1e-12) { // Avoid division by zero
+            normScalar = 1.0 / maxAbsValue;
+        }
+        normalizationScalar.store(normScalar, std::memory_order_release);
+        return normScalar;
+    }
+
+    // Deferred mode: keep using existing normScalar
+    return normalizationScalar.load(std::memory_order_acquire);
 }
 
 void LayeredTransferFunction::setDeferNormalization(bool shouldDefer) {
@@ -153,6 +198,126 @@ bool LayeredTransferFunction::isNormalizationDeferred() const {
     return deferNormalization;
 }
 
+void LayeredTransferFunction::setNormalizationEnabled(bool enabled) {
+    normalizationEnabled = enabled;
+
+    // Immediately update composite to apply new normalization state
+    // This ensures the change takes effect without waiting for next model mutation
+    updateComposite();
+}
+
+bool LayeredTransferFunction::isNormalizationEnabled() const {
+    return normalizationEnabled;
+}
+
+void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
+    // Entering spline mode:
+    // - Harmonics are kept intact (hidden but present for undo)
+    // - Spline will fit to the current normalized composite (base + harmonics)
+    // - Spline evaluation bypasses normalization (user controls amplitude via anchors)
+    //
+    // CRITICAL: We do NOT modify normalizationScalar here!
+    // - normalizationScalar only affects harmonic mode evaluation
+    // - Spline mode evaluation doesn't use normalizationScalar (direct PCHIP)
+    // - SplineFitter needs the correct normScalar to read normalized composite
+    // - Premature reset to 1.0 caused bug where SplineFitter fit unnormalized values
+
+    splineLayerEnabled.store(enabled, std::memory_order_release);
+    invalidateCompositeCache();
+}
+
+bool LayeredTransferFunction::hasNonZeroHarmonics() const {
+    // Check harmonics only (coefficients[1..40]), not WT mix at [0]
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        if (std::abs(coefficients[i]) > HARMONIC_EPSILON) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LayeredTransferFunction::bakeHarmonicsToBase() {
+    // Early exit if no harmonics to bake (no-op optimization)
+    if (!hasNonZeroHarmonics())
+        return false;
+
+    // Capture composite curve (base + harmonics with normalization applied)
+    // This preserves the visual appearance of the curve exactly
+    for (int i = 0; i < tableSize; ++i) {
+        double compositeValue = getCompositeValue(i);
+        setBaseLayerValue(i, compositeValue);
+    }
+
+    // Set WT coefficient to 1.0 (CRITICAL: enables the baked base layer)
+    // If WT was 0 during harmonic editing, the baked base layer would be invisible
+    coefficients[0] = 1.0;
+
+    // Zero out all harmonic coefficients (h1..h40)
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = 0.0;
+    }
+
+    // Regenerate composite (now just base layer with WT mix = 1.0)
+    // Note: normalizationScalar is preserved (not reset to 1.0)
+    updateComposite();
+
+    return true;
+}
+
+void LayeredTransferFunction::bakeCompositeToBase() {
+    // Capture composite curve (base + harmonics with normalization applied)
+    // This preserves the visual appearance of the curve exactly
+    for (int i = 0; i < tableSize; ++i) {
+        double compositeValue = getCompositeValue(i);
+        setBaseLayerValue(i, compositeValue);
+    }
+
+    // Set WT coefficient to 1.0 (enable base layer)
+    coefficients[0] = 1.0;
+
+    // Zero out all harmonic coefficients (h1..h40)
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = 0.0;
+    }
+
+    // Regenerate composite (now just base layer with WT mix = 1.0)
+    updateComposite();
+}
+
+std::array<double, LayeredTransferFunction::NUM_HARMONIC_COEFFICIENTS>
+LayeredTransferFunction::getHarmonicCoefficients() const {
+    std::array<double, NUM_HARMONIC_COEFFICIENTS> coeffs{};
+
+    // Copy all coefficients: [0] = WT mix, [1..40] = harmonics
+    for (int i = 0; i < NUM_HARMONIC_COEFFICIENTS && i < static_cast<int>(coefficients.size()); ++i) {
+        coeffs[i] = coefficients[i];
+    }
+
+    return coeffs;
+}
+
+void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs) {
+
+    // Set all coefficients: [0] = WT mix, [1..40] = harmonics
+    for (int i = 0; i < NUM_HARMONIC_COEFFICIENTS && i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = coeffs[i];
+    }
+
+    updateComposite();
+}
+
+bool LayeredTransferFunction::isSplineLayerEnabled() const {
+    return splineLayerEnabled.load(std::memory_order_acquire);
+}
+
+void LayeredTransferFunction::invalidateCompositeCache() {
+    compositeCacheValid.store(false, std::memory_order_release);
+}
+
+bool LayeredTransferFunction::isCompositeCacheValid() const {
+    return compositeCacheValid.load(std::memory_order_acquire);
+}
+
 double LayeredTransferFunction::normalizeIndex(int index) const {
     if (index < 0 || index >= tableSize)
         return 0.0;
@@ -160,7 +325,13 @@ double LayeredTransferFunction::normalizeIndex(int index) const {
 }
 
 double LayeredTransferFunction::applyTransferFunction(double x) const {
-    return interpolate(x);
+    // Check cache validity (fast path ~95%)
+    if (juce_likely(compositeCacheValid.load(std::memory_order_acquire))) {
+        return interpolate(x); // Use cached composite table (~5-10ns)
+    }
+
+    // Slow path: direct evaluation (~40-50ns)
+    return evaluateDirect(x);
 }
 
 void LayeredTransferFunction::processBlock(double* samples, int numSamples) {
@@ -171,14 +342,14 @@ void LayeredTransferFunction::processBlock(double* samples, int numSamples) {
 
 double LayeredTransferFunction::interpolate(double x) const {
     switch (interpMode) {
-        case InterpolationMode::Linear:
-            return interpolateLinear(x);
-        case InterpolationMode::Cubic:
-            return interpolateCubic(x);
-        case InterpolationMode::CatmullRom:
-            return interpolateCatmullRom(x);
-        default:
-            return interpolateLinear(x);
+    case InterpolationMode::Linear:
+        return interpolateLinear(x);
+    case InterpolationMode::Cubic:
+        return interpolateCubic(x);
+    case InterpolationMode::CatmullRom:
+        return interpolateCatmullRom(x);
+    default:
+        return interpolateLinear(x);
     }
 }
 
@@ -190,7 +361,7 @@ double LayeredTransferFunction::interpolateLinear(double x) const {
 
     // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
     // Avoids lambda overhead, branch prediction issues, and extra atomic loads
-    if (juce_likely (extrapMode == ExtrapolationMode::Clamp)) {
+    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
         int idx0 = juce::jlimit(0, tableSize - 1, index);
         int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
 
@@ -205,14 +376,13 @@ double LayeredTransferFunction::interpolateLinear(double x) const {
 
     // Handle index
     if (index < 0) {
-        double slope = compositeTable[1].load(std::memory_order_acquire) -
-                      compositeTable[0].load(std::memory_order_acquire);
+        double slope =
+            compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
         y0 = compositeTable[0].load(std::memory_order_acquire) + slope * index;
     } else if (index >= tableSize) {
         double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) -
-                      compositeTable[tableSize - 2].load(std::memory_order_acquire);
-        y0 = compositeTable[tableSize - 1].load(std::memory_order_acquire) +
-             slope * (index - tableSize + 1);
+                       compositeTable[tableSize - 2].load(std::memory_order_acquire);
+        y0 = compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (index - tableSize + 1);
     } else {
         y0 = compositeTable[index].load(std::memory_order_acquire);
     }
@@ -220,14 +390,13 @@ double LayeredTransferFunction::interpolateLinear(double x) const {
     // Handle index + 1
     int index1 = index + 1;
     if (index1 < 0) {
-        double slope = compositeTable[1].load(std::memory_order_acquire) -
-                      compositeTable[0].load(std::memory_order_acquire);
+        double slope =
+            compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
         y1 = compositeTable[0].load(std::memory_order_acquire) + slope * index1;
     } else if (index1 >= tableSize) {
         double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) -
-                      compositeTable[tableSize - 2].load(std::memory_order_acquire);
-        y1 = compositeTable[tableSize - 1].load(std::memory_order_acquire) +
-             slope * (index1 - tableSize + 1);
+                       compositeTable[tableSize - 2].load(std::memory_order_acquire);
+        y1 = compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (index1 - tableSize + 1);
     } else {
         y1 = compositeTable[index1].load(std::memory_order_acquire);
     }
@@ -242,7 +411,7 @@ double LayeredTransferFunction::interpolateCubic(double x) const {
     double t = x_proj - index;
 
     // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
-    if (juce_likely (extrapMode == ExtrapolationMode::Clamp)) {
+    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
         int idx0 = juce::jlimit(0, tableSize - 1, index - 1);
         int idx1 = juce::jlimit(0, tableSize - 1, index);
         int idx2 = juce::jlimit(0, tableSize - 1, index + 1);
@@ -263,14 +432,13 @@ double LayeredTransferFunction::interpolateCubic(double x) const {
     // Linear extrapolation path (helper lambda for readability)
     auto getSample = [this](int i) -> double {
         if (i < 0) {
-            double slope = compositeTable[1].load(std::memory_order_acquire) -
-                          compositeTable[0].load(std::memory_order_acquire);
+            double slope =
+                compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
             return compositeTable[0].load(std::memory_order_acquire) + slope * i;
         } else if (i >= tableSize) {
             double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) -
-                          compositeTable[tableSize - 2].load(std::memory_order_acquire);
-            return compositeTable[tableSize - 1].load(std::memory_order_acquire) +
-                   slope * (i - tableSize + 1);
+                           compositeTable[tableSize - 2].load(std::memory_order_acquire);
+            return compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (i - tableSize + 1);
         } else {
             return compositeTable[i].load(std::memory_order_acquire);
         }
@@ -295,7 +463,7 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
     double t = x_proj - index;
 
     // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
-    if (juce_likely (extrapMode == ExtrapolationMode::Clamp)) {
+    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
         int idx0 = juce::jlimit(0, tableSize - 1, index - 1);
         int idx1 = juce::jlimit(0, tableSize - 1, index);
         int idx2 = juce::jlimit(0, tableSize - 1, index + 1);
@@ -306,23 +474,20 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
         double y2 = compositeTable[idx2].load(std::memory_order_relaxed);
         double y3 = compositeTable[idx3].load(std::memory_order_relaxed);
 
-        return 0.5 * ((2.0 * y1) +
-                      (-y0 + y2) * t +
-                      (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
+        return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                       (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
     }
 
     // Linear extrapolation path (helper lambda for readability)
     auto getSample = [this](int i) -> double {
         if (i < 0) {
-            double slope = compositeTable[1].load(std::memory_order_acquire) -
-                          compositeTable[0].load(std::memory_order_acquire);
+            double slope =
+                compositeTable[1].load(std::memory_order_acquire) - compositeTable[0].load(std::memory_order_acquire);
             return compositeTable[0].load(std::memory_order_acquire) + slope * i;
         } else if (i >= tableSize) {
             double slope = compositeTable[tableSize - 1].load(std::memory_order_acquire) -
-                          compositeTable[tableSize - 2].load(std::memory_order_acquire);
-            return compositeTable[tableSize - 1].load(std::memory_order_acquire) +
-                   slope * (i - tableSize + 1);
+                           compositeTable[tableSize - 2].load(std::memory_order_acquire);
+            return compositeTable[tableSize - 1].load(std::memory_order_acquire) + slope * (i - tableSize + 1);
         } else {
             return compositeTable[i].load(std::memory_order_acquire);
         }
@@ -333,10 +498,61 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
     double y2 = getSample(index + 1);
     double y3 = getSample(index + 2);
 
-    return 0.5 * ((2.0 * y1) +
-                  (-y0 + y2) * t +
-                  (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
+    return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                   (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+}
+
+double LayeredTransferFunction::evaluateDirect(double x) const {
+    bool splineEnabled = splineLayerEnabled.load(std::memory_order_acquire);
+
+    if (splineEnabled) {
+        // Spline mode: direct PCHIP evaluation, no normalization
+        // User has direct amplitude control via anchor placement
+        return splineLayer->evaluate(x);
+    } else {
+        // Harmonic mode: base + harmonics with normalization
+        double baseValue = interpolateBase(x); // NEW helper method
+        double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+        double wtCoeff = coefficients[0];
+        double result = wtCoeff * baseValue + harmonicValue;
+
+        // Apply normalization scalar (only in harmonic mode)
+        double normScalar = normalizationScalar.load(std::memory_order_acquire);
+        return normScalar * result;
+    }
+}
+
+double LayeredTransferFunction::interpolateBase(double x) const {
+    // Map x from signal range to table index
+    double x_proj = (x - minValue) / (maxValue - minValue) * (tableSize - 1);
+    int index = static_cast<int>(x_proj);
+    double t = x_proj - index;
+
+    // Use linear interpolation (simple and fast for direct path)
+    int idx0 = juce::jlimit(0, tableSize - 1, index);
+    int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
+
+    double y0 = baseTable[idx0].load(std::memory_order_relaxed);
+    double y1 = baseTable[idx1].load(std::memory_order_relaxed);
+
+    return y0 + t * (y1 - y0);
+}
+
+double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
+    // CRITICAL: Always evaluate base + harmonics, ignoring spline layer state
+    // Used by SplineFitter to read the normalized composite when entering spline mode
+    //
+    // normalizationScalar is preserved when entering spline mode (not reset to 1.0),
+    // so this returns the properly normalized values that SplineFitter needs to fit
+
+    double baseValue = interpolateBase(x);
+    double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+    double wtCoeff = coefficients[0];
+    double result = wtCoeff * baseValue + harmonicValue;
+
+    // Apply normalization scalar to match what user sees on screen
+    double normScalar = normalizationScalar.load(std::memory_order_acquire);
+    return normScalar * result;
 }
 
 juce::ValueTree LayeredTransferFunction::toValueTree() const {
@@ -359,21 +575,23 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
         }
         baseVT.setProperty("tableData", baseBlob, nullptr);
         vt.addChild(baseVT, -1, nullptr);
-    } else {
-        // Log or handle invalid table size if necessary
-        jassertfalse; // Debug assertion for invalid table size
     }
 
     // Serialize harmonic layer (algorithm settings only, no coefficients)
     if (harmonicLayer) {
         vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
-    } else {
-        // Log or handle null harmonic layer if necessary
-        jassertfalse; // Debug assertion for null harmonic layer
+    }
+
+    // NEW: Serialize spline layer
+    if (splineLayer) {
+        vt.addChild(splineLayer->toValueTree(), -1, nullptr);
     }
 
     // Serialize normalization scalar
     vt.setProperty("normalizationScalar", normalizationScalar.load(std::memory_order_acquire), nullptr);
+
+    // Serialize normalization enabled state
+    vt.setProperty("normalizationEnabled", normalizationEnabled, nullptr);
 
     // Serialize settings
     vt.setProperty("interpolationMode", static_cast<int>(interpMode), nullptr);
@@ -388,12 +606,15 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     }
 
     // Load coefficients
+    // CRITICAL: Always maintain exactly NUM_HARMONIC_COEFFICIENTS (41) coefficients
+    // Old presets may have fewer coefficients - pad with zeros if needed
+    coefficients.resize(NUM_HARMONIC_COEFFICIENTS, 0.0); // Reset to 41 zeros
     if (vt.hasProperty("coefficients")) {
         juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
         if (coeffArray != nullptr) {
-            coefficients.clear();
-            for (const auto& var : *coeffArray) {
-                coefficients.push_back(static_cast<double>(var));
+            int numToLoad = std::min(static_cast<int>(coeffArray->size()), NUM_HARMONIC_COEFFICIENTS);
+            for (int i = 0; i < numToLoad; ++i) {
+                coefficients[i] = static_cast<double>((*coeffArray)[i]);
             }
         }
     }
@@ -417,9 +638,23 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
         harmonicLayer->precomputeBasisFunctions(tableSize, minValue, maxValue);
     }
 
+    // NEW: Load spline layer
+    auto splineVT = vt.getChildWithName("SplineLayer");
+    if (splineVT.isValid()) {
+        splineLayer->fromValueTree(splineVT);
+    }
+
     // Load normalization scalar (optional - will be recomputed anyway)
     if (vt.hasProperty("normalizationScalar")) {
-        normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")), std::memory_order_release);
+        normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")),
+                                  std::memory_order_release);
+    }
+
+    // Load normalization enabled state (default to true if not present for backward compatibility)
+    if (vt.hasProperty("normalizationEnabled")) {
+        normalizationEnabled = static_cast<bool>(vt.getProperty("normalizationEnabled"));
+    } else {
+        normalizationEnabled = true; // Safe default for old presets
     }
 
     // Load settings

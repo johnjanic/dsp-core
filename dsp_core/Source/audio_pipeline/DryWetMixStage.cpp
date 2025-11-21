@@ -3,8 +3,7 @@
 namespace dsp_core::audio_pipeline {
 
 DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
-    : effectsPipeline_(std::move(effectsPipeline))
-{
+    : effectsPipeline_(std::move(effectsPipeline)) {
     jassert(effectsPipeline_ != nullptr);
 }
 
@@ -47,7 +46,8 @@ void DryWetMixStage::process(juce::AudioBuffer<double>& buffer) {
         }
 
         // Read delayed dry signal (latencySamples behind)
-        const int readPos = (delayBufferWritePos_ + delayBuffer_.getNumSamples() - latencySamples) % delayBuffer_.getNumSamples();
+        const int readPos =
+            (delayBufferWritePos_ + delayBuffer_.getNumSamples() - latencySamples) % delayBuffer_.getNumSamples();
         for (int ch = 0; ch < numChannels; ++ch) {
             double* dryData = dryBuffer_.getWritePointer(ch);
 

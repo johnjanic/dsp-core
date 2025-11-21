@@ -14,13 +14,15 @@ namespace dsp_core::audio_pipeline {
  * - Supports both dB and linear gain setting
  */
 class GainStage : public AudioProcessingStage {
-public:
+  public:
     GainStage() = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void process(juce::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override { return "Gain"; }
+    juce::String getName() const override {
+        return "Gain";
+    }
 
     /**
      * Set gain in decibels.
@@ -38,7 +40,7 @@ public:
      */
     double getTargetGainLinear() const;
 
-private:
+  private:
     juce::dsp::Gain<double> gainProcessor_;
     juce::LinearSmoothedValue<double> smoothedGain_{1.0};
     double sampleRate_ = 44100.0;

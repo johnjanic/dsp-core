@@ -1,10 +1,10 @@
 #ifdef DSP_CORE_H_INCLUDED
- /* When you add this cpp file to your project, you mustn't include it in a file where you've
-    already included any other headers - just put it inside a file on its own, possibly with your config
-    flags preceding it, but don't include anything else. That also includes avoiding any automatic prefix
-    header files that the compiler may be using.
- */
- #error "Incorrect use of JUCE cpp file"
+/* When you add this cpp file to your project, you mustn't include it in a file where you've
+   already included any other headers - just put it inside a file on its own, possibly with your config
+   flags preceding it, but don't include anything else. That also includes avoiding any automatic prefix
+   header files that the compiler may be using.
+*/
+#error "Incorrect use of JUCE cpp file"
 #endif
 
 #include "dsp_core.h"
@@ -12,9 +12,22 @@
 #include "Source/ExpressionEvaluator.cpp"
 #include "Source/HarmonicLayer.cpp"
 #include "Source/LayeredTransferFunction.cpp"
+#include "Source/SplineLayer.cpp"
 #include "Source/TransferFunction.cpp"
+#include "Source/Services/AdaptiveToleranceCalculator.cpp"
+#include "Source/Services/CoordinateSnapper.cpp"
+#include "Source/Services/CurveFeatureDetector.cpp"
+#include "Source/Services/SplineFitter.cpp"
+#include "Source/Services/SplineEvaluator.cpp"
+#include "Source/Services/SymmetryAnalyzer.cpp"
+#include "Source/Services/TransferFunctionOperations.cpp"
+#include "Source/Services/ZeroCrossingSolver.cpp"
 #include "Source/audio_pipeline/AudioPipeline.cpp"
 #include "Source/audio_pipeline/GainStage.cpp"
 #include "Source/audio_pipeline/DryWetMixStage.cpp"
 #include "Source/audio_pipeline/WaveshapingStage.cpp"
 #include "Source/audio_pipeline/OversamplingWrapper.cpp"
+#include "Source/audio_pipeline/DCBlockingFilter.cpp"
+#include "Source/audio_pipeline/DCOffsetCompensator.cpp"
+#include "Source/audio_pipeline/SilenceDetector.cpp"
+#include "Source/audio_pipeline/DynamicOutputBiasing.cpp"

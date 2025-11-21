@@ -22,7 +22,6 @@
 
 *******************************************************************************/
 
-
 #pragma once
 #define DSP_CORE_H_INCLUDED
 
@@ -33,10 +32,26 @@
 #include "Source/ExpressionEvaluator.h"
 #include "Source/HarmonicLayer.h"
 #include "Source/LayeredTransferFunction.h"
+#include "Source/SplineLayer.h"
+#include "Source/SplineTypes.h"
 #include "Source/TransferFunction.h"
+#include "Source/Services/AdaptiveToleranceCalculator.h"
+#include "Source/Services/CoordinateSnapper.h"
+#include "Source/Services/CurveFeatureDetector.h"
+#include "Source/Services/SplineFitter.h"
+#include "Source/Services/SplineEvaluator.h"
+#include "Source/Services/SymmetryAnalyzer.h"
+#include "Source/Services/TransferFunctionOperations.h"
+#include "Source/Services/ZeroCrossingSolver.h"
 #include "Source/audio_pipeline/AudioProcessingStage.h"
 #include "Source/audio_pipeline/AudioPipeline.h"
 #include "Source/audio_pipeline/GainStage.h"
 #include "Source/audio_pipeline/DryWetMixStage.h"
 #include "Source/audio_pipeline/WaveshapingStage.h"
 #include "Source/audio_pipeline/OversamplingWrapper.h"
+#include "Source/audio_pipeline/DCBlockingFilter.h"
+#include "Source/audio_pipeline/DCOffsetCompensator.h"
+#include "Source/audio_pipeline/PeakEnvelopeDetector.h"
+#include "Source/audio_pipeline/BiasFadeController.h"
+#include "Source/audio_pipeline/SilenceDetector.h"
+#include "Source/audio_pipeline/DynamicOutputBiasing.h"

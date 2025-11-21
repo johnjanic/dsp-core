@@ -32,7 +32,7 @@ namespace dsp_core::audio_pipeline {
  *             wet: effects pipeline → mix with dry
  */
 class DryWetMixStage : public AudioProcessingStage {
-public:
+  public:
     /**
      * Wrap an effects pipeline with dry/wet mixing.
      * @param effectsPipeline Pipeline containing the effects chain (e.g., input gain → waveshaper → output gain)
@@ -54,7 +54,9 @@ public:
     /**
      * Get current mix amount.
      */
-    double getMixAmount() const { return mixAmount_; }
+    double getMixAmount() const {
+        return mixAmount_;
+    }
 
     /**
      * Get the wrapped effects pipeline for tag-based stage access.
@@ -62,15 +64,15 @@ public:
      */
     AudioPipeline* getEffectsPipeline();
 
-private:
+  private:
     void captureDrySignal(const juce::AudioBuffer<double>& buffer);
     void applyMix(juce::AudioBuffer<double>& wetBuffer);
 
     std::unique_ptr<AudioPipeline> effectsPipeline_;
-    juce::AudioBuffer<double> dryBuffer_;         // Current dry signal
-    juce::AudioBuffer<double> delayBuffer_;       // Circular buffer for latency compensation
-    int delayBufferWritePos_ = 0;                 // Write position in delay buffer
-    double mixAmount_ = 1.0;  // 100% wet by default
+    juce::AudioBuffer<double> dryBuffer_;   // Current dry signal
+    juce::AudioBuffer<double> delayBuffer_; // Circular buffer for latency compensation
+    int delayBufferWritePos_ = 0;           // Write position in delay buffer
+    double mixAmount_ = 1.0;                // 100% wet by default
 };
 
 } // namespace dsp_core::audio_pipeline

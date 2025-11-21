@@ -62,3 +62,529 @@ else()
 endif()
 
 add_test(NAME DryWetMixStageTests COMMAND dry_wet_mix_stage_tests)
+
+# SplineFitter tests
+add_executable(spline_fitter_tests
+    SplineFitterTest.cpp
+)
+
+target_include_directories(spline_fitter_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_fitter_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_fitter_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_fitter_tests)
+endif()
+
+add_test(NAME SplineFitterTests COMMAND spline_fitter_tests)
+
+# SplineEvaluator tests
+add_executable(spline_evaluator_tests
+    SplineEvaluatorTest.cpp
+)
+
+target_include_directories(spline_evaluator_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_evaluator_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_evaluator_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_evaluator_tests)
+endif()
+
+add_test(NAME SplineEvaluatorTests COMMAND spline_evaluator_tests)
+
+# DCBlockingFilter tests
+add_executable(dc_blocking_filter_tests
+    DCBlockingFilterTest.cpp
+)
+
+target_include_directories(dc_blocking_filter_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(dc_blocking_filter_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(dc_blocking_filter_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(dc_blocking_filter_tests)
+endif()
+
+add_test(NAME DCBlockingFilterTests COMMAND dc_blocking_filter_tests)
+
+# DynamicOutputBiasing tests
+add_executable(dynamic_output_biasing_tests
+    DynamicOutputBiasingTest.cpp
+)
+
+target_include_directories(dynamic_output_biasing_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(dynamic_output_biasing_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(dynamic_output_biasing_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(dynamic_output_biasing_tests)
+endif()
+
+add_test(NAME DynamicOutputBiasingTests COMMAND dynamic_output_biasing_tests)
+
+# ZeroCrossingSolver tests
+add_executable(zero_crossing_solver_tests
+    ZeroCrossingSolverTests.cpp
+)
+
+target_include_directories(zero_crossing_solver_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(zero_crossing_solver_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(zero_crossing_solver_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(zero_crossing_solver_tests)
+endif()
+
+add_test(NAME ZeroCrossingSolverTests COMMAND zero_crossing_solver_tests)
+
+# DCOffsetCompensator tests
+add_executable(dc_offset_compensator_tests
+    DCOffsetCompensatorTests.cpp
+)
+
+target_include_directories(dc_offset_compensator_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(dc_offset_compensator_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(dc_offset_compensator_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(dc_offset_compensator_tests)
+endif()
+
+add_test(NAME DCOffsetCompensatorTests COMMAND dc_offset_compensator_tests)
+
+# CurveFeatureDetector tests
+add_executable(curve_feature_detector_tests
+    CurveFeatureDetectorTest.cpp
+)
+
+target_include_directories(curve_feature_detector_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(curve_feature_detector_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(curve_feature_detector_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(curve_feature_detector_tests)
+endif()
+
+add_test(NAME CurveFeatureDetectorTests COMMAND curve_feature_detector_tests)
+
+# SplineLayer tests
+add_executable(spline_layer_tests
+    SplineLayerTest.cpp
+)
+
+target_include_directories(spline_layer_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_layer_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_layer_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_layer_tests)
+endif()
+
+add_test(NAME SplineLayerTests COMMAND spline_layer_tests)
+
+# LayeredTransferFunctionSpline tests
+add_executable(layered_transfer_function_spline_tests
+    LayeredTransferFunctionSplineTest.cpp
+)
+
+target_include_directories(layered_transfer_function_spline_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(layered_transfer_function_spline_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(layered_transfer_function_spline_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(layered_transfer_function_spline_tests)
+endif()
+
+add_test(NAME LayeredTransferFunctionSplineTests COMMAND layered_transfer_function_spline_tests)
+
+# Algorithm Benchmark tests
+add_executable(algorithm_benchmark_tests
+    AlgorithmBenchmarkTest.cpp
+)
+
+target_include_directories(algorithm_benchmark_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(algorithm_benchmark_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(algorithm_benchmark_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(algorithm_benchmark_tests)
+endif()
+
+add_test(NAME AlgorithmBenchmarkTests COMMAND algorithm_benchmark_tests)
+
+# CoordinateSnapper tests
+add_executable(coordinate_snapper_tests
+    CoordinateSnapperTest.cpp
+)
+
+target_include_directories(coordinate_snapper_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(coordinate_snapper_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(coordinate_snapper_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(coordinate_snapper_tests)
+endif()
+
+add_test(NAME CoordinateSnapperTests COMMAND coordinate_snapper_tests)
+
+# AdaptiveTolerance tests
+add_executable(adaptive_tolerance_tests
+    AdaptiveToleranceTest.cpp
+)
+
+target_include_directories(adaptive_tolerance_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(adaptive_tolerance_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(adaptive_tolerance_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(adaptive_tolerance_tests)
+endif()
+
+add_test(NAME AdaptiveToleranceTests COMMAND adaptive_tolerance_tests)
+
+# SymmetryAnalyzer tests
+add_executable(symmetry_analyzer_tests
+    SymmetryAnalyzerTest.cpp
+)
+
+target_include_directories(symmetry_analyzer_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(symmetry_analyzer_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(symmetry_analyzer_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(symmetry_analyzer_tests)
+endif()
+
+add_test(NAME SymmetryAnalyzerTests COMMAND symmetry_analyzer_tests)
+
+# SplineFitterIntegration tests
+add_executable(spline_fitter_integration_tests
+    SplineFitterIntegrationTest.cpp
+)
+
+target_include_directories(spline_fitter_integration_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_fitter_integration_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_fitter_integration_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_fitter_integration_tests)
+endif()
+
+add_test(NAME SplineFitterIntegrationTests COMMAND spline_fitter_integration_tests)
+
+# SplineFitterExactExtrema tests
+add_executable(spline_fitter_exact_extrema_tests
+    SplineFitterExactExtremaTest.cpp
+)
+
+target_include_directories(spline_fitter_exact_extrema_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(spline_fitter_exact_extrema_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(spline_fitter_exact_extrema_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(spline_fitter_exact_extrema_tests)
+endif()
+
+add_test(NAME SplineFitterExactExtremaTests COMMAND spline_fitter_exact_extrema_tests)
+
+# ExtremaQualityMetrics tests (for parameter tuning)
+add_executable(extrema_quality_metrics_tests
+    ExtremaQualityMetricsTest.cpp
+    AnchorEfficiencyMetricsTest.cpp
+)
+
+target_include_directories(extrema_quality_metrics_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(extrema_quality_metrics_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(extrema_quality_metrics_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(extrema_quality_metrics_tests)
+endif()
+
+add_test(NAME ExtremaQualityMetricsTests COMMAND extrema_quality_metrics_tests)
+
+# FeatureDetectionDiagnostic tests (for root cause analysis)
+add_executable(feature_detection_diagnostic_tests
+    FeatureDetectionDiagnosticTest.cpp
+)
+
+target_include_directories(feature_detection_diagnostic_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(feature_detection_diagnostic_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(feature_detection_diagnostic_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(feature_detection_diagnostic_tests)
+endif()
+
+add_test(NAME FeatureDetectionDiagnosticTests COMMAND feature_detection_diagnostic_tests)
+
+# HarmonicAnchorDistribution tests (for debugging anchor clustering)
+add_executable(harmonic_anchor_distribution_tests
+    HarmonicAnchorDistributionTest.cpp
+)
+
+target_include_directories(harmonic_anchor_distribution_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(harmonic_anchor_distribution_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(harmonic_anchor_distribution_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(harmonic_anchor_distribution_tests)
+endif()
+
+add_test(NAME HarmonicAnchorDistributionTests COMMAND harmonic_anchor_distribution_tests)
+
+# FeatureDetectorDebug tests (for debugging extrema detection failure)
+add_executable(feature_detector_debug_tests
+    FeatureDetectorDebugTest.cpp
+)
+
+target_include_directories(feature_detector_debug_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(feature_detector_debug_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(feature_detector_debug_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(feature_detector_debug_tests)
+endif()
+
+add_test(NAME FeatureDetectorDebugTests COMMAND feature_detector_debug_tests)
+
+# AnchorClusteringAnalysis tests (for validating symmetry hypothesis)
+add_executable(anchor_clustering_analysis_tests
+    AnchorClusteringAnalysisTest.cpp
+)
+
+target_include_directories(anchor_clustering_analysis_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(anchor_clustering_analysis_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(anchor_clustering_analysis_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(anchor_clustering_analysis_tests)
+endif()
+
+add_test(NAME AnchorClusteringAnalysisTests COMMAND anchor_clustering_analysis_tests)
+
+# TransferFunctionOperations tests
+add_executable(transfer_function_operations_tests
+    TransferFunctionOperationsTest.cpp
+)
+
+target_include_directories(transfer_function_operations_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(transfer_function_operations_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(transfer_function_operations_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(transfer_function_operations_tests)
+endif()
+
+add_test(NAME TransferFunctionOperationsTests COMMAND transfer_function_operations_tests)

@@ -2,9 +2,7 @@
 
 namespace dsp_core::audio_pipeline {
 
-WaveshapingStage::WaveshapingStage(dsp_core::LayeredTransferFunction& ltf)
-    : ltf_(ltf) {
-}
+WaveshapingStage::WaveshapingStage(dsp_core::LayeredTransferFunction& ltf) : ltf_(ltf) {}
 
 void WaveshapingStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Waveshaping is stateless, no preparation needed

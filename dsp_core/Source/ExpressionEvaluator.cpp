@@ -12,21 +12,18 @@
 
 namespace dsp_core {
 
-ExpressionEvaluator::ExpressionEvaluator()
-{
+ExpressionEvaluator::ExpressionEvaluator() {
     symbolTable.add_variable("x", xVar);
     symbolTable.add_constants();
     expression.register_symbol_table(symbolTable);
 }
 
-bool ExpressionEvaluator::compile(const std::string& expressionStr)
-{
+bool ExpressionEvaluator::compile(const std::string& expressionStr) {
     return parser.compile(expressionStr, expression);
 }
 
-double ExpressionEvaluator::evaluate(double x) const
-{
-    const_cast<double&>(xVar) = x;  // set the input variable
+double ExpressionEvaluator::evaluate(double x) const {
+    const_cast<double&>(xVar) = x;
     return expression.value();
 }
 
