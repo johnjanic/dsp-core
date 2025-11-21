@@ -15,7 +15,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     std::unique_ptr<DCBlockingFilter> filter_;
 
     // Helper: Fill buffer with DC offset
-    void fillWithDC(juce::AudioBuffer<double>& buffer, double dcValue) {
+    static void fillWithDC(juce::AudioBuffer<double>& buffer, double dcValue) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
                 buffer.setSample(ch, i, dcValue);
@@ -24,8 +24,8 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Fill buffer with sine wave
-    void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate, double amplitude = 1.0,
-                      double dcOffset = 0.0) {
+    static void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate,
+                             double amplitude = 1.0, double dcOffset = 0.0) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
                 double phase = 2.0 * M_PI * frequency * i / sampleRate;
@@ -35,7 +35,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Measure RMS of buffer
-    double measureRMS(const juce::AudioBuffer<double>& buffer) {
+    static double measureRMS(const juce::AudioBuffer<double>& buffer) {
         double sumSquares = 0.0;
         int totalSamples = 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
@@ -49,7 +49,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Measure mean (DC) of buffer
-    double measureMean(const juce::AudioBuffer<double>& buffer) {
+    static double measureMean(const juce::AudioBuffer<double>& buffer) {
         double sum = 0.0;
         int totalSamples = 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {

@@ -33,7 +33,7 @@ class HarmonicAnchorDistributionTest : public ::testing::Test {
         }
     }
 
-    void analyzeAnchorDistribution(const std::vector<dsp_core::SplineAnchor>& anchors, int harmonic) {
+    static void analyzeAnchorDistribution(const std::vector<dsp_core::SplineAnchor>& anchors, int harmonic) {
         std::cout << "\n=== Harmonic " << harmonic << " Anchor Distribution ===" << std::endl;
         std::cout << "Total anchors: " << anchors.size() << std::endl;
 

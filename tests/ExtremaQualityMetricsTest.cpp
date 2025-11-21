@@ -25,7 +25,7 @@ class ExtremaQualityMetrics : public ::testing::Test {
     /**
      * Find numerical extrema by scanning dy/dx sign changes
      */
-    std::vector<double> findNumericalExtrema(const dsp_core::LayeredTransferFunction& ltf) {
+    static std::vector<double> findNumericalExtrema(const dsp_core::LayeredTransferFunction& ltf) {
         std::vector<double> extrema;
         const int tableSize = ltf.getTableSize();
 
@@ -53,7 +53,7 @@ class ExtremaQualityMetrics : public ::testing::Test {
     /**
      * Find anchor closest to target x position
      */
-    double findAnchorNear(const std::vector<dsp_core::SplineAnchor>& anchors, double target_x) {
+    static double findAnchorNear(const std::vector<dsp_core::SplineAnchor>& anchors, double target_x) {
         if (anchors.empty()) {
             return std::numeric_limits<double>::infinity();
         }

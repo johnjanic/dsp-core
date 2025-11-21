@@ -788,8 +788,8 @@ class FeatureBasedFittingTest : public ::testing::Test {
      * 4. Check if each extremum matches a data extremum (within tolerance)
      * 5. Count extrema that DON'T match = spurious ripple
      */
-    int countSpuriousExtrema(const std::vector<dsp_core::SplineAnchor>& anchors,
-                             const dsp_core::LayeredTransferFunction& originalData) {
+    static int countSpuriousExtrema(const std::vector<dsp_core::SplineAnchor>& anchors,
+                                    const dsp_core::LayeredTransferFunction& originalData) {
         // Get actual extrema from original data
         auto dataFeatures = dsp_core::Services::CurveFeatureDetector::detectFeatures(originalData);
         std::set<int> dataExtremaIndices(dataFeatures.localExtrema.begin(), dataFeatures.localExtrema.end());

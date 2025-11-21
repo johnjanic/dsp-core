@@ -93,7 +93,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
     /**
      * Helper: Measure max error between two tables
      */
-    double computeMaxError(const std::vector<double>& original, const std::vector<double>& fitted) const {
+    static double computeMaxError(const std::vector<double>& original, const std::vector<double>& fitted) {
         double maxError = 0.0;
         for (size_t i = 0; i < original.size(); ++i) {
             double error = std::abs(original[i] - fitted[i]);

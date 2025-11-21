@@ -168,7 +168,7 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
         return records;
     }
 
-    std::map<std::string, double> computeRegionalErrors(const std::vector<Sample>& samples,
+    static std::map<std::string, double> computeRegionalErrors(const std::vector<Sample>& samples,
                                                         const std::vector<dsp_core::SplineAnchor>& anchors) {
         std::map<std::string, double> regionErrors;
 
