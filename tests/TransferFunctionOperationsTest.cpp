@@ -38,8 +38,7 @@ TEST_F(TransferFunctionOperationsTest, Invert_FlipsAllValues) {
     // Verify all values are negated
     for (int i = 0; i < tableSize; ++i) {
         double expected = -(-1.0 + (2.0 * i / (tableSize - 1)));
-        EXPECT_NEAR(ltf->getBaseLayerValue(i), expected, 1e-10)
-            << "Value at index " << i << " not correctly inverted";
+        EXPECT_NEAR(ltf->getBaseLayerValue(i), expected, 1e-10) << "Value at index " << i << " not correctly inverted";
     }
 }
 
@@ -155,7 +154,8 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_PreservesShape) {
 
     // Calculate original average
     double origSum = 0.0;
-    for (double v : original) origSum += v;
+    for (double v : original)
+        origSum += v;
     double origAvg = origSum / tableSize;
 
     TransferFunctionOperations::removeDCSteadyState(*ltf);
@@ -202,7 +202,8 @@ TEST_F(TransferFunctionOperationsTest, Normalize_PreservesRelativeShape) {
 
     // Find original max for expected scale factor
     double origMax = 0.0;
-    for (double v : original) origMax = std::max(origMax, std::abs(v));
+    for (double v : original)
+        origMax = std::max(origMax, std::abs(v));
 
     TransferFunctionOperations::normalize(*ltf);
 
