@@ -198,7 +198,7 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
             }
         }
 
-        auto avg = [](const std::vector<double>& v) { return std::accumulate(v.begin(), v.end(), 0.0) / v.size(); };
+        auto avg = [](const std::vector<double>& v) { return std::accumulate(v.begin(), v.end(), 0.0) / static_cast<double>(v.size()); };
         auto avgInt = [](const std::vector<int>& v) {
             return std::accumulate(v.begin(), v.end(), 0) / static_cast<double>(v.size());
         };

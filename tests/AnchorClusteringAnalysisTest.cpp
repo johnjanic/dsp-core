@@ -266,7 +266,7 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
     std::cout << "\n=== SUMMARY ===" << std::endl;
     std::cout << "Total anchor additions: " << records.size() << std::endl;
     std::cout << "Symmetry violations: " << symmetryViolations << std::endl;
-    std::cout << "Percentage: " << (100.0 * symmetryViolations / records.size()) << "%" << std::endl;
+    std::cout << "Percentage: " << (100.0 * static_cast<double>(symmetryViolations) / static_cast<double>(records.size())) << "%" << std::endl;
 
     if (symmetryViolations > records.size() / 4) {
         std::cout << "\n⚠️  ROOT CAUSE IDENTIFIED: POOR ANCHOR INFLUENCE RADIUS" << std::endl;

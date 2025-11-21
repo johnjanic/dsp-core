@@ -107,6 +107,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
      */
     std::vector<double> captureBaseLayer() const {
         std::vector<double> base;
+        base.reserve(static_cast<size_t>(ltf->getTableSize()));
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             base.push_back(ltf->getBaseLayerValue(i));
         }
@@ -240,6 +241,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     // Capture true composite for comparison
     std::vector<double> originalState;
+    originalState.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         originalState.push_back(ltf->getCompositeValue(i));
     }
@@ -258,6 +260,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     // STEP d: Verify shape preserved (max error <5%)
     std::vector<double> splineState;
+    splineState.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         splineState.push_back(ltf->getCompositeValue(i));
     }
@@ -413,6 +416,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Capture original shape
     std::vector<double> originalShape;
+    originalShape.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         originalShape.push_back(ltf->getCompositeValue(i));
     }
@@ -435,6 +439,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Verify first fit quality
     std::vector<double> firstFit;
+    firstFit.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         firstFit.push_back(ltf->getCompositeValue(i));
     }
@@ -464,6 +469,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Verify shape preservation
     std::vector<double> secondFit;
+    secondFit.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         secondFit.push_back(ltf->getCompositeValue(i));
     }

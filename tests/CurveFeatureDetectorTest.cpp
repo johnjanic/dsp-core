@@ -200,7 +200,7 @@ TEST_F(CurveFeatureDetectorTest, SecondDerivativeDetectsInflection) {
     EXPECT_GE(features.inflectionPoints.size(), 1);
 
     // Inflection should be near center (index 128)
-    if (features.inflectionPoints.size() > 0) {
+    if (!features.inflectionPoints.empty()) {
         int inflectionIdx = features.inflectionPoints[0];
         EXPECT_NEAR(inflectionIdx, 128, 10) << "Inflection of x³ should be near center";
     }
@@ -315,6 +315,7 @@ class ExactExtremaPositioningTest : public ::testing::Test {
     // Helper: Extract x-coordinates from extrema indices
     std::vector<double> getExtremaPositions(const dsp_core::Services::CurveFeatureDetector::FeatureResult& features) {
         std::vector<double> positions;
+        positions.reserve(features.localExtrema.size());
         for (int idx : features.localExtrema) {
             positions.push_back(ltf->normalizeIndex(idx));
         }
@@ -491,7 +492,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
     }
 
     // Summary metric: what percentage are exact?
-    double accuracy = 100.0 * numWithinTolerance / expected.size();
+    double accuracy = 100.0 * static_cast<double>(numWithinTolerance) / static_cast<double>(expected.size());
     std::cout << "Harmonic 40 extrema accuracy: " << accuracy << "% within 0.01% tolerance\n";
     std::cout << "Exact: " << numWithinTolerance << "/" << expected.size() << "\n";
 }
@@ -523,6 +524,7 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
 
     // Expected extrema at x = ±0.5
     std::vector<double> positionsCoarse;
+    positionsCoarse.reserve(featuresCoarse.localExtrema.size());
     for (int idx : featuresCoarse.localExtrema) {
         positionsCoarse.push_back(ltfCoarse->normalizeIndex(idx));
     }

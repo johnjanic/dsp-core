@@ -115,7 +115,7 @@ double computeAveragePositionError(const std::vector<dsp_core::SplineAnchor>& an
         total_error += std::abs(anchor_x - extremum_x);
     }
 
-    return total_error / extrema_positions.size();
+    return total_error / static_cast<double>(extrema_positions.size());
 }
 
 /**

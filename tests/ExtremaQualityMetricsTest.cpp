@@ -87,7 +87,7 @@ class ExtremaQualityMetrics : public ::testing::Test {
             total_error += error;
         }
 
-        return total_error / extrema.size();
+        return total_error / static_cast<double>(extrema.size());
     }
 };
 

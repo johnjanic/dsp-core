@@ -56,11 +56,11 @@ class HarmonicAnchorDistributionTest : public ::testing::Test {
         }
 
         std::cout << "\nRegion distribution:" << std::endl;
-        std::cout << "  [-1.0, -0.66]: " << nearMinusOne << " anchors (" << (100.0 * nearMinusOne / anchors.size())
+        std::cout << "  [-1.0, -0.66]: " << nearMinusOne << " anchors (" << (100.0 * static_cast<double>(nearMinusOne) / static_cast<double>(anchors.size()))
                   << "%)" << std::endl;
-        std::cout << "  (-0.66, 0.66): " << middle << " anchors (" << (100.0 * middle / anchors.size()) << "%)"
+        std::cout << "  (-0.66, 0.66): " << middle << " anchors (" << (100.0 * static_cast<double>(middle) / static_cast<double>(anchors.size())) << "%)"
                   << std::endl;
-        std::cout << "  [0.66, 1.0]:   " << nearPlusOne << " anchors (" << (100.0 * nearPlusOne / anchors.size())
+        std::cout << "  [0.66, 1.0]:   " << nearPlusOne << " anchors (" << (100.0 * static_cast<double>(nearPlusOne) / static_cast<double>(anchors.size()))
                   << "%)" << std::endl;
     }
 
@@ -242,7 +242,7 @@ TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
             }
         }
 
-        double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
+        double clusteringPercentage = 100.0 * static_cast<double>(boundaryAnchors) / static_cast<double>(result.anchors.size());
         std::cout << "\nH3 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size() << " ("
                   << clusteringPercentage << "%)" << std::endl;
 
@@ -266,7 +266,7 @@ TEST_F(HarmonicAnchorDistributionTest, NoBoundaryClusteringRegression) {
             }
         }
 
-        double clusteringPercentage = 100.0 * boundaryAnchors / result.anchors.size();
+        double clusteringPercentage = 100.0 * static_cast<double>(boundaryAnchors) / static_cast<double>(result.anchors.size());
         std::cout << "H5 boundary clustering: " << boundaryAnchors << "/" << result.anchors.size() << " ("
                   << clusteringPercentage << "%)" << std::endl;
 
@@ -313,9 +313,9 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic3_TightConfig_ClusteringAnalysis)
 
     std::cout << "\nClustering analysis:" << std::endl;
     std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size() << " ("
-              << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
+              << (100.0 * static_cast<double>(nearLeftStrict) / static_cast<double>(result.anchors.size())) << "%)" << std::endl;
     std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size() << " ("
-              << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
+              << (100.0 * static_cast<double>(nearLeftLoose) / static_cast<double>(result.anchors.size())) << "%)" << std::endl;
 }
 
 TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis) {
@@ -355,9 +355,9 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
 
     std::cout << "\nClustering analysis:" << std::endl;
     std::cout << "  Anchors in x < -0.9:  " << nearLeftStrict << " / " << result.anchors.size() << " ("
-              << (100.0 * nearLeftStrict / result.anchors.size()) << "%)" << std::endl;
+              << (100.0 * static_cast<double>(nearLeftStrict) / static_cast<double>(result.anchors.size())) << "%)" << std::endl;
     std::cout << "  Anchors in x < -0.66: " << nearLeftLoose << " / " << result.anchors.size() << " ("
-              << (100.0 * nearLeftLoose / result.anchors.size()) << "%)" << std::endl;
+              << (100.0 * static_cast<double>(nearLeftLoose) / static_cast<double>(result.anchors.size())) << "%)" << std::endl;
 
     // This should trigger if there's pathological clustering
     // DISABLED: This is expected behavior for steep boundary derivatives
@@ -392,7 +392,7 @@ TEST_F(HarmonicAnchorDistributionTest, Harmonic5_TightConfig_ClusteringAnalysis)
         if (errors.empty())
             return std::make_pair(0.0, 0.0);
         double maxErr = *std::max_element(errors.begin(), errors.end());
-        double avgErr = std::accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
+        double avgErr = std::accumulate(errors.begin(), errors.end(), 0.0) / static_cast<double>(errors.size());
         return std::make_pair(maxErr, avgErr);
     };
 

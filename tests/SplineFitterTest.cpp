@@ -528,7 +528,7 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
             // Clamp x to [-1, 1] for acos/asin
             x = std::max(-1.0, std::min(1.0, x));
 
-            double y;
+            double y = 0.0;
             if (n % 2 == 0) {
                 // Even harmonic: cos(n * acos(x))
                 y = std::cos(n * std::acos(x));
@@ -551,7 +551,7 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
         // Medium harmonics (7-15): Moderate tolerance (challenging but achievable)
         // High harmonics (16-25): Relaxed tolerance (PCHIP struggles with high-frequency oscillations)
         // Very high harmonics (26+): Skip (beyond PCHIP's capabilities)
-        double errorTolerance;
+        double errorTolerance = 0.0;
         if (n <= 6) {
             errorTolerance = config.positionTolerance * 2.0; // 0.004 for tight config
         } else if (n <= 15) {
@@ -577,7 +577,7 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
         if (n <= 6) {
             std::vector<double> testPoints = {-0.9, -0.5, 0.0, 0.5, 0.9};
             for (double testX : testPoints) {
-                double expected;
+                double expected = 0.0;
                 if (n % 2 == 0) {
                     expected = std::cos(n * std::acos(testX));
                 } else {
@@ -633,7 +633,7 @@ TEST_F(SplineFitterTest, Performance_ComplexCurves) {
         // Functions 1-3 (high-frequency oscillations): Best-effort due to PCHIP limitations
         // Note: Feature-based anchor placement (Phase 3) prioritizes structural correctness
         // (no ripple) over minimizing absolute error, so tolerances are slightly relaxed
-        double errorTolerance;
+        double errorTolerance = 0.0;
         if (idx == 0) {
             errorTolerance = config.positionTolerance * 3.0; // 0.006 - steep but achievable
         } else {
@@ -2050,7 +2050,7 @@ TEST_F(BacktranslationTest, Scribble_LocalizedNoise_DoesNotAffectStraightRegions
     // Create curve with localized noise in middle region
     for (int i = 0; i < ltf->getTableSize(); ++i) {
         double x = ltf->normalizeIndex(i);
-        double y;
+        double y = 0.0;
 
         if (x < -0.3 || x > 0.3) {
             // Straight regions (left and right)
