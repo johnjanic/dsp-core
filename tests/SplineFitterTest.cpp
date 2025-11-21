@@ -2213,7 +2213,7 @@ TEST_F(SplineFitterTest, Performance_AdaptiveAlgorithm_Baseline) {
     std::cout << "Passed: " << passCount << "/" << testCases.size() << std::endl;
 
     // Overall average should be reasonable
-    double avgTime = static_cast<double>(totalTime) / testCases.size();
+    double avgTime = static_cast<double>(totalTime) / static_cast<double>(testCases.size());
     EXPECT_LT(avgTime, 100.0) << "Average time per curve should be <100ms, got " << avgTime << "ms";
 }
 
