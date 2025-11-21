@@ -2052,11 +2052,8 @@ TEST_F(BacktranslationTest, Scribble_LocalizedNoise_DoesNotAffectStraightRegions
         double x = ltf->normalizeIndex(i);
         double y;
 
-        if (x < -0.3) {
-            // Left straight region
-            y = x / 2.0;
-        } else if (x > 0.3) {
-            // Right straight region
+        if (x < -0.3 || x > 0.3) {
+            // Straight regions (left and right)
             y = x / 2.0;
         } else {
             // Middle noisy region: base + high-frequency noise
