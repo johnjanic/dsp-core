@@ -211,17 +211,14 @@ TEST_F(SplineFitterTest, PCHIPTangents_LocalExtremum) {
     EXPECT_TRUE(result.success);
 
     // Find anchor at peak (x ≈ 0)
-    bool foundPeak = false;
+    // Note: RDP simplification means we may not capture the exact peak
+    // but if we do, the tangent should be near zero
     for (const auto& anchor : result.anchors) {
         if (std::abs(anchor.x) < 0.1 && std::abs(anchor.y - 1.0) < 0.1) {
             // Tangent should be near zero at peak
             EXPECT_NEAR(anchor.tangent, 0.0, 0.3) << "Tangent at peak (x=" << anchor.x << ") should be near zero";
-            foundPeak = true;
         }
     }
-
-    // Note: RDP simplification means we may not capture the exact peak
-    // but if we do, the tangent should be near zero
 }
 
 TEST_F(SplineFitterTest, PCHIPTangents_SlopeCapping) {
@@ -1990,8 +1987,6 @@ TEST_F(BacktranslationTest, Scribble_RandomWalk_Simplified) {
 
     double y = 0.0; // Start at center
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-
         // Random walk: add small random step every ~160 samples (16384/100)
         if (i % 164 == 0) {
             double randomStep = (static_cast<double>(std::rand()) / RAND_MAX) * 0.2 - 0.1; // [-0.1, 0.1]

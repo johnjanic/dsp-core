@@ -814,12 +814,10 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
             totalNonCenter++;
 
             // Find complementary anchor
-            bool foundPair = false;
             for (const auto& other : fitResult.anchors) {
                 if (std::abs(anchor.x + other.x) < 1e-4) {
                     // Found potential pair at -x
                     if (std::abs(anchor.y + other.y) < 0.1) {
-                        foundPair = true;
                         pairedCount++;
                         break;
                     }

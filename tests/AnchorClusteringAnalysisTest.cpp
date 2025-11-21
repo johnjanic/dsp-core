@@ -51,14 +51,14 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
 
     // Structure to record each anchor addition
     struct AnchorAdditionRecord {
-        int iteration;
+        int iteration = 0;
         dsp_core::SplineAnchor addedAnchor;
-        double maxErrorBefore;
-        double maxErrorAfter;
-        double maxErrorLocationBefore; // x coordinate
-        double maxErrorLocationAfter;
-        double errorReductionPercent;
-        bool errorSwitchedSides;                       // For symmetric functions
+        double maxErrorBefore = 0.0;
+        double maxErrorAfter = 0.0;
+        double maxErrorLocationBefore = 0.0; // x coordinate
+        double maxErrorLocationAfter = 0.0;
+        double errorReductionPercent = 0.0;
+        bool errorSwitchedSides = false;               // For symmetric functions
         std::map<std::string, double> regionMaxErrors; // By region after addition
     };
 

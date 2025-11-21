@@ -171,16 +171,21 @@ TEST_F(LayeredTransferFunctionSplineTest, DisablingSplineLayerRestoresHarmonicMo
     ltf->getSplineLayer().setAnchors(linearAnchors);
     ltf->setSplineLayerEnabled(true);
 
-    double splineResult = ltf->applyTransferFunction(0.5);
+    const double splineResult = ltf->applyTransferFunction(0.5);
 
     // Disable spline mode
     ltf->setSplineLayerEnabled(false);
     ltf->updateComposite();
 
-    double harmonicResult = ltf->applyTransferFunction(0.5);
+    const double harmonicResult = ltf->applyTransferFunction(0.5);
 
     // Results should be different (harmonic mode uses base+harmonics)
     // Note: This test assumes base layer is identity and harmonics are zero
+    // Both modes produce similar results for linear transfer functions
+    EXPECT_GE(splineResult, -1.0);
+    EXPECT_LE(splineResult, 1.0);
+    EXPECT_GE(harmonicResult, -1.0);
+    EXPECT_LE(harmonicResult, 1.0);
 }
 
 //==============================================================================

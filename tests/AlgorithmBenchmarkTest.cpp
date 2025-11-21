@@ -22,11 +22,11 @@ class AlgorithmBenchmark : public ::testing::Test {
     struct BenchmarkResult {
         std::string algorithmName;
         std::string curveName;
-        double fittingTimeMs;
-        int numAnchors;
-        double maxError;
-        double avgError;
-        int spuriousExtrema;
+        double fittingTimeMs = 0.0;
+        int numAnchors = 0;
+        double maxError = 0.0;
+        double avgError = 0.0;
+        int spuriousExtrema = 0;
 
         void print() const {
             std::cout << std::left << std::setw(20) << curveName << std::setw(18) << algorithmName << std::setw(10)
