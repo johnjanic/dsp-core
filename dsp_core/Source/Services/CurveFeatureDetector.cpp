@@ -8,13 +8,14 @@
 namespace dsp_core {
 namespace Services {
 
+// NOTE: All methods use getBaseLayerValue() instead of getCompositeValue()
+// because composite might have normalization issues during fitting.
+
 CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const LayeredTransferFunction& ltf,
                                                                          const FeatureDetectionConfig& config) {
     FeatureResult result;
     int tableSize = ltf.getTableSize();
 
-    // Compute vertical range for significance filtering
-    // Use base layer for testing (composite might have normalization issues)
     double minY = ltf.getBaseLayerValue(0);
     double maxY = ltf.getBaseLayerValue(0);
     for (int i = 1; i < tableSize; ++i) {
@@ -46,7 +47,6 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
             (std::abs(deriv_prev) > config.derivativeThreshold || std::abs(deriv) > config.derivativeThreshold);
 
         if (hasSignChange && atLeastOneSignificant) {
-            // Use base layer for testing (composite might have normalization issues)
             double y = ltf.getBaseLayerValue(i);
 
             if (config.enableSignificanceFiltering) {
@@ -196,10 +196,9 @@ double CurveFeatureDetector::estimateDerivative(const LayeredTransferFunction& l
         return (y1 - y0) / (x1 - x0);
     }
 
-    // Central difference for interior points (more accurate)
+    // Central difference for interior points
     double x0 = ltf.normalizeIndex(idx - 1);
     double x1 = ltf.normalizeIndex(idx + 1);
-    // Use base layer for testing (composite might have normalization issues)
     double y0 = ltf.getBaseLayerValue(idx - 1);
     double y1 = ltf.getBaseLayerValue(idx + 1);
 
@@ -210,8 +209,7 @@ double CurveFeatureDetector::estimateSecondDerivative(const LayeredTransferFunct
     if (idx < 1 || idx >= ltf.getTableSize() - 1)
         return 0.0;
 
-    double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0); // Uniform spacing
-    // Use base layer for testing (composite might have normalization issues)
+    double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0);
     double y_prev = ltf.getBaseLayerValue(idx - 1);
     double y = ltf.getBaseLayerValue(idx);
     double y_next = ltf.getBaseLayerValue(idx + 1);

@@ -23,7 +23,7 @@ bool ExpressionEvaluator::compile(const std::string& expressionStr) {
 }
 
 double ExpressionEvaluator::evaluate(double x) const {
-    const_cast<double&>(xVar) = x; // set the input variable
+    const_cast<double&>(xVar) = x;
     return expression.value();
 }
 
