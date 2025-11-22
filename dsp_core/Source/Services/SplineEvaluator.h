@@ -1,8 +1,7 @@
 #pragma once
 #include "../SplineTypes.h"
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 /**
  * SplineEvaluator - Pure service for PCHIP spline evaluation
@@ -52,5 +51,4 @@ class SplineEvaluator {
     SplineEvaluator() = delete; // Pure static utility
 };
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

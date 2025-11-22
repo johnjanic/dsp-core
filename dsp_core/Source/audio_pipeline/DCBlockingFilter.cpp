@@ -3,7 +3,13 @@
 
 namespace dsp_core::audio_pipeline {
 
-void DCBlockingFilter::prepareToPlay(double sampleRate, int samplesPerBlock) {
+namespace {
+    // Cutoff frequency limits (safety: preserve low-end, avoid audible filtering)
+    constexpr double kMinFrequencyHz = 1.0;
+    constexpr double kMaxFrequencyHz = 20.0;
+} // namespace
+
+void DCBlockingFilter::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     sampleRate_ = sampleRate;
 
     // Resize filters for stereo (will be resized in process() if needed)
@@ -48,7 +54,7 @@ void DCBlockingFilter::reset() {
 
 void DCBlockingFilter::setCutoffFrequency(double frequencyHz) {
     // Clamp to 1-20Hz range (safety: preserve low-end, avoid audible filtering)
-    frequencyHz = juce::jlimit(1.0, 20.0, frequencyHz);
+    frequencyHz = juce::jlimit(kMinFrequencyHz, kMaxFrequencyHz, frequencyHz);
 
     // Store with atomic release
     cutoffFrequency_.store(frequencyHz, std::memory_order_release);

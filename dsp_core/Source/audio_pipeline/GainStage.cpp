@@ -2,15 +2,19 @@
 
 namespace dsp_core::audio_pipeline {
 
+namespace {
+constexpr double kGainRampTimeSeconds = 0.01; // 10ms ramp time
+} // namespace
+
 void GainStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     sampleRate_ = sampleRate;
     maxBlockSize_ = samplesPerBlock;
 
-    smoothedGain_.reset(sampleRate, 0.01); // 10ms ramp time
+    smoothedGain_.reset(sampleRate, kGainRampTimeSeconds);
 
     // CRITICAL: Prepare gainProcessor ONCE in prepareToPlay, NOT in process()
     // Calling prepare() in audio thread causes allocations!
-    juce::dsp::ProcessSpec spec;
+    juce::dsp::ProcessSpec spec{};
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = static_cast<juce::uint32>(numChannels_);
@@ -31,7 +35,7 @@ void GainStage::process(juce::AudioBuffer<double>& buffer) {
 
     // Process buffer
     juce::dsp::AudioBlock<double> block(buffer);
-    juce::dsp::ProcessContextReplacing<double> context(block);
+    const juce::dsp::ProcessContextReplacing<double> context(block);
     gainProcessor_.process(context);
 
     // Skip smoothing for remaining samples
@@ -46,7 +50,7 @@ void GainStage::reset() {
 }
 
 void GainStage::setGainDB(double gainDB) {
-    double linear = juce::Decibels::decibelsToGain(gainDB);
+    const double linear = juce::Decibels::decibelsToGain(gainDB);
     smoothedGain_.setTargetValue(linear);
 }
 

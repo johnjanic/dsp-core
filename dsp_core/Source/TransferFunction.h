@@ -54,7 +54,7 @@ class TransferFunction {
 
     // Apply a function to the table (for editor or processor use)
     void applyFunction(const std::function<double(double)>& func);
-    void processBlock(double* samples, int numSamples);
+    void processBlock(double* samples, int numSamples) const;
 
     // Normalize the table so the maximum value becomes 1.0 (if max != 0)
     void normalizeByMaximum();
@@ -67,9 +67,9 @@ class TransferFunction {
     double applyTransferFunctionLinear(double x) const;
     double applyTransferFunctionCubic(double x) const;
     double applyTransferFunctionCatmullRom(double x) const;
-    double interpolateLinear(double y0, double y1, double t) const;
-    double interpolateCubic(double y0, double y1, double y2, double y3, double t) const;
-    double interpolateCatmullRom(double y0, double y1, double y2, double y3, double t) const;
+    static double interpolateLinear(double y0, double y1, double t);
+    static double interpolateCubic(double y0, double y1, double y2, double y3, double t);
+    static double interpolateCatmullRom(double y0, double y1, double y2, double y3, double t);
 
     int tableSize;
     double minSignalValue, maxSignalValue;

@@ -4,8 +4,7 @@
 #include <numeric>
 #include <algorithm>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTransferFunction& ltf,
                                                               const Config& config) {
@@ -24,16 +23,16 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTrans
     // Sample from center to right edge
     for (int i = 0; i < config.sampleCount; ++i) {
         // Map to [0, tableSize/2] range
-        double t = static_cast<double>(i) / (config.sampleCount - 1);
-        int positiveIdx = centerIdx + static_cast<int>(t * (tableSize - centerIdx - 1));
-        int negativeIdx = centerIdx - static_cast<int>(t * centerIdx);
+        const double t = static_cast<double>(i) / (config.sampleCount - 1);
+        const int positiveIdx = centerIdx + static_cast<int>(t * (tableSize - centerIdx - 1));
+        const int negativeIdx = centerIdx - static_cast<int>(t * centerIdx);
 
         // Evaluate at the x positions (includes base + harmonics, ignores spline)
-        double xPositive = ltf.normalizeIndex(positiveIdx);
-        double xNegative = ltf.normalizeIndex(negativeIdx);
+        const double xPositive = ltf.normalizeIndex(positiveIdx);
+        const double xNegative = ltf.normalizeIndex(negativeIdx);
 
-        double yPositive = ltf.evaluateBaseAndHarmonics(xPositive);
-        double yNegative = ltf.evaluateBaseAndHarmonics(xNegative);
+        const double yPositive = ltf.evaluateBaseAndHarmonics(xPositive);
+        const double yNegative = ltf.evaluateBaseAndHarmonics(xNegative);
 
         fPositive.push_back(yPositive);
         fNegative.push_back(yNegative);
@@ -42,7 +41,7 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTrans
     // CRITICAL: Check zero-crossing at origin for odd symmetry
     // For odd symmetry f(-x) = -f(x), we must have f(0) = 0
     // If |f(0)| > tolerance, the curve cannot be odd-symmetric
-    double yAtZero = ltf.evaluateBaseAndHarmonics(0.0);
+    const double yAtZero = ltf.evaluateBaseAndHarmonics(0.0);
     const double zeroCrossingTolerance = 0.1; // 10% tolerance
 
     if (std::abs(yAtZero) > zeroCrossingTolerance) {
@@ -90,8 +89,8 @@ double SymmetryAnalyzer::computeSymmetryScore(const std::vector<double>& fPositi
     double denomNeg = 0.0;
 
     for (int i = 0; i < n; ++i) {
-        double devPos = fPositive[i] - meanPos;
-        double devNeg = -fNegative[i] - meanNeg; // Flip sign
+        const double devPos = fPositive[i] - meanPos;
+        const double devNeg = -fNegative[i] - meanNeg; // Flip sign
 
         numerator += devPos * devNeg;
         denomPos += devPos * devPos;
@@ -104,7 +103,7 @@ double SymmetryAnalyzer::computeSymmetryScore(const std::vector<double>& fPositi
         return (std::abs(meanPos) < 1e-6 && std::abs(meanNeg) < 1e-6) ? 1.0 : 0.0;
     }
 
-    double correlation = numerator / std::sqrt(denomPos * denomNeg);
+    const double correlation = numerator / std::sqrt(denomPos * denomNeg);
 
     // Clamp to [0, 1] range (negative correlation = asymmetric)
     return std::max(0.0, std::min(1.0, correlation));
@@ -114,5 +113,4 @@ SymmetryAnalyzer::Result SymmetryAnalyzer::analyzeOddSymmetry(const LayeredTrans
     return analyzeOddSymmetry(ltf, Config{});
 }
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

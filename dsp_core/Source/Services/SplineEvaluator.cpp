@@ -3,8 +3,7 @@
 #include <cmath>
 #include <juce_core/juce_core.h>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 double SplineEvaluator::evaluate(const std::vector<SplineAnchor>& anchors, double x) {
 
@@ -14,7 +13,7 @@ double SplineEvaluator::evaluate(const std::vector<SplineAnchor>& anchors, doubl
         return anchors[0].y;
 
     // Find segment containing x
-    int segIdx = findSegment(anchors, x);
+    const int segIdx = findSegment(anchors, x);
     if (segIdx < 0)
         return anchors.front().y; // Before first anchor
     if (segIdx >= static_cast<int>(anchors.size()) - 1) {
@@ -46,7 +45,7 @@ void SplineEvaluator::evaluateBatch(const std::vector<SplineAnchor>& anchors, co
     int currentSegment = 0;
 
     for (int i = 0; i < count; ++i) {
-        double x = xValues[i];
+        const double x = xValues[i];
 
         // Advance segment while x is beyond current segment's end
         // This works because xValues are sorted (each x >= previous x)
@@ -84,7 +83,7 @@ double SplineEvaluator::evaluateDerivative(const std::vector<SplineAnchor>& anch
         return 0.0;
 
     // Find segment containing x
-    int segIdx = findSegment(anchors, x);
+    const int segIdx = findSegment(anchors, x);
     if (segIdx < 0)
         return anchors.front().tangent; // Before first anchor
     if (segIdx >= static_cast<int>(anchors.size()) - 1) {
@@ -114,7 +113,7 @@ int SplineEvaluator::findSegment(const std::vector<SplineAnchor>& anchors, doubl
 double SplineEvaluator::evaluateSegment(const SplineAnchor& p0, const SplineAnchor& p1, double x) {
 
     // Normalize to [0, 1] within segment
-    double dx = p1.x - p0.x;
+    const double dx = p1.x - p0.x;
     if (std::abs(dx) < 1e-12)
         return p0.y; // Degenerate segment
 
@@ -127,19 +126,19 @@ double SplineEvaluator::evaluateSegment(const SplineAnchor& p0, const SplineAnch
     // h01(t) = -2t³ + 3t² = t²(3-2t)
     // h11(t) = t³ - t² = t²(t-1)
 
-    double t2 = t * t;
-    double t3 = t2 * t;
-    double omt = 1.0 - t;    // (1-t)
-    double omt2 = omt * omt; // (1-t)²
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    const double omt = 1.0 - t;    // (1-t)
+    const double omt2 = omt * omt; // (1-t)²
 
-    double h00 = (1.0 + 2.0 * t) * omt2; // 2t³ - 3t² + 1
-    double h10 = t * omt2;               // t³ - 2t² + t
-    double h01 = t2 * (3.0 - 2.0 * t);   // -2t³ + 3t²
-    double h11 = t2 * (t - 1.0);         // t³ - t²
+    const double h00 = (1.0 + 2.0 * t) * omt2; // 2t³ - 3t² + 1
+    const double h10 = t * omt2;               // t³ - 2t² + t
+    const double h01 = t2 * (3.0 - 2.0 * t);   // -2t³ + 3t²
+    const double h11 = t2 * (t - 1.0);         // t³ - t²
 
     // Get tangent values (slopes at control points)
-    double m0 = p0.tangent;
-    double m1 = p1.tangent;
+    const double m0 = p0.tangent;
+    const double m1 = p1.tangent;
 
     // Hermite interpolation
     // H(t) = h00·y0 + h10·Δx·m0 + h01·y1 + h11·Δx·m1
@@ -149,7 +148,7 @@ double SplineEvaluator::evaluateSegment(const SplineAnchor& p0, const SplineAnch
 double SplineEvaluator::evaluateSegmentDerivative(const SplineAnchor& p0, const SplineAnchor& p1, double x) {
 
     // Normalize to [0, 1] within segment
-    double dx = p1.x - p0.x;
+    const double dx = p1.x - p0.x;
     if (std::abs(dx) < 1e-12)
         return 0.0; // Degenerate segment
 
@@ -162,23 +161,22 @@ double SplineEvaluator::evaluateSegmentDerivative(const SplineAnchor& p0, const 
     // h01'(t) = -6t² + 6t = 6t(1-t)
     // h11'(t) = 3t² - 2t
 
-    double t2 = t * t;
+    const double t2 = t * t;
 
-    double h00_dt = 6.0 * t * (t - 1.0);      // 6t² - 6t
-    double h10_dt = 3.0 * t2 - 4.0 * t + 1.0; // 3t² - 4t + 1
-    double h01_dt = 6.0 * t * (1.0 - t);      // -6t² + 6t
-    double h11_dt = 3.0 * t2 - 2.0 * t;       // 3t² - 2t
+    const double h00_dt = 6.0 * t * (t - 1.0);      // 6t² - 6t
+    const double h10_dt = 3.0 * t2 - 4.0 * t + 1.0; // 3t² - 4t + 1
+    const double h01_dt = 6.0 * t * (1.0 - t);      // -6t² + 6t
+    const double h11_dt = 3.0 * t2 - 2.0 * t;       // 3t² - 2t
 
     // Get tangent values
-    double m0 = p0.tangent;
-    double m1 = p1.tangent;
+    const double m0 = p0.tangent;
+    const double m1 = p1.tangent;
 
     // H'(t) with respect to t
-    double dH_dt = h00_dt * p0.y + h10_dt * dx * m0 + h01_dt * p1.y + h11_dt * dx * m1;
+    const double dH_dt = h00_dt * p0.y + h10_dt * dx * m0 + h01_dt * p1.y + h11_dt * dx * m1;
 
     // Convert to derivative with respect to x: dH/dx = (dH/dt) / (dx/dt) = (dH/dt) / dx
     return dH_dt / dx;
 }
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

@@ -2,7 +2,7 @@
 
 namespace dsp_core::audio_pipeline {
 
-void SilenceDetector::prepareToPlay(double sampleRate, int samplesPerBlock) {
+void SilenceDetector::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     sampleRate_ = sampleRate;
 
     // Initialize per-channel envelopes (typically 2 for stereo)

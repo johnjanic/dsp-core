@@ -6,8 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 //==============================================================================
 // Main API
@@ -545,49 +544,13 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample
     if (samples.size() < 2)
         return {};
 
-    // Phase 3: FEATURE-BASED ANCHOR PLACEMENT
-    // Start with mandatory feature anchors (extrema, inflection points)
+    // Initialize anchors from mandatory features or endpoints
     std::vector<SplineAnchor> anchors;
-
     if (mandatoryAnchorIndices.empty() || ltf == nullptr) {
-        // Fallback: If no mandatory anchors provided, use endpoints only
         anchors.push_back({samples.front().x, samples.front().y, false, 0.0});
         anchors.push_back({samples.back().x, samples.back().y, false, 0.0});
     } else {
-        // Convert mandatory table indices to sample anchors
-        // mandatoryAnchorIndices are table indices from CurveFeatureDetector
-        // We need to convert them to x coordinates, then find the closest samples
-
-        for (int tableIdx : mandatoryAnchorIndices) {
-            // Convert table index to x coordinate using LayeredTransferFunction's mapping
-            double targetX = ltf->normalizeIndex(tableIdx);
-
-            // Find closest sample to this x coordinate
-            // Since samples are sorted by x, we could use binary search,
-            // but linear search is fine for small arrays
-            size_t closestIdx = 0;
-            double minDist = std::abs(samples[0].x - targetX);
-
-            for (size_t i = 1; i < samples.size(); ++i) {
-                double dist = std::abs(samples[i].x - targetX);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closestIdx = i;
-                }
-            }
-
-            anchors.push_back({samples[closestIdx].x, samples[closestIdx].y, false, 0.0});
-        }
-
-        // Sort anchors by x (should already be sorted, but ensure)
-        std::sort(anchors.begin(), anchors.end(),
-                  [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
-
-        // Remove any duplicates
-        anchors.erase(
-            std::unique(anchors.begin(), anchors.end(),
-                        [](const SplineAnchor& a, const SplineAnchor& b) { return std::abs(a.x - b.x) < 1e-9; }),
-            anchors.end());
+        anchors = initializeAnchorsFromIndices(samples, *ltf, mandatoryAnchorIndices);
     }
 
     // Calculate how many additional anchors we can add
@@ -623,131 +586,26 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample
 
     // Iteratively refine with error-driven placement (quality)
     for (int iteration = 0; iteration < remainingAnchors; ++iteration) {
-        // Compute tangents for current anchor set using configured algorithm
         computeTangents(anchors, config);
 
-        // Find sample with highest error
-        auto worst = findWorstFitSample(samples, anchors);
+        const auto worst = findWorstFitSample(samples, anchors);
 
-        // Compute adaptive tolerance (increases with anchor density to prevent over-fitting)
-        // The adaptive tolerance calculator uses quadratic scaling and anchor density multiplier
-        // to aggressively relax tolerance as anchors accumulate, solving the backtranslation problem.
-        double adaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
+        const double adaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
             verticalRange, static_cast<int>(anchors.size()), config.maxAnchors, adaptiveConfig);
 
-        // NOTE: We do NOT apply positionTolerance as a floor here. The adaptive tolerance
-        // calculator is trusted to compute the right tolerance based on curve complexity
-        // and anchor density. Applying a floor prevented backtranslation stability.
-
-        // Converged?
         if (worst.maxError <= adaptiveTolerance)
             break;
 
         // Insert anchor(s) at worst-fit location
-        const auto& worstSample = samples[worst.sampleIndex];
-
         if (useSymmetricMode) {
-            // === SYMMETRIC MODE: Add complementary pair ===
-
-            // Find complementary x position
-            double complementaryX = -worstSample.x;
-
-            // Find sample closest to complementary x
-            size_t complementaryIdx = 0;
-            double minDist = std::abs(samples[0].x - complementaryX);
-            for (size_t i = 1; i < samples.size(); ++i) {
-                double dist = std::abs(samples[i].x - complementaryX);
-                if (dist < minDist) {
-                    minDist = dist;
-                    complementaryIdx = i;
-                }
-            }
-
-            const auto& complementarySample = samples[complementaryIdx];
-
-            // Check if complementary position already has anchor
-            bool hasComplementaryAnchor =
-                std::any_of(anchors.begin(), anchors.end(), [&complementarySample](const SplineAnchor& a) {
-                    return std::abs(a.x - complementarySample.x) < 1e-9;
-                });
-
-            // Check if original position already has anchor
-            bool hasOriginalAnchor = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
-                return std::abs(a.x - worstSample.x) < 1e-9;
-            });
-
-            // Check if complementary position ALSO has significant error
-            // (Don't waste anchor budget on low-error positions)
-            double complementaryError = 0.0;
-            if (!hasComplementaryAnchor) {
-                double splineYAtComplementary = SplineEvaluator::evaluate(anchors, complementarySample.x);
-                complementaryError = std::abs(complementarySample.y - splineYAtComplementary);
-            }
-
-            // Only add complementary pair if:
-            // 1. Original position doesn't have anchor
-            // 2. Complementary position doesn't have anchor
-            // 3. Complementary position has significant error (>50% of adaptive tolerance)
-            // 4. We have room for 2 more anchors
-            bool canAddPair = !hasOriginalAnchor && !hasComplementaryAnchor &&
-                              complementaryError > adaptiveTolerance * 0.5 && (iteration + 1 < remainingAnchors);
-
-            if (canAddPair) {
-                // Add both anchors with symmetric y values
-                // For odd symmetry: if we have f(x) at x and f(-x) at -x,
-                // we want to enforce perfect symmetry by using the average
-                double yOriginal = worstSample.y;              // f(x)
-                double yComplementary = complementarySample.y; // f(-x)
-
-                // For perfect odd symmetry: f(-x) = -f(x)
-                // Average the two to get a symmetric value
-                double ySymmetric = (yOriginal - yComplementary) / 2.0;
-
-                // Insert original anchor at (x, ySymmetric)
-                auto insertPos1 = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
-                                                   [](const SplineAnchor& a, double x) { return a.x < x; });
-                anchors.insert(insertPos1, {worstSample.x, ySymmetric, false, 0.0});
-
-                // Insert complementary anchor at (-x, -ySymmetric) for odd symmetry
-                auto insertPos2 = std::lower_bound(anchors.begin(), anchors.end(), complementarySample.x,
-                                                   [](const SplineAnchor& a, double x) { return a.x < x; });
-                anchors.insert(insertPos2, {complementarySample.x, -ySymmetric, false, 0.0});
-
-                // Consume 2 iterations (we added 2 anchors)
-                ++iteration;
-
-            } else {
-                // Fallback: add single anchor (asymmetric, but necessary)
-                // Better to break symmetry slightly than leave large errors unaddressed
-                auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
-                                                  [](const SplineAnchor& a, double x) { return a.x < x; });
-
-                bool isDuplicate = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
-                    return std::abs(a.x - worstSample.x) < 1e-9;
-                });
-
-                if (isDuplicate)
-                    break; // No progress possible
-
-                anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
-            }
-
-        } else {
-            // === ASYMMETRIC MODE: Original greedy algorithm ===
-
-            // Find insertion point (maintain sorted order by x)
-            auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
-                                              [](const SplineAnchor& a, double x) { return a.x < x; });
-
-            // Don't insert duplicate x positions
-            bool isDuplicate = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
-                return std::abs(a.x - worstSample.x) < 1e-9;
-            });
-
-            if (isDuplicate)
+            const int anchorsAdded = insertAnchorSymmetric(anchors, samples, worst.sampleIndex, adaptiveTolerance);
+            if (anchorsAdded == 0)
                 break; // No progress possible
-
-            anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+            if (anchorsAdded == 2)
+                ++iteration; // Consume extra iteration for pair
+        } else {
+            if (!insertAnchorAsymmetric(anchors, samples[worst.sampleIndex]))
+                break; // No progress possible
         }
     }
 
@@ -867,5 +725,121 @@ SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(const LayeredTr
     return info;
 }
 
-} // namespace Services
-} // namespace dsp_core
+//==============================================================================
+// Helper Methods for Greedy Spline Fitting
+//==============================================================================
+
+std::vector<SplineAnchor> SplineFitter::initializeAnchorsFromIndices(const std::vector<Sample>& samples,
+                                                                      const LayeredTransferFunction& ltf,
+                                                                      const std::vector<int>& mandatoryIndices) {
+    std::vector<SplineAnchor> anchors;
+
+    for (const int tableIdx : mandatoryIndices) {
+        const double targetX = ltf.normalizeIndex(tableIdx);
+
+        // Find closest sample to this x coordinate
+        size_t closestIdx = 0;
+        double minDist = std::abs(samples[0].x - targetX);
+
+        for (size_t i = 1; i < samples.size(); ++i) {
+            const double dist = std::abs(samples[i].x - targetX);
+            if (dist < minDist) {
+                minDist = dist;
+                closestIdx = i;
+            }
+        }
+
+        anchors.push_back({samples[closestIdx].x, samples[closestIdx].y, false, 0.0});
+    }
+
+    // Sort anchors by x
+    std::sort(anchors.begin(), anchors.end(),
+              [](const SplineAnchor& a, const SplineAnchor& b) { return a.x < b.x; });
+
+    // Remove duplicates
+    anchors.erase(std::unique(anchors.begin(), anchors.end(),
+                              [](const SplineAnchor& a, const SplineAnchor& b) { return std::abs(a.x - b.x) < 1e-9; }),
+                  anchors.end());
+
+    return anchors;
+}
+
+int SplineFitter::insertAnchorSymmetric(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
+                                        size_t worstSampleIndex, double adaptiveTolerance) {
+    const auto& worstSample = samples[worstSampleIndex];
+
+    // Find complementary x position and closest sample
+    const double complementaryX = -worstSample.x;
+    size_t complementaryIdx = 0;
+    double minDist = std::abs(samples[0].x - complementaryX);
+    for (size_t i = 1; i < samples.size(); ++i) {
+        const double dist = std::abs(samples[i].x - complementaryX);
+        if (dist < minDist) {
+            minDist = dist;
+            complementaryIdx = i;
+        }
+    }
+    const auto& complementarySample = samples[complementaryIdx];
+
+    // Check for existing anchors
+    const bool hasOriginalAnchor = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
+        return std::abs(a.x - worstSample.x) < 1e-9;
+    });
+
+    const bool hasComplementaryAnchor =
+        std::any_of(anchors.begin(), anchors.end(),
+                    [&complementarySample](const SplineAnchor& a) { return std::abs(a.x - complementarySample.x) < 1e-9; });
+
+    // Check complementary error
+    double complementaryError = 0.0;
+    if (!hasComplementaryAnchor) {
+        const double splineY = SplineEvaluator::evaluate(anchors, complementarySample.x);
+        complementaryError = std::abs(complementarySample.y - splineY);
+    }
+
+    // Determine if we can add a symmetric pair
+    const bool canAddPair = !hasOriginalAnchor && !hasComplementaryAnchor && complementaryError > adaptiveTolerance * 0.5;
+
+    if (canAddPair) {
+        // Add both anchors with symmetric y values (odd symmetry)
+        const double ySymmetric = (worstSample.y - complementarySample.y) / 2.0;
+
+        auto insertPos1 = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                           [](const SplineAnchor& a, double x) { return a.x < x; });
+        anchors.insert(insertPos1, {worstSample.x, ySymmetric, false, 0.0});
+
+        auto insertPos2 = std::lower_bound(anchors.begin(), anchors.end(), complementarySample.x,
+                                           [](const SplineAnchor& a, double x) { return a.x < x; });
+        anchors.insert(insertPos2, {complementarySample.x, -ySymmetric, false, 0.0});
+
+        return 2;
+    }
+
+    // Fallback: add single anchor
+    if (hasOriginalAnchor) {
+        return 0; // No progress possible
+    }
+
+    auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                      [](const SplineAnchor& a, double x) { return a.x < x; });
+    anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+    return 1;
+}
+
+bool SplineFitter::insertAnchorAsymmetric(std::vector<SplineAnchor>& anchors, const Sample& worstSample) {
+    // Check for duplicate
+    const bool isDuplicate = std::any_of(anchors.begin(), anchors.end(), [&worstSample](const SplineAnchor& a) {
+        return std::abs(a.x - worstSample.x) < 1e-9;
+    });
+
+    if (isDuplicate) {
+        return false;
+    }
+
+    auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstSample.x,
+                                      [](const SplineAnchor& a, double x) { return a.x < x; });
+    anchors.insert(insertPos, {worstSample.x, worstSample.y, false, 0.0});
+    return true;
+}
+
+} // namespace dsp_core::Services

@@ -160,6 +160,24 @@ class CurveFeatureDetector {
      * @return Estimated d²y/dx²
      */
     static double estimateSecondDerivative(const LayeredTransferFunction& ltf, int idx);
+
+    // Internal feature representation for prioritization
+    struct Feature {
+        int index;
+        double significance;
+        bool isExtremum;
+    };
+
+    // Helper methods to reduce cognitive complexity
+    static void detectLocalExtrema(const LayeredTransferFunction& ltf, const FeatureDetectionConfig& config,
+                                   double amplitudeThreshold, double verticalCenter, FeatureResult& result,
+                                   std::vector<Feature>& features);
+
+    static void detectInflections(const LayeredTransferFunction& ltf, const FeatureDetectionConfig& config,
+                                  FeatureResult& result, std::vector<Feature>& features);
+
+    static void prioritizeFeatures(const FeatureDetectionConfig& config, int tableSize, FeatureResult& result,
+                                   std::vector<Feature>& features);
 };
 
 } // namespace Services
