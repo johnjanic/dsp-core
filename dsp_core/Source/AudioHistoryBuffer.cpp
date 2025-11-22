@@ -12,11 +12,12 @@ void AudioHistoryBuffer::pushSamples(const double* samples, int numSamples) {
 void AudioHistoryBuffer::getHistory(double* outSamples, int numSamples) const {
     jassert(numSamples <= size);
 
-    int start = (writePos - numSamples + size) % size;
-    int firstPart = juce::jmin(size - start, numSamples);
-    int secondPart = numSamples - firstPart;
+    const int start = (writePos - numSamples + size) % size;
+    const int firstPart = juce::jmin(size - start, numSamples);
+    const int secondPart = numSamples - firstPart;
 
     std::memcpy(outSamples, buffer.data() + start, firstPart * sizeof(double));
-    if (secondPart > 0)
+    if (secondPart > 0) {
         std::memcpy(outSamples + firstPart, buffer.data(), secondPart * sizeof(double));
+    }
 }

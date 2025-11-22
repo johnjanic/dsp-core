@@ -92,16 +92,17 @@ double HarmonicLayer::evaluateChebyshevTrig(double x, const std::vector<double>&
 
 // Polynomial evaluation using Clenshaw's algorithm (future support)
 double HarmonicLayer::evaluateChebyshevPolynomial(double x, const std::vector<double>& coeffs) {
-    if (coeffs.size() <= 1)
+    if (coeffs.size() <= 1) {
         return 0.0;
+    }
 
     // Clenshaw's algorithm for numerical stability
     double b_kplus1 = 0.0;
     double b_kplus2 = 0.0;
-    int N = static_cast<int>(coeffs.size()) - 1;
+    const int N = static_cast<int>(coeffs.size()) - 1;
 
     for (int k = N; k >= 1; --k) {
-        double temp = b_kplus1;
+        const double temp = b_kplus1;
         b_kplus1 = 2.0 * x * b_kplus1 - b_kplus2 + coeffs[k];
         b_kplus2 = temp;
     }
@@ -122,14 +123,14 @@ void HarmonicLayer::fromValueTree(const juce::ValueTree& vt) {
 
     // Load numHarmonics (optional - for validation)
     if (vt.hasProperty("numHarmonics")) {
-        int loadedNumHarmonics = vt.getProperty("numHarmonics");
+        const int loadedNumHarmonics = vt.getProperty("numHarmonics");
         if (loadedNumHarmonics != numHarmonics) {
             jassertfalse; // Mismatch in harmonic count
         }
     }
 
     // Load algorithm
-    juce::String algoStr = vt.getProperty("algorithm", "trig").toString();
+    const juce::String algoStr = vt.getProperty("algorithm", "trig").toString();
     algorithm = (algoStr == "polynomial") ? Algorithm::Polynomial : Algorithm::Trig;
 
     // Invalidate precomputed data (will be recomputed on next evaluate)
