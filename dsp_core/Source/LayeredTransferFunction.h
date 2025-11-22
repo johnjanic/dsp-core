@@ -284,7 +284,7 @@ class LayeredTransferFunction {
     /**
      * Process block of samples in-place
      */
-    void processBlock(double* samples, int numSamples);
+    void processBlock(double* samples, int numSamples) const;
 
     //==========================================================================
     // Interpolation/Extrapolation Modes (same as TransferFunction)

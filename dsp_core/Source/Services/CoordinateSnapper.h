@@ -1,8 +1,7 @@
 #pragma once
 #include <juce_core/juce_core.h>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 /**
  * CoordinateSnapper - Pure service for grid snapping in world space
@@ -64,5 +63,4 @@ class CoordinateSnapper {
     CoordinateSnapper() = delete; // Pure static utility
 };
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

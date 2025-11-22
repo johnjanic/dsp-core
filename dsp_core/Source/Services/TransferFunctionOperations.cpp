@@ -1,14 +1,14 @@
 #include "TransferFunctionOperations.h"
+#include <algorithm>
 #include <cmath>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 void TransferFunctionOperations::invert(LayeredTransferFunction& ltf) {
     const int tableSize = ltf.getTableSize();
 
     for (int i = 0; i < tableSize; ++i) {
-        double currentValue = ltf.getBaseLayerValue(i);
+        const double currentValue = ltf.getBaseLayerValue(i);
         ltf.setBaseLayerValue(i, -currentValue);
     }
 
@@ -21,7 +21,7 @@ void TransferFunctionOperations::removeDCInstantaneous(LayeredTransferFunction& 
     const double dcOffset = ltf.getBaseLayerValue(midIndex);
 
     for (int i = 0; i < tableSize; ++i) {
-        double currentValue = ltf.getBaseLayerValue(i);
+        const double currentValue = ltf.getBaseLayerValue(i);
         ltf.setBaseLayerValue(i, currentValue - dcOffset);
     }
 
@@ -35,10 +35,10 @@ void TransferFunctionOperations::removeDCSteadyState(LayeredTransferFunction& lt
     for (int i = 0; i < tableSize; ++i) {
         sum += ltf.getBaseLayerValue(i);
     }
-    const double average = sum / tableSize;
+    const double average = sum / static_cast<double>(tableSize);
 
     for (int i = 0; i < tableSize; ++i) {
-        double currentValue = ltf.getBaseLayerValue(i);
+        const double currentValue = ltf.getBaseLayerValue(i);
         ltf.setBaseLayerValue(i, currentValue - average);
     }
 
@@ -50,24 +50,22 @@ void TransferFunctionOperations::normalize(LayeredTransferFunction& ltf) {
 
     double maxAbsValue = 0.0;
     for (int i = 0; i < tableSize; ++i) {
-        double absValue = std::abs(ltf.getBaseLayerValue(i));
-        if (absValue > maxAbsValue) {
-            maxAbsValue = absValue;
-        }
+        const double absValue = std::abs(ltf.getBaseLayerValue(i));
+        maxAbsValue = std::max(maxAbsValue, absValue);
     }
 
-    if (maxAbsValue < 1e-10) {
+    constexpr double kMinNormalizeThreshold = 1e-10;
+    if (maxAbsValue < kMinNormalizeThreshold) {
         return;
     }
 
     const double scaleFactor = 1.0 / maxAbsValue;
     for (int i = 0; i < tableSize; ++i) {
-        double currentValue = ltf.getBaseLayerValue(i);
+        const double currentValue = ltf.getBaseLayerValue(i);
         ltf.setBaseLayerValue(i, currentValue * scaleFactor);
     }
 
     ltf.updateComposite();
 }
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

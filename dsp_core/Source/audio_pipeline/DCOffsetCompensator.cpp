@@ -8,7 +8,7 @@ DCOffsetCompensator::DCOffsetCompensator(LayeredTransferFunction& ltf) : ltf_(lt
     lastBiasUpdate_ = std::chrono::steady_clock::now();
 }
 
-void DCOffsetCompensator::prepareToPlay(double sampleRate, int samplesPerBlock) {
+void DCOffsetCompensator::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     sampleRate_ = sampleRate;
 
     // Configure fade controller with proper attack/release times
@@ -62,16 +62,16 @@ void DCOffsetCompensator::process(juce::AudioBuffer<double>& buffer) {
             envelope.process(data[i]);
 
             // Check if channel is near silence
-            bool nearSilence = envelope.isNearSilence();
+            const bool nearSilence = envelope.isNearSilence();
 
             // Update fade controller (updates target based on silence state)
             fade_.process(nearSilence);
 
             // Get current fade amount [0,1]
-            double fadeAmount = fade_.getNextValue();
+            const double fadeAmount = fade_.getNextValue();
 
             // Apply bias: biasedInput = input + (fadeAmount * bias)
-            double biasedInput = data[i] + (fadeAmount * bias);
+            const double biasedInput = data[i] + (fadeAmount * bias);
 
             // NO CLAMPING - transparency over safety
             // Apply transfer function

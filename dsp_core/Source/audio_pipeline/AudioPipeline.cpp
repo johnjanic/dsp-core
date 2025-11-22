@@ -42,8 +42,9 @@ void AudioPipeline::reset() {
 juce::String AudioPipeline::getName() const {
     juce::String name = "Pipeline[";
     for (size_t i = 0; i < stages_.size(); ++i) {
-        if (i > 0)
+        if (i > 0) {
             name += " -> ";
+        }
         name += stages_[i]->getName();
     }
     name += "]";

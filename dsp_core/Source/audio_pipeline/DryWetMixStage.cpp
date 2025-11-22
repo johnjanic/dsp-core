@@ -2,6 +2,10 @@
 
 namespace dsp_core::audio_pipeline {
 
+namespace {
+constexpr int kMaxChannels = 8; // Support stereo, 5.1, 7.1
+} // namespace
+
 DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
     : effectsPipeline_(std::move(effectsPipeline)) {
     jassert(effectsPipeline_ != nullptr);
@@ -9,8 +13,7 @@ DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
 
 void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Allocate dry buffer for current block
-    // Assume max 8 channels (stereo, 5.1, 7.1)
-    dryBuffer_.setSize(8, samplesPerBlock, false, true, true);
+    dryBuffer_.setSize(kMaxChannels, samplesPerBlock, false, true, true);
 
     // Prepare effects pipeline
     effectsPipeline_->prepareToPlay(sampleRate, samplesPerBlock);
@@ -20,7 +23,7 @@ void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     if (latencySamples > 0) {
         // Need circular buffer large enough for latency + one block
         const int delayBufferSize = latencySamples + samplesPerBlock;
-        delayBuffer_.setSize(8, delayBufferSize, false, true, true);
+        delayBuffer_.setSize(kMaxChannels, delayBufferSize, false, true, true);
         delayBufferWritePos_ = 0;
     } else {
         // No latency, no delay buffer needed

@@ -3,11 +3,11 @@
 namespace dsp_core::audio_pipeline {
 
 DynamicOutputBiasing::DynamicOutputBiasing(LayeredTransferFunction& ltf, SilenceDetector& silenceDetector)
-    : ltf_(ltf), silenceDetector_(silenceDetector),
-      lastBiasUpdate_() // Default-constructed (epoch), allows first update immediately
+    : ltf_(ltf), silenceDetector_(silenceDetector)
+    // lastBiasUpdate_ default-constructed (epoch), allows first update immediately
 {}
 
-void DynamicOutputBiasing::prepareToPlay(double sampleRate, int samplesPerBlock) {
+void DynamicOutputBiasing::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     sampleRate_ = sampleRate;
 
     // Configure fade controller
@@ -37,7 +37,7 @@ void DynamicOutputBiasing::process(juce::AudioBuffer<double>& buffer) {
     for (int i = 0; i < numSamples; ++i) {
         // Update fade controller (once per sample)
         fade_.process(nearSilence);
-        double N = fade_.getNextValue();
+        const double N = fade_.getNextValue();
 
         // Apply bias to all channels
         for (int ch = 0; ch < numChannels; ++ch) {
@@ -65,7 +65,7 @@ void DynamicOutputBiasing::updateBias() {
 
     // Compute DC offset: B = f(0)
     // This is trivial for output biasing (just evaluate at x=0)
-    double dcOffset = ltf_.applyTransferFunction(0.0);
+    const double dcOffset = ltf_.applyTransferFunction(0.0);
 
     // Atomic write (UI thread → audio thread)
     cachedBias_.store(dcOffset, std::memory_order_release);

@@ -13,9 +13,9 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::solve(const LayeredTransferF
 
     // Brute-force search over entire table
     for (int i = 0; i < tableSize; ++i) {
-        double x = ltf.normalizeIndex(i);
-        double fx = ltf.applyTransferFunction(x);
-        double absFx = std::abs(fx);
+        const double x = ltf.normalizeIndex(i);
+        const double fx = ltf.applyTransferFunction(x);
+        const double absFx = std::abs(fx);
 
         if (absFx < minAbsOutput) {
             minAbsOutput = absFx;
@@ -59,9 +59,9 @@ ZeroCrossingSolver::SolveResult ZeroCrossingSolver::refineBisection(const Layere
 
     // Bisection iterations
     for (int iter = 0; iter < maxIterations; ++iter) {
-        double mid = (left + right) * 0.5;
-        double fMid = ltf.applyTransferFunction(mid);
-        double absFMid = std::abs(fMid);
+        const double mid = (left + right) * 0.5;
+        const double fMid = ltf.applyTransferFunction(mid);
+        const double absFMid = std::abs(fMid);
 
         // Update best if this is closer to zero
         if (absFMid < bestAbsFx) {

@@ -2,8 +2,7 @@
 #include "../SplineTypes.h"
 #include "../LayeredTransferFunction.h"
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 /**
  * SplineFitter - Pure service for spline curve fitting
@@ -90,8 +89,19 @@ class SplineFitter {
     static void pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
                                       double pruningTolerance, const SplineFitConfig& config);
 
+    // Helper methods for greedySplineFit to reduce cognitive complexity
+    static std::vector<SplineAnchor> initializeAnchorsFromIndices(const std::vector<Sample>& samples,
+                                                                   const LayeredTransferFunction& ltf,
+                                                                   const std::vector<int>& mandatoryIndices);
+
+    // Insert anchor pair in symmetric mode. Returns number of anchors added (1 or 2)
+    static int insertAnchorSymmetric(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
+                                     size_t worstSampleIndex, double adaptiveTolerance);
+
+    // Insert single anchor in asymmetric mode. Returns true if anchor was inserted
+    static bool insertAnchorAsymmetric(std::vector<SplineAnchor>& anchors, const Sample& worstSample);
+
     SplineFitter() = delete; // Pure static utility
 };
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

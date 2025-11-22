@@ -1,8 +1,7 @@
 #include "CoordinateSnapper.h"
 #include <cmath>
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 double CoordinateSnapper::snapValue(double value, double gridStep) {
     // Return original value for invalid grid steps
@@ -27,7 +26,7 @@ bool CoordinateSnapper::isNearGridLine(double value, double gridStep, double thr
     }
 
     // Find nearest grid line and check distance
-    double nearest = nearestGridLine(value, gridStep);
+    const double nearest = nearestGridLine(value, gridStep);
     return std::abs(value - nearest) <= thresholdWorldSpace;
 }
 
@@ -41,5 +40,4 @@ double CoordinateSnapper::nearestGridLine(double value, double gridStep) {
     return std::round(value / gridStep) * gridStep;
 }
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

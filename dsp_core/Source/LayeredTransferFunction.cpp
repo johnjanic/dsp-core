@@ -16,14 +16,23 @@
 
 namespace dsp_core {
 
-LayeredTransferFunction::LayeredTransferFunction(int size, double minVal, double maxVal)
-    : tableSize(size), minValue(minVal), maxValue(maxVal), harmonicLayer(std::make_unique<HarmonicLayer>(40)),
+namespace {
+    // Number of harmonics for harmonic layer synthesis
+    constexpr int kNumHarmonics = 40;
+    // Total coefficients: [0] = wavetable mix, [1..40] = harmonic amplitudes
+    constexpr int kTotalCoefficients = kNumHarmonics + 1;
+    // Epsilon for zero comparison in normalization
+    constexpr double kNormalizationEpsilon = 1e-12;
+} // namespace
+
+LayeredTransferFunction::LayeredTransferFunction(int tableSize, double minVal, double maxVal)
+    : tableSize(tableSize), minValue(minVal), maxValue(maxVal), harmonicLayer(std::make_unique<HarmonicLayer>(kNumHarmonics)),
       splineLayer(std::make_unique<SplineLayer>()), // NEW: Initialize spline layer
-      coefficients(41, 0.0),                        // 41 coefficients: [0] = WT, [1..40] = harmonics
-      baseTable(size), compositeTable(size) {
+      coefficients(kTotalCoefficients, 0.0),        // kTotalCoefficients: [0] = WT, [1..40] = harmonics
+      baseTable(tableSize), compositeTable(tableSize) {
 
     // Pre-allocate scratch buffer for updateComposite() (eliminates heap allocation)
-    unnormalizedMixBuffer.resize(size);
+    unnormalizedMixBuffer.resize(tableSize);
 
     // Initialize coefficients
     coefficients[0] = 1.0; // Default WT mix = 1.0 (full base layer)
@@ -149,9 +158,7 @@ void LayeredTransferFunction::updateCompositeHarmonicMode() {
 
         // Track maximum absolute value
         const double absValue = std::abs(unnormalized);
-        if (absValue > maxAbsValue) {
-            maxAbsValue = absValue;
-        }
+        maxAbsValue = std::max(absValue, maxAbsValue);
     }
 
     // Step 2: Compute normalization scalar (or use frozen/disabled scalar)
@@ -174,7 +181,7 @@ double LayeredTransferFunction::computeNormalizationScalar(double maxAbsValue) {
     if (!deferNormalization) {
         // Normal mode: recalculate normalization scalar
         double normScalar = 1.0;
-        if (maxAbsValue > 1e-12) { // Avoid division by zero
+        if (maxAbsValue > kNormalizationEpsilon) { // Avoid division by zero
             normScalar = 1.0 / maxAbsValue;
         }
         normalizationScalar.store(normScalar, std::memory_order_release);
@@ -336,7 +343,7 @@ double LayeredTransferFunction::applyTransferFunction(double x) const {
     return evaluateDirect(x);
 }
 
-void LayeredTransferFunction::processBlock(double* samples, int numSamples) {
+void LayeredTransferFunction::processBlock(double* samples, int numSamples) const {
     for (int i = 0; i < numSamples; ++i) {
         samples[i] = applyTransferFunction(samples[i]);
     }
@@ -374,7 +381,8 @@ double LayeredTransferFunction::interpolateLinear(double x) const {
     }
 
     // Linear extrapolation path (requires boundary checks and slope calculations)
-    double y0, y1;
+    double y0;
+    double y1;
 
     // Handle index
     if (index < 0) {
@@ -511,17 +519,17 @@ double LayeredTransferFunction::evaluateDirect(double x) const {
         // Spline mode: direct PCHIP evaluation, no normalization
         // User has direct amplitude control via anchor placement
         return splineLayer->evaluate(x);
-    } else {
-        // Harmonic mode: base + harmonics with normalization
-        const double baseValue = interpolateBase(x); // NEW helper method
-        const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-        const double wtCoeff = coefficients[0];
-        const double result = wtCoeff * baseValue + harmonicValue;
-
-        // Apply normalization scalar (only in harmonic mode)
-        const double normScalar = normalizationScalar.load(std::memory_order_acquire);
-        return normScalar * result;
     }
+
+    // Harmonic mode: base + harmonics with normalization
+    const double baseValue = interpolateBase(x); // NEW helper method
+    const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+    const double wtCoeff = coefficients[0];
+    const double result = wtCoeff * baseValue + harmonicValue;
+
+    // Apply normalization scalar (only in harmonic mode)
+    const double normScalar = normalizationScalar.load(std::memory_order_acquire);
+    return normScalar * result;
 }
 
 double LayeredTransferFunction::interpolateBase(double x) const {

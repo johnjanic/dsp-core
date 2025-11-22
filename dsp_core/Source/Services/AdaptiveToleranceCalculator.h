@@ -1,7 +1,6 @@
 #pragma once
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 /**
  * AdaptiveToleranceCalculator - Pure service for computing adaptive error tolerances
@@ -74,5 +73,4 @@ class AdaptiveToleranceCalculator {
     AdaptiveToleranceCalculator() = delete; // Pure static service
 };
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

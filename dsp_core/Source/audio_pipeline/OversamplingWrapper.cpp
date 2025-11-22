@@ -2,13 +2,18 @@
 
 namespace dsp_core::audio_pipeline {
 
+namespace {
+constexpr int kMaxOversamplingOrder = 4;
+constexpr int kNumOversamplingModes = kMaxOversamplingOrder + 1; // Orders 0-4
+} // namespace
+
 OversamplingWrapper::OversamplingWrapper(std::unique_ptr<AudioProcessingStage> wrappedStage, int oversamplingOrder)
     : wrappedStage_(std::move(wrappedStage)), currentOrder_(oversamplingOrder) {
     jassert(wrappedStage_ != nullptr);
-    jassert(oversamplingOrder >= 0 && oversamplingOrder <= 4);
+    jassert(oversamplingOrder >= 0 && oversamplingOrder <= kMaxOversamplingOrder);
 
     // Pre-create all oversamplers
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < kNumOversamplingModes; ++i) {
         oversamplers_[i] = std::make_unique<juce::dsp::Oversampling<double>>(
             2, // 2 channels (stereo)
             i, // Oversampling order
@@ -21,7 +26,7 @@ void OversamplingWrapper::prepareToPlay(double sampleRate, int samplesPerBlock) 
     maxBlockSize_ = samplesPerBlock;
 
     // Prepare all oversamplers
-    juce::dsp::ProcessSpec spec;
+    juce::dsp::ProcessSpec spec{};
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = 2;
@@ -86,9 +91,10 @@ int OversamplingWrapper::getLatencySamples() const {
 }
 
 void OversamplingWrapper::setOversamplingOrder(int order) {
-    jassert(order >= 0 && order <= 4);
-    if (order == currentOrder_)
+    jassert(order >= 0 && order <= kMaxOversamplingOrder);
+    if (order == currentOrder_) {
         return;
+    }
 
     currentOrder_ = order;
 

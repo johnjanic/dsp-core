@@ -1,8 +1,7 @@
 #pragma once
 #include "../LayeredTransferFunction.h"
 
-namespace dsp_core {
-namespace Services {
+namespace dsp_core::Services {
 
 /**
  * TransferFunctionOperations - Pure service for transfer function transformations
@@ -64,5 +63,4 @@ class TransferFunctionOperations {
     TransferFunctionOperations() = delete; // Pure static utility
 };
 
-} // namespace Services
-} // namespace dsp_core
+} // namespace dsp_core::Services

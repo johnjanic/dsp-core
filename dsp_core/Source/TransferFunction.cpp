@@ -2,8 +2,8 @@
 
 namespace dsp_core {
 
-TransferFunction::TransferFunction(int size, double minVal, double maxVal)
-    : tableSize(size), minSignalValue(minVal), maxSignalValue(maxVal), table(size) {
+TransferFunction::TransferFunction(int tableSize, double minSignalValue, double maxSignalValue)
+    : tableSize(tableSize), minSignalValue(minSignalValue), maxSignalValue(maxSignalValue), table(tableSize) {
     reset();
 }
 
@@ -91,11 +91,11 @@ double TransferFunction::applyTransferFunctionCatmullRom(double x) const {
     return interpolateCatmullRom(y0, y1, y2, y3, t);
 }
 
-double TransferFunction::interpolateLinear(double y0, double y1, double t) const {
+double TransferFunction::interpolateLinear(double y0, double y1, double t) {
     return y0 + t * (y1 - y0);
 }
 
-double TransferFunction::interpolateCubic(double y0, double y1, double y2, double y3, double t) const {
+double TransferFunction::interpolateCubic(double y0, double y1, double y2, double y3, double t) {
     const double a0 = y3 - y2 - y0 + y1;
     const double a1 = y0 - y1 - a0;
     const double a2 = y2 - y0;
@@ -103,7 +103,8 @@ double TransferFunction::interpolateCubic(double y0, double y1, double y2, doubl
     return a0 * t * t * t + a1 * t * t + a2 * t + a3;
 }
 
-double TransferFunction::interpolateCatmullRom(double y0, double y1, double y2, double y3, double t) const {
+double TransferFunction::interpolateCatmullRom(double y0, double y1, double y2, double y3, double t) {
+    // Catmull-Rom coefficients: 2.0, 5.0, 4.0, 3.0 are from the spline basis
     return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                   (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
 }
@@ -143,7 +144,7 @@ void TransferFunction::applyFunction(const std::function<double(double)>& func) 
     }
 }
 
-void TransferFunction::processBlock(double* samples, int numSamples) {
+void TransferFunction::processBlock(double* samples, int numSamples) const {
     for (int n = 0; n < numSamples; ++n) {
         const double inputSample = samples[n];
         samples[n] = applyTransferFunction(inputSample);
@@ -154,9 +155,7 @@ void TransferFunction::normalizeByMaximum() {
     double maxVal = 0.0;
     for (const auto& v : table) {
         const double absVal = std::abs(v.load());
-        if (absVal > maxVal) {
-            maxVal = absVal;
-        }
+        maxVal = std::max(absVal, maxVal);
     }
     if (maxVal > 0.0) {
         for (auto& v : table) {
