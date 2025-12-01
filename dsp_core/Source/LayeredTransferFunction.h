@@ -308,6 +308,59 @@ class LayeredTransferFunction {
     }
 
     //==========================================================================
+    // Version Tracking (for seamless LUT updates)
+    //==========================================================================
+
+    /**
+     * Get current version of transfer function
+     *
+     * The version counter increments on every mutation to enable dirty detection.
+     * Used by SeamlessTransferFunction to trigger asynchronous LUT rendering.
+     *
+     * NOTE: Version is NOT serialized - it's a runtime-only dirty tracking mechanism.
+     *
+     * @return Current version number
+     */
+    uint64_t getVersion() const {
+        return versionCounter.load(std::memory_order_acquire);
+    }
+
+    /**
+     * Set spline anchors (wrapper that increments version counter)
+     *
+     * Use this instead of getSplineLayer().setAnchors() to ensure version tracking works.
+     */
+    void setSplineAnchors(const std::vector<SplineAnchor>& anchors);
+
+    /**
+     * Clear all spline anchors (wrapper that increments version counter)
+     */
+    void clearSplineAnchors();
+
+    /**
+     * Set normalization scalar directly (for worker thread to restore frozen state)
+     *
+     * CRITICAL: Only used by LUT renderer to restore frozen normalization state.
+     * UI code should NOT call this - use setNormalizationEnabled() instead.
+     *
+     * @param scalar The normalization scalar to set
+     */
+    void setNormalizationScalar(double scalar) {
+        normalizationScalar.store(scalar, std::memory_order_release);
+    }
+
+    //==========================================================================
+    // Debugging
+    //==========================================================================
+
+    /**
+     * Get instance ID for debugging (identifies which LayeredTransferFunction instance this is)
+     */
+    int getInstanceId() const {
+        return instanceId;
+    }
+
+    //==========================================================================
     // Serialization
     //==========================================================================
 
@@ -315,6 +368,10 @@ class LayeredTransferFunction {
     void fromValueTree(const juce::ValueTree& vt);
 
   private:
+    // Instance tracking for debugging
+    static std::atomic<int> instanceCounter;
+    int instanceId;
+
     int tableSize;
     double minValue, maxValue;
 
@@ -345,6 +402,9 @@ class LayeredTransferFunction {
 
     // NEW: Cache validity flag (allows direct evaluation when cache invalid)
     std::atomic<bool> compositeCacheValid{false};
+
+    // Version counter for dirty detection (used by SeamlessTransferFunction)
+    std::atomic<uint64_t> versionCounter{0};
 
     // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
     mutable std::vector<double> unnormalizedMixBuffer;

@@ -2,7 +2,11 @@
 
 namespace dsp_core::audio_pipeline {
 
-WaveshapingStage::WaveshapingStage(dsp_core::LayeredTransferFunction& ltf) : ltf_(ltf) {}
+WaveshapingStage::WaveshapingStage(const dsp_core::SeamlessTransferFunction& tf)
+    : seamlessTransferFunction_(&tf), layeredTransferFunction_(nullptr) {}
+
+WaveshapingStage::WaveshapingStage(dsp_core::LayeredTransferFunction& ltf)
+    : seamlessTransferFunction_(nullptr), layeredTransferFunction_(&ltf) {}
 
 void WaveshapingStage::prepareToPlay(double /*sampleRate*/, int /*samplesPerBlock*/) {
     // Waveshaping is stateless, no preparation needed
@@ -14,7 +18,12 @@ void WaveshapingStage::process(juce::AudioBuffer<double>& buffer) {
 
     for (int ch = 0; ch < numChannels; ++ch) {
         double* channelData = buffer.getWritePointer(ch);
-        ltf_.processBlock(channelData, numSamples);
+
+        if (seamlessTransferFunction_ != nullptr) {
+            seamlessTransferFunction_->processBlock(channelData, numSamples);
+        } else if (layeredTransferFunction_ != nullptr) {
+            layeredTransferFunction_->processBlock(channelData, numSamples);
+        }
     }
 }
 

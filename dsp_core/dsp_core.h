@@ -32,6 +32,8 @@
 #include "Source/ExpressionEvaluator.h"
 #include "Source/HarmonicLayer.h"
 #include "Source/LayeredTransferFunction.h"
+#include "Source/SeamlessTransferFunction.h"
+#include "Source/SeamlessTransferFunctionImpl.h"
 #include "Source/SplineLayer.h"
 #include "Source/SplineTypes.h"
 #include "Source/TransferFunction.h"

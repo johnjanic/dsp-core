@@ -1,4 +1,5 @@
 #include "DryWetMixStage.h"
+#include <juce_core/juce_core.h>
 
 namespace dsp_core::audio_pipeline {
 
@@ -117,6 +118,14 @@ void DryWetMixStage::applyMix(juce::AudioBuffer<double>& wetBuffer) {
 
     const double dryGain = 1.0 - mixAmount_;
     const double wetGain = mixAmount_;
+
+    // Debug: Log mix amounts occasionally
+    static int debugCounter = 0;
+    if (++debugCounter % 10000 == 0) {
+        DBG("[DRY/WET] mixAmount=" + juce::String(mixAmount_) +
+            " dryGain=" + juce::String(dryGain) +
+            " wetGain=" + juce::String(wetGain));
+    }
 
     for (int ch = 0; ch < numChannels; ++ch) {
         double* wetData = wetBuffer.getWritePointer(ch);
