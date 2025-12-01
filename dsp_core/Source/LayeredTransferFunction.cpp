@@ -140,19 +140,7 @@ double LayeredTransferFunction::getCoefficient(int index) const {
 
 double LayeredTransferFunction::getCompositeValue(int index) const {
     if (index >= 0 && index < tableSize) {
-        const double value = compositeTable[index].load(std::memory_order_acquire);
-
-        // Debug: Log first few reads after coefficients are set
-        static int readCounter = 0;
-        if (readCounter < 5 && index == 8192) {
-            readCounter++;
-            DBG("[GET_COMPOSITE:" + juce::String(instanceId) + "] index=" + juce::String(index) +
-                " value=" + juce::String(value) +
-                " coeffs[0]=" + juce::String(coefficients[0]) +
-                " coeffs[1]=" + juce::String(coefficients[1]));
-        }
-
-        return value;
+        return compositeTable[index].load(std::memory_order_acquire);
     }
     return 0.0;
 }
@@ -187,16 +175,6 @@ void LayeredTransferFunction::updateCompositeHarmonicMode() {
     // Step 1: Compute unnormalized mix and find max absolute value
     double maxAbsValue = 0.0;
 
-    // Debug: Track which instance and when
-    static int updateCounter = 0;
-    updateCounter++;
-    const int midIndex = tableSize / 2;
-
-    DBG("[COMPOSITE_UPDATE:" + juce::String(instanceId) + "] Call #" + juce::String(updateCounter) +
-        " coeffs[0]=" + juce::String(coefficients[0]) +
-        " coeffs[1]=" + juce::String(coefficients[1]) +
-        " coeffs[2]=" + juce::String(coefficients[2]));
-
     for (int i = 0; i < tableSize; ++i) {
         const double x = normalizeIndex(i);
 
@@ -204,15 +182,6 @@ void LayeredTransferFunction::updateCompositeHarmonicMode() {
         const double baseValue = baseTable[i].load(std::memory_order_acquire);
         const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
         const double wavetableCoeff = coefficients[0]; // WT mix coefficient
-
-        // Debug: Log harmonic evaluation at middle of table
-        if (i == midIndex && updateCounter <= 10) {
-            DBG("[HARMONIC_EVAL:" + juce::String(instanceId) + "] index=" + juce::String(i) +
-                " x=" + juce::String(x) +
-                " baseValue=" + juce::String(baseValue) +
-                " harmonicValue=" + juce::String(harmonicValue) +
-                " wtCoeff=" + juce::String(wavetableCoeff));
-        }
 
         // Compute unnormalized mix: UnNorm = wtCoeff*Base + HarmonicSum
         // Note: harmonicLayer->evaluate() already sums harmonicCoeff[n] * Harmonic_n(x)
@@ -228,19 +197,10 @@ void LayeredTransferFunction::updateCompositeHarmonicMode() {
     // Step 2: Compute normalization scalar (or use frozen/disabled scalar)
     const double normScalar = computeNormalizationScalar(maxAbsValue);
 
-    DBG("[COMPOSITE_STORE:" + juce::String(instanceId) + "] maxAbsValue=" + juce::String(maxAbsValue) +
-        " normScalar=" + juce::String(normScalar));
-
     // Step 3: Store normalized composite
     for (int i = 0; i < tableSize; ++i) {
         const double normalized = normScalar * unnormalizedMixBuffer[i];
         compositeTable[i].store(normalized, std::memory_order_release);
-
-        // Debug: Log a few sample points
-        if (updateCounter <= 10 && (i == midIndex || i == 0 || i == tableSize-1)) {
-            DBG("[COMPOSITE_STORE:" + juce::String(instanceId) + "] [" + juce::String(i) + "] unnorm=" +
-                juce::String(unnormalizedMixBuffer[i]) + " norm=" + juce::String(normalized));
-        }
     }
 }
 
@@ -384,16 +344,10 @@ LayeredTransferFunction::getHarmonicCoefficients() const {
 }
 
 void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs) {
-
-    DBG("[SET_COEFFS:" + juce::String(instanceId) + "] Setting coefficients: [0]=" + juce::String(coeffs[0]) +
-        " [1]=" + juce::String(coeffs[1]) + " [2]=" + juce::String(coeffs[2]));
-
     // Set all coefficients: [0] = WT mix, [1..40] = harmonics
     for (int i = 0; i < NUM_HARMONIC_COEFFICIENTS && i < static_cast<int>(coefficients.size()); ++i) {
         coefficients[i] = coeffs[i];
     }
-
-    DBG("[SET_COEFFS:" + juce::String(instanceId) + "] About to call updateComposite");
 
     updateComposite();
     versionCounter.fetch_add(1, std::memory_order_release);

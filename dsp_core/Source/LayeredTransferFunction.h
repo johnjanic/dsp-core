@@ -295,9 +295,16 @@ class LayeredTransferFunction {
 
     void setInterpolationMode(InterpolationMode mode) {
         interpMode = mode;
+        // Increment version to trigger LUT re-render with new interpolation mode
+        // NOTE: Interpolation mode affects LUT evaluation, not LUT contents, but
+        // we re-render anyway for simplicity (see Task 3 design rationale in
+        // seamless-transfer-function-changes.md)
+        versionCounter.fetch_add(1, std::memory_order_release);
     }
     void setExtrapolationMode(ExtrapolationMode mode) {
         extrapMode = mode;
+        // Increment version to trigger LUT re-render with new extrapolation mode
+        versionCounter.fetch_add(1, std::memory_order_release);
     }
 
     InterpolationMode getInterpolationMode() const {

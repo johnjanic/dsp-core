@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <juce_core/juce_core.h>
+#include <juce_audio_basics/juce_audio_basics.h>
 
 namespace dsp_core {
 
@@ -83,15 +84,15 @@ class AudioEngine {
     double applyTransferFunction(double x) const;
 
     /**
-     * Process block of samples in-place (audio thread)
+     * Process multi-channel buffer in-place (audio thread)
      *
-     * Checks for new LUT once at start, then processes all samples.
-     * Crossfade state advances sample-by-sample if active.
+     * Processes all channels with shared crossfade state.
+     * Checks for new LUT once at start, then processes all channels.
+     * Crossfade position advances correctly (once per sample, not per channel).
      *
-     * @param samples Pointer to sample buffer (modified in-place)
-     * @param numSamples Number of samples to process
+     * @param buffer Multi-channel audio buffer (modified in-place)
      */
-    void processBlock(double* samples, int numSamples) const;
+    void processBuffer(juce::AudioBuffer<double>& buffer) const;
 
     /**
      * Get reference to worker target index (for worker thread)
@@ -242,7 +243,7 @@ struct RenderJob {
  * LUTRendererThread - Background worker thread that renders LUTs from RenderJobs
  *
  * Architecture:
- *   - Lock-free job queue (AbstractFifo, 8 slots)
+ *   - Lock-free job queue (AbstractFifo, 4 slots - sufficient for 25Hz polling)
  *   - Job coalescing: drains queue, renders only latest job
  *   - Worker-owned LayeredTransferFunction for isolated rendering
  *   - Writes to lutBuffers[workerTargetIndex] (safe from audio thread)
@@ -350,10 +351,10 @@ class LUTRendererThread : public juce::Thread {
      */
     void renderLUT(const RenderJob& job, LUTBuffer* outputBuffer);
 
-    // Job queue (lock-free, 8 slots)
+    // Job queue (lock-free, 4 slots is sufficient given 25Hz polling + job coalescing)
     juce::WaitableEvent wakeEvent;
-    juce::AbstractFifo jobQueue{8};
-    RenderJob jobSlots[8];
+    juce::AbstractFifo jobQueue{4};
+    RenderJob jobSlots[4];
 
     // Worker-owned LayeredTransferFunction for rendering
     std::unique_ptr<LayeredTransferFunction> tempLTF;

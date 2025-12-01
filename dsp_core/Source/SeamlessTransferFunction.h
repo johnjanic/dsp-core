@@ -115,15 +115,18 @@ class SeamlessTransferFunction {
     double applyTransferFunction(double x) const;
 
     /**
-     * Process block of samples in-place (audio thread)
+     * Process multi-channel buffer in-place (audio thread)
      *
-     * Checks for new LUT once at start, then processes all samples.
-     * Crossfade state advances sample-by-sample if active.
+     * Processes all channels with shared crossfade state.
+     * Checks for new LUT once at start, then processes all channels.
+     * Crossfade position advances correctly (once per sample, not per channel).
      *
-     * @param samples Pointer to sample buffer (modified in-place)
-     * @param numSamples Number of samples to process
+     * CRITICAL: This method processes all channels together to ensure
+     * stereo consistency. All channels see identical crossfade positions.
+     *
+     * @param buffer Multi-channel audio buffer (modified in-place)
      */
-    void processBlock(double* samples, int numSamples) const;
+    void processBuffer(juce::AudioBuffer<double>& buffer) const;
 
     /**
      * Prepare for playback (audio thread)

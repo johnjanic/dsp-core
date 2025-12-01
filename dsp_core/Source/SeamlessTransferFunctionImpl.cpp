@@ -1,24 +1,8 @@
 #include "SeamlessTransferFunctionImpl.h"
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 
 namespace dsp_core {
-
-namespace {
-// Debug file logger (anonymous namespace, thread-safe via mutex, writes to /tmp/thc_daw_debug.txt)
-void logToFile(const std::string& message) {
-    static std::mutex logMutex;
-    std::lock_guard<std::mutex> lock(logMutex);
-    std::ofstream logFile("/tmp/thc_daw_debug.txt", std::ios::app);
-    if (logFile.is_open()) {
-        auto now = std::chrono::system_clock::now();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-        logFile << "[" << ms.count() << "ms] " << message << "\n";
-        logFile.flush();
-    }
-}
-} // anonymous namespace
 
 //==============================================================================
 // AudioEngine Implementation
@@ -40,7 +24,10 @@ AudioEngine::AudioEngine() {
 
 void AudioEngine::prepareToPlay(double sr, int samplesPerBlock) {
     sampleRate = sr;
-    constexpr double crossfadeDurationMs = 10.0;
+    // CRITICAL: Crossfade must be long enough to smooth DC offset transitions
+    // DC blocking filter (5Hz highpass) has ~32ms time constant
+    // 50ms crossfade = 1.5× time constant (balances smoothness vs latency)
+    constexpr double crossfadeDurationMs = 50.0;
     crossfadeSamples = static_cast<int>(sampleRate * crossfadeDurationMs / 1000.0);
 
     // EDGE CASE: If sample rate changes mid-crossfade, clamp position to new duration
@@ -64,72 +51,84 @@ double AudioEngine::applyTransferFunction(double x) const {
     }
 }
 
-void AudioEngine::processBlock(double* samples, int numSamples) const {
-    // Check for new LUT once at start of block
+void AudioEngine::processBuffer(juce::AudioBuffer<double>& buffer) const {
+    // Check for new LUT once per multi-channel buffer
     checkForNewLUT();
 
+    const int numChannels = buffer.getNumChannels();
+    const int numSamples = buffer.getNumSamples();
+
     static int debugCounter = 0;
-    const bool shouldDebug = (++debugCounter % 10000 == 0); // Log every 10000th block
+    const bool shouldDebug = (++debugCounter % 10000 == 0);
 
-    // Process all samples
+    // Process all samples across all channels
+    // CRITICAL: Crossfade position advances once per sample, NOT per channel
     for (int i = 0; i < numSamples; ++i) {
-        double output;
-
         if (crossfading) {
-            // Linear crossfade
+            // Calculate crossfade gains (same for all channels)
             const double alpha = static_cast<double>(crossfadePosition) / crossfadeSamples;
             const double gainOld = 1.0 - alpha;
             const double gainNew = alpha;
-            const double oldValue = evaluateLUT(oldLUT, samples[i]);
-            const double newValue = evaluateLUT(newLUT, samples[i]);
-            output = gainOld * oldValue + gainNew * newValue;
 
-            // Debug first sample during crossfade
-            if (shouldDebug && i == 0) {
-                DBG("[CROSSFADE] pos=" + juce::String(crossfadePosition) +
-                    " alpha=" + juce::String(alpha, 4) +
-                    " input=" + juce::String(samples[i], 6) +
-                    " old=" + juce::String(oldValue, 6) +
-                    " new=" + juce::String(newValue, 6) +
-                    " output=" + juce::String(output, 6));
+            // Apply crossfade to all channels
+            for (int ch = 0; ch < numChannels; ++ch) {
+                double* channelData = buffer.getWritePointer(ch);
+                const double input = channelData[i];
+                const double oldValue = evaluateLUT(oldLUT, input);
+                const double newValue = evaluateLUT(newLUT, input);
+                channelData[i] = gainOld * oldValue + gainNew * newValue;
+
+                // Debug first channel first sample
+                if (shouldDebug && i == 0 && ch == 0) {
+                    DBG("[CROSSFADE] pos=" + juce::String(crossfadePosition) +
+                        " alpha=" + juce::String(alpha, 4) +
+                        " input=" + juce::String(input, 6) +
+                        " old=" + juce::String(oldValue, 6) +
+                        " new=" + juce::String(newValue, 6) +
+                        " output=" + juce::String(channelData[i], 6));
+                }
             }
 
-            // Advance crossfade position
+            // Advance crossfade position ONCE per sample (not per channel!)
             if (++crossfadePosition >= crossfadeSamples) {
                 crossfading = false;
                 DBG("[AUDIO] Crossfade complete");
             }
         } else {
-            // No crossfade: use primary LUT
+            // No crossfade: use primary LUT for all channels
             const int idx = primaryIndex.load(std::memory_order_acquire);
-            output = evaluateLUT(&lutBuffers[idx], samples[i]);
 
-            // Debug: Log first sample of occasional blocks
-            if (shouldDebug && i == 0 && std::abs(samples[i]) < 0.1) {
-                DBG("[AUDIO] processBlock: input=" + juce::String(samples[i]) +
-                    " output=" + juce::String(output) +
-                    " bufferIdx=" + juce::String(idx) +
-                    " LUT[8192]=" + juce::String(lutBuffers[idx].data[8192]));
+            for (int ch = 0; ch < numChannels; ++ch) {
+                double* channelData = buffer.getWritePointer(ch);
+                const double input = channelData[i];
+                channelData[i] = evaluateLUT(&lutBuffers[idx], input);
+
+                // Debug first channel first sample
+                if (shouldDebug && i == 0 && ch == 0 && std::abs(input) < 0.1) {
+                    DBG("[AUDIO] processBuffer: input=" + juce::String(input) +
+                        " output=" + juce::String(channelData[i]) +
+                        " bufferIdx=" + juce::String(idx) +
+                        " LUT[8192]=" + juce::String(lutBuffers[idx].data[8192]));
+                }
             }
         }
-
-        samples[i] = output;
     }
 }
 
 void AudioEngine::checkForNewLUT() const {
     if (newLUTReady.load(std::memory_order_acquire)) {
+        // CRITICAL FIX: Don't interrupt active crossfade
+        // Let current crossfade complete, then pick up new LUT on next processBlock call
+        // This prevents audible clicks from aborting mid-crossfade
         if (crossfading) {
-            crossfading = false; // Abort old crossfade
+            DBG("[AUDIO] New LUT ready but crossfade in progress - deferring update");
+            return;  // Skip this update - flag stays true, we'll catch it after crossfade completes
         }
 
         // CRITICAL: Use acquire memory order to ensure worker's LUT data is visible
         const int oldPrimaryIdx = primaryIndex.load(std::memory_order_acquire);
         const int oldSecondaryIdx = secondaryIndex.load(std::memory_order_acquire);
         const int workerIdx = workerTargetIndex.load(std::memory_order_acquire);
-
-        DBG("[AUDIO] New LUT detected! Swapping buffers: primary=" + juce::String(oldPrimaryIdx) + " -> " + juce::String(workerIdx));
-        logToFile("[AUDIO] New LUT detected! Swapping buffers: primary=" + std::to_string(oldPrimaryIdx) + " -> " + std::to_string(workerIdx));
 
         // Rotate indices: worker target becomes new primary
         // old primary becomes new secondary (for crossfade)
@@ -141,16 +140,6 @@ void AudioEngine::checkForNewLUT() const {
         // Set up crossfade pointers
         oldLUT = &lutBuffers[oldPrimaryIdx];
         newLUT = &lutBuffers[workerIdx];
-
-        // Log sample values from the new LUT for verification
-        DBG("[AUDIO] New LUT samples: [0]=" + juce::String(lutBuffers[workerIdx].data[0]) +
-            " [8192]=" + juce::String(lutBuffers[workerIdx].data[8192]) +
-            " [16383]=" + juce::String(lutBuffers[workerIdx].data[16383]));
-
-        // CRITICAL: Log old LUT values to verify they're identity
-        DBG("[AUDIO] Old LUT samples: [0]=" + juce::String(lutBuffers[oldPrimaryIdx].data[0]) +
-            " [8192]=" + juce::String(lutBuffers[oldPrimaryIdx].data[8192]) +
-            " [16383]=" + juce::String(lutBuffers[oldPrimaryIdx].data[16383]));
 
         newLUTReady.store(false, std::memory_order_release);
         crossfading = true;
@@ -380,14 +369,9 @@ void LUTRendererThread::processJobs() {
         // Get worker target buffer index (safe - audio thread won't touch this buffer)
         const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
 
-        DBG("[WORKER] Processing render job version " + juce::String(static_cast<int64_t>(latestJob.version)) + " into buffer " + juce::String(targetIdx));
-        logToFile("[WORKER] Processing render job version " + std::to_string(latestJob.version) + " into buffer " + std::to_string(targetIdx));
-
         // Render LUT into target buffer
         if (lutBuffers != nullptr) {
             renderLUT(latestJob, &lutBuffers[targetIdx]);
-            DBG("[WORKER] Render complete, newLUTReady set to true");
-            logToFile("[WORKER] Render complete for version " + std::to_string(latestJob.version));
         }
 #if JUCE_DEBUG
         else {
@@ -433,18 +417,14 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
     tempLTF->setExtrapolationMode(job.extrapolationMode);
 
     // 7. Render composite
+    // NOTE: updateComposite() is safe - handles zero-curve case defensively (epsilon = 1e-12)
+    // If curve is all zeros, normalizationScalar defaults to 1.0 (identity scaling)
     tempLTF->updateComposite();
 
     // 8. Copy composite to output buffer
     for (int i = 0; i < TABLE_SIZE; ++i) {
         outputBuffer->data[i] = tempLTF->getCompositeValue(i);
     }
-
-    // Debug: Log sample values being written to LUT
-    DBG("[WORKER_WRITE] outputBuffer samples: [0]=" + juce::String(outputBuffer->data[0]) +
-        " [8192]=" + juce::String(outputBuffer->data[8192]) +
-        " [16383]=" + juce::String(outputBuffer->data[16383]) +
-        " version=" + juce::String(job.version));
 
     outputBuffer->version = job.version;
     outputBuffer->interpolationMode = job.interpolationMode;
@@ -455,14 +435,11 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
 
     // 10. Update visualizer LUT (async on message thread)
     if (visualizerLUTPtr && onVisualizerUpdate) {
-        // Capture data for async callback (avoid race with next render)
-        std::array<double, TABLE_SIZE> visualizerData = outputBuffer->data;
-        uint64_t visualizerVersion = outputBuffer->version;
-
-        // Schedule visualizer update on message thread
-        juce::MessageManager::callAsync([this, visualizerData, visualizerVersion]() {
+        // Capture data directly into lambda using C++14 init-capture (eliminates one copy)
+        // Copy is still needed because outputBuffer may be overwritten by next render
+        juce::MessageManager::callAsync([this, data = outputBuffer->data]() {
             if (visualizerLUTPtr) {
-                *visualizerLUTPtr = visualizerData;
+                *visualizerLUTPtr = data;
                 if (onVisualizerUpdate) {
                     onVisualizerUpdate();
                 }
@@ -502,17 +479,6 @@ TransferFunctionDirtyPoller::~TransferFunctionDirtyPoller() {
 }
 
 void TransferFunctionDirtyPoller::timerCallback() {
-    // Debug: Log that timer fired (first 10 ticks only to avoid spam)
-    static int tickCount = 0;
-    if (tickCount < 10) {
-        tickCount++;
-        logToFile("[POLLER_TICK] Timer callback fired, tick #" + std::to_string(tickCount));
-
-        // Check if we're on the message thread
-        bool onMessageThread = juce::MessageManager::getInstance()->isThisTheMessageThread();
-        logToFile("[POLLER_THREAD] onMessageThread=" + std::string(onMessageThread ? "YES" : "NO"));
-    }
-
     // CRITICAL: Verify we're on message thread (debug builds only)
     // LayeredTransferFunction is mutated from message thread, so we must read from message thread
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
@@ -520,21 +486,11 @@ void TransferFunctionDirtyPoller::timerCallback() {
     // Check if version has changed since last tick
     const uint64_t currentVersion = ltf.getVersion();
 
-    // Debug: Log version check (first 10 ticks)
-    if (tickCount <= 10) {
-        logToFile("[POLLER_CHECK] lastSeen=" + std::to_string(lastSeenVersion) +
-                  " current=" + std::to_string(currentVersion));
-    }
-
     if (currentVersion != lastSeenVersion) {
         // Version changed - capture snapshot and enqueue render job
-        DBG("[POLLER] Version changed: " + juce::String(static_cast<int64_t>(lastSeenVersion)) + " -> " + juce::String(static_cast<int64_t>(currentVersion)));
-        logToFile("[POLLER] Version changed: " + std::to_string(lastSeenVersion) + " -> " + std::to_string(currentVersion));
         RenderJob job = captureRenderJob();
         renderer.enqueueJob(job);
         lastSeenVersion = currentVersion;
-        DBG("[POLLER] Enqueued render job for version " + juce::String(static_cast<int64_t>(currentVersion)));
-        logToFile("[POLLER] Enqueued render job for version " + std::to_string(currentVersion));
     }
 }
 
@@ -555,11 +511,6 @@ RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
     for (int i = 0; i < TABLE_SIZE; ++i) {
         job.baseLayerData[i] = ltf.getBaseLayerValue(i);
     }
-
-    // Debug: Check what we captured
-    DBG("[POLLER] Captured base layer: [0]=" + juce::String(job.baseLayerData[0]) +
-        " [8192]=" + juce::String(job.baseLayerData[8192]) +
-        " [16383]=" + juce::String(job.baseLayerData[16383]));
 
     // Copy coefficients
     job.coefficients = ltf.getHarmonicCoefficients();

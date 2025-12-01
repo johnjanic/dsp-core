@@ -13,15 +13,16 @@ void WaveshapingStage::prepareToPlay(double /*sampleRate*/, int /*samplesPerBloc
 }
 
 void WaveshapingStage::process(juce::AudioBuffer<double>& buffer) {
-    const int numChannels = buffer.getNumChannels();
-    const int numSamples = buffer.getNumSamples();
+    if (seamlessTransferFunction_ != nullptr) {
+        // Use new multi-channel processBuffer() API for correct crossfade handling
+        seamlessTransferFunction_->processBuffer(buffer);
+    } else if (layeredTransferFunction_ != nullptr) {
+        // LayeredTransferFunction still uses per-channel processing
+        const int numChannels = buffer.getNumChannels();
+        const int numSamples = buffer.getNumSamples();
 
-    for (int ch = 0; ch < numChannels; ++ch) {
-        double* channelData = buffer.getWritePointer(ch);
-
-        if (seamlessTransferFunction_ != nullptr) {
-            seamlessTransferFunction_->processBlock(channelData, numSamples);
-        } else if (layeredTransferFunction_ != nullptr) {
+        for (int ch = 0; ch < numChannels; ++ch) {
+            double* channelData = buffer.getWritePointer(ch);
             layeredTransferFunction_->processBlock(channelData, numSamples);
         }
     }

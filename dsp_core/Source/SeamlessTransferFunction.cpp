@@ -1,27 +1,8 @@
 #include "SeamlessTransferFunction.h"
 #include "SeamlessTransferFunctionImpl.h"
 #include <juce_core/juce_core.h>
-#include <fstream>
-#include <mutex>
-#include <chrono>
-#include <cstdio>
 
 namespace dsp_core {
-
-// Local file logger for SeamlessTransferFunction
-namespace {
-void logToFileLocal(const std::string& message) {
-    static std::mutex logMutex;
-    std::lock_guard<std::mutex> lock(logMutex);
-    std::ofstream logFile("/tmp/thc_daw_debug.txt", std::ios::app);
-    if (logFile.is_open()) {
-        auto now = std::chrono::system_clock::now();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-        logFile << "[" << ms.count() << "ms] " << message << "\n";
-        logFile.flush();
-    }
-}
-}
 
 //==============================================================================
 // Pimpl - Private implementation
@@ -119,10 +100,10 @@ double SeamlessTransferFunction::applyTransferFunction(double x) const {
     return pimpl->audioEngine.applyTransferFunction(x);
 }
 
-void SeamlessTransferFunction::processBlock(double* samples, int numSamples) const {
-    // Audio thread: just process samples with active LUT (crossfade handled automatically)
+void SeamlessTransferFunction::processBuffer(juce::AudioBuffer<double>& buffer) const {
+    // Audio thread: process entire multi-channel buffer with shared crossfade state
     // Change detection happens on the Editor's timer (25Hz) via notifyEditingModelChanged()
-    pimpl->audioEngine.processBlock(samples, numSamples);
+    pimpl->audioEngine.processBuffer(buffer);
 }
 
 void SeamlessTransferFunction::prepareToPlay(double sampleRate, int samplesPerBlock) {
@@ -178,83 +159,32 @@ void SeamlessTransferFunction::startSeamlessUpdates() {
     // Create poller (NO TIMER - Editor will push changes via notifyEditingModelChanged)
     pimpl->poller = std::make_unique<TransferFunctionDirtyPoller>(pimpl->editingModel, *pimpl->renderer);
     // NOTE: Do NOT start poller's timer! Editor's timer handles change detection now.
-    char buf[256];
-    snprintf(buf, sizeof(buf), "[INIT] Poller created at %p (this=%p pimpl=%p)",
-             (void*)pimpl->poller.get(), (void*)this, (void*)pimpl.get());
-    logToFileLocal(buf);
 
     // Trigger initial render (ensures visualizer shows correct curve immediately)
     pimpl->poller->forceRender();
-    logToFileLocal("[INIT] Initial render triggered");
 }
 
 void SeamlessTransferFunction::stopSeamlessUpdates() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    char buf[256];
-    snprintf(buf, sizeof(buf), "[STOP] stopSeamlessUpdates called (this=%p pimpl=%p poller=%p)",
-             (void*)this, (void*)pimpl.get(), pimpl ? (void*)pimpl->poller.get() : nullptr);
-    logToFileLocal(buf);
-
     if (pimpl->poller) {
         pimpl->poller->stopTimer();
         pimpl->poller.reset();
-        logToFileLocal("[STOP] Poller destroyed");
     }
 
     if (pimpl->renderer) {
         pimpl->renderer->stopThread(1000); // 1 second timeout
         pimpl->renderer.reset();
-        logToFileLocal("[STOP] Renderer destroyed");
     }
 }
 
 void SeamlessTransferFunction::notifyEditingModelChanged() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    // CRITICAL: Log entry to verify this function is being called
-    static int entryCount = 0;
-    if (entryCount < 10) {
-        entryCount++;
-        char buf[256];
-        snprintf(buf, sizeof(buf), "[NOTIFY] notifyEditingModelChanged ENTERED (call #%d) this=%p pimpl=%p",
-                 entryCount, (void*)this, (void*)pimpl.get());
-        logToFileLocal(buf);
-    }
-
     // Directly trigger the poller's timer callback to capture and enqueue a render job
     // This is called from the Editor's timer (25Hz) when it detects version changes
     if (pimpl && pimpl->poller) {
-        const uint64_t currentVersion = pimpl->editingModel.getVersion();
-
-        // Debug: Log first few notifications (file-based for DAW visibility)
-        static int notifyCount = 0;
-        if (notifyCount < 10) {
-            notifyCount++;
-            char buf[256];
-            snprintf(buf, sizeof(buf), "[NOTIFY] Poller exists at %p, version=%lu, calling timerCallback()",
-                     (void*)pimpl->poller.get(), (unsigned long)currentVersion);
-            logToFileLocal(buf);
-        }
-
         pimpl->poller->timerCallback();
-
-        // Log after timerCallback returns
-        static int returnCount = 0;
-        if (returnCount < 10) {
-            returnCount++;
-            logToFileLocal("[NOTIFY] Returned from timerCallback()");
-        }
-    } else {
-        // Log if poller is nullptr
-        static int nullCount = 0;
-        if (nullCount < 10) {
-            nullCount++;
-            char buf[256];
-            snprintf(buf, sizeof(buf), "[NOTIFY] ERROR: pimpl=%p poller=%p (one is nullptr!)",
-                     (void*)pimpl.get(), pimpl ? (void*)pimpl->poller.get() : nullptr);
-            logToFileLocal(buf);
-        }
     }
 }
 
