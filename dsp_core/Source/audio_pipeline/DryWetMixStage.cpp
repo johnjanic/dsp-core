@@ -5,6 +5,7 @@ namespace dsp_core::audio_pipeline {
 
 namespace {
 constexpr int kMaxChannels = 8; // Support stereo, 5.1, 7.1
+constexpr int kDebugLogInterval = 10000; // Debug logging frequency
 } // namespace
 
 DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
@@ -121,7 +122,7 @@ void DryWetMixStage::applyMix(juce::AudioBuffer<double>& wetBuffer) {
 
     // Debug: Log mix amounts occasionally
     static int debugCounter = 0;
-    if (++debugCounter % 10000 == 0) {
+    if (++debugCounter % kDebugLogInterval == 0) {
         DBG("[DRY/WET] mixAmount=" + juce::String(mixAmount_) +
             " dryGain=" + juce::String(dryGain) +
             " wetGain=" + juce::String(wetGain));

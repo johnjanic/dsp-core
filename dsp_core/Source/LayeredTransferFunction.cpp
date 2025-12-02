@@ -60,12 +60,6 @@ LayeredTransferFunction::LayeredTransferFunction(int tableSize, double minVal, d
 double LayeredTransferFunction::getBaseLayerValue(int index) const {
     if (index >= 0 && index < tableSize) {
         const double value = baseTable[index].load(std::memory_order_acquire);
-
-        // Debug: Log reads at center point to trace data flow
-        if (index == 8192) {
-            DBG("[MODEL:" + juce::String(instanceId) + "] getBaseLayerValue(" + juce::String(index) + ") = " + juce::String(value));
-        }
-
         return value;
     }
     return 0.0;
@@ -80,8 +74,6 @@ void LayeredTransferFunction::setBaseLayerValue(int index, double value) {
             DBG("[MODEL:" + juce::String(instanceId) + "] setBaseLayerValue(" + juce::String(index) + ", " + juce::String(value) + ")");
         }
 
-        // NEW: Invalidate cache on base layer changes
-        invalidateCompositeCache();
         versionCounter.fetch_add(1, std::memory_order_release);
     }
 }
@@ -111,13 +103,11 @@ const SplineLayer& LayeredTransferFunction::getSplineLayer() const {
 
 void LayeredTransferFunction::setSplineAnchors(const std::vector<SplineAnchor>& anchors) {
     splineLayer->setAnchors(anchors);
-    invalidateCompositeCache();
     versionCounter.fetch_add(1, std::memory_order_release);
 }
 
 void LayeredTransferFunction::clearSplineAnchors() {
     splineLayer->setAnchors({});
-    invalidateCompositeCache();
     versionCounter.fetch_add(1, std::memory_order_release);
 }
 
@@ -125,8 +115,6 @@ void LayeredTransferFunction::setCoefficient(int index, double value) {
     if (index >= 0 && index < static_cast<int>(coefficients.size())) {
         coefficients[index] = value;
 
-        // NEW: Invalidate cache on coefficient changes
-        invalidateCompositeCache();
         versionCounter.fetch_add(1, std::memory_order_release);
     }
 }
@@ -151,9 +139,6 @@ void LayeredTransferFunction::updateComposite() {
     } else {
         updateCompositeHarmonicMode();
     }
-
-    // Mark cache as valid after rebuild
-    compositeCacheValid.store(true, std::memory_order_release);
 }
 
 void LayeredTransferFunction::updateCompositeSplineMode() {
@@ -266,7 +251,6 @@ void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
     // - Premature reset to 1.0 caused bug where SplineFitter fit unnormalized values
 
     splineLayerEnabled.store(enabled, std::memory_order_release);
-    invalidateCompositeCache();
     versionCounter.fetch_add(1, std::memory_order_release);
 }
 
@@ -357,14 +341,6 @@ bool LayeredTransferFunction::isSplineLayerEnabled() const {
     return splineLayerEnabled.load(std::memory_order_acquire);
 }
 
-void LayeredTransferFunction::invalidateCompositeCache() {
-    compositeCacheValid.store(false, std::memory_order_release);
-}
-
-bool LayeredTransferFunction::isCompositeCacheValid() const {
-    return compositeCacheValid.load(std::memory_order_acquire);
-}
-
 double LayeredTransferFunction::normalizeIndex(int index) const {
     if (index < 0 || index >= tableSize) {
         return 0.0;
@@ -373,13 +349,7 @@ double LayeredTransferFunction::normalizeIndex(int index) const {
 }
 
 double LayeredTransferFunction::applyTransferFunction(double x) const {
-    // Check cache validity (fast path ~95%)
-    if (juce_likely(compositeCacheValid.load(std::memory_order_acquire))) {
-        return interpolate(x); // Use cached composite table (~5-10ns)
-    }
-
-    // Slow path: direct evaluation (~40-50ns)
-    return evaluateDirect(x);
+    return interpolate(x);
 }
 
 void LayeredTransferFunction::processBlock(double* samples, int numSamples) const {
@@ -523,8 +493,11 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
         const double y2 = compositeTable[idx2].load(std::memory_order_relaxed);
         const double y3 = compositeTable[idx3].load(std::memory_order_relaxed);
 
+        // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+        // Standard Catmull-Rom interpolation formula
         return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                       (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+        // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
     }
 
     // Linear extrapolation path (helper lambda for readability)
@@ -547,44 +520,11 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
     const double y2 = getSample(index + 1);
     const double y3 = getSample(index + 2);
 
+    // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+    // Standard Catmull-Rom interpolation formula
     return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                   (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
-}
-
-double LayeredTransferFunction::evaluateDirect(double x) const {
-    const bool splineEnabled = splineLayerEnabled.load(std::memory_order_acquire);
-
-    if (splineEnabled) {
-        // Spline mode: direct PCHIP evaluation, no normalization
-        // User has direct amplitude control via anchor placement
-        return splineLayer->evaluate(x);
-    }
-
-    // Harmonic mode: base + harmonics with normalization
-    const double baseValue = interpolateBase(x); // NEW helper method
-    const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-    const double wtCoeff = coefficients[0];
-    const double result = wtCoeff * baseValue + harmonicValue;
-
-    // Apply normalization scalar (only in harmonic mode)
-    const double normScalar = normalizationScalar.load(std::memory_order_acquire);
-    return normScalar * result;
-}
-
-double LayeredTransferFunction::interpolateBase(double x) const {
-    // Map x from signal range to table index
-    const double x_proj = (x - minValue) / (maxValue - minValue) * (tableSize - 1);
-    const int index = static_cast<int>(x_proj);
-    const double t = x_proj - index;
-
-    // Use linear interpolation (simple and fast for direct path)
-    const int idx0 = juce::jlimit(0, tableSize - 1, index);
-    const int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
-
-    const double y0 = baseTable[idx0].load(std::memory_order_relaxed);
-    const double y1 = baseTable[idx1].load(std::memory_order_relaxed);
-
-    return y0 + t * (y1 - y0);
+    // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 }
 
 double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
@@ -594,7 +534,20 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     // normalizationScalar is preserved when entering spline mode (not reset to 1.0),
     // so this returns the properly normalized values that SplineFitter needs to fit
 
-    const double baseValue = interpolateBase(x);
+    // Interpolate base layer (linear interpolation)
+    const double x_proj = (x - minValue) / (maxValue - minValue) * (tableSize - 1);
+    const int index = static_cast<int>(x_proj);
+    const double t = x_proj - index;
+
+    const int idx0 = juce::jlimit(0, tableSize - 1, index);
+    const int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
+
+    const double y0 = baseTable[idx0].load(std::memory_order_relaxed);
+    const double y1 = baseTable[idx1].load(std::memory_order_relaxed);
+
+    const double baseValue = y0 + t * (y1 - y0);
+
+    // Add harmonics
     const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
     const double wtCoeff = coefficients[0];
     const double result = wtCoeff * baseValue + harmonicValue;
@@ -661,7 +614,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     if (vt.hasProperty("coefficients")) {
         const juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
         if (coeffArray != nullptr) {
-            const int numToLoad = std::min(static_cast<int>(coeffArray->size()), NUM_HARMONIC_COEFFICIENTS);
+            const int numToLoad = std::min(coeffArray->size(), NUM_HARMONIC_COEFFICIENTS);
             for (int i = 0; i < numToLoad; ++i) {
                 coefficients[i] = static_cast<double>((*coeffArray)[i]);
             }

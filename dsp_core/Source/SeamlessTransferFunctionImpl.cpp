@@ -22,13 +22,14 @@ AudioEngine::AudioEngine() {
     }
 }
 
-void AudioEngine::prepareToPlay(double sr, int samplesPerBlock) {
-    sampleRate = sr;
+void AudioEngine::prepareToPlay(double sampleRate, int samplesPerBlock) {
+    this->sampleRate = sampleRate;
     // CRITICAL: Crossfade must be long enough to smooth DC offset transitions
     // DC blocking filter (5Hz highpass) has ~32ms time constant
     // 50ms crossfade = 1.5× time constant (balances smoothness vs latency)
     constexpr double crossfadeDurationMs = 50.0;
-    crossfadeSamples = static_cast<int>(sampleRate * crossfadeDurationMs / 1000.0);
+    constexpr double msToSeconds = 1000.0;
+    crossfadeSamples = static_cast<int>(sampleRate * crossfadeDurationMs / msToSeconds);
 
     // EDGE CASE: If sample rate changes mid-crossfade, clamp position to new duration
     // This prevents overshoot if duration is shortened (rare but possible during host init)
@@ -275,8 +276,11 @@ double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
         const double y2 = lut->data[idx2];
         const double y3 = lut->data[idx3];
 
+        // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+        // Standard Catmull-Rom interpolation formula
         return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                       (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+        // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
     }
 
     // Linear extrapolation path
@@ -297,8 +301,11 @@ double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
     const double y2 = getSample(index + 1);
     const double y3 = getSample(index + 2);
 
+    // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+    // Standard Catmull-Rom interpolation formula
     return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                   (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+    // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 }
 
 //==============================================================================
@@ -416,14 +423,21 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
     tempLTF->setInterpolationMode(job.interpolationMode);
     tempLTF->setExtrapolationMode(job.extrapolationMode);
 
-    // 7. Render composite
-    // NOTE: updateComposite() is safe - handles zero-curve case defensively (epsilon = 1e-12)
-    // If curve is all zeros, normalizationScalar defaults to 1.0 (identity scaling)
-    tempLTF->updateComposite();
-
-    // 8. Copy composite to output buffer
-    for (int i = 0; i < TABLE_SIZE; ++i) {
-        outputBuffer->data[i] = tempLTF->getCompositeValue(i);
+    // 7. Render LUT based on mode
+    if (job.splineLayerEnabled) {
+        // SPLINE MODE: Direct evaluation (bypass compositeTable)
+        // Spline evaluation is direct (no normalization layer), so read directly from SplineLayer
+        for (int i = 0; i < TABLE_SIZE; ++i) {
+            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+            outputBuffer->data[i] = tempLTF->getSplineLayer().evaluate(x);
+        }
+    } else {
+        // HARMONIC MODE: Use compositeTable (normalization included)
+        // Harmonic mode needs normalization, which happens in updateComposite()
+        tempLTF->updateComposite();
+        for (int i = 0; i < TABLE_SIZE; ++i) {
+            outputBuffer->data[i] = tempLTF->getCompositeValue(i);
+        }
     }
 
     outputBuffer->version = job.version;

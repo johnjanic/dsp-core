@@ -154,23 +154,6 @@ class LayeredTransferFunction {
      */
     bool isSplineLayerEnabled() const;
 
-    /**
-     * Invalidate composite cache (forces direct evaluation)
-     *
-     * Called when:
-     *   - Spline anchors change
-     *   - Base layer edited
-     *   - Coefficients changed
-     *   - Layer mode switched
-     */
-    void invalidateCompositeCache();
-
-    /**
-     * Check if composite cache is valid
-     *
-     * @return true if cached path can be used, false if direct evaluation required
-     */
-    bool isCompositeCacheValid() const;
 
     //==========================================================================
     // Harmonic Layer Baking
@@ -407,9 +390,6 @@ class LayeredTransferFunction {
     // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
     std::atomic<bool> splineLayerEnabled{false};
 
-    // NEW: Cache validity flag (allows direct evaluation when cache invalid)
-    std::atomic<bool> compositeCacheValid{false};
-
     // Version counter for dirty detection (used by SeamlessTransferFunction)
     std::atomic<uint64_t> versionCounter{0};
 
@@ -427,14 +407,6 @@ class LayeredTransferFunction {
     double interpolateLinear(double x) const;
     double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
-
-    // NEW: Direct evaluation (bypasses composite cache)
-    // Used when cache is invalid (during anchor drag, after edits)
-    double evaluateDirect(double x) const;
-
-    // NEW: Interpolate base layer directly (bypasses composite)
-    // Needed for harmonic mode when cache invalid
-    double interpolateBase(double x) const;
 
     // Mode-specific composite update helpers
     void updateCompositeSplineMode();

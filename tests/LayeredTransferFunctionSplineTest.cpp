@@ -44,14 +44,6 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineLayerCanBeEnabled) {
     EXPECT_TRUE(ltf->isSplineLayerEnabled());
 }
 
-TEST_F(LayeredTransferFunctionSplineTest, EnablingSplineLayerInvalidatesCache) {
-    ltf->updateComposite();
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    ltf->setSplineLayerEnabled(true);
-    EXPECT_FALSE(ltf->isCompositeCacheValid());
-}
-
 TEST_F(LayeredTransferFunctionSplineTest, EnablingSplineLayerLocksNormalization) {
     ltf->setSplineLayerEnabled(true);
     EXPECT_NEAR(ltf->getNormalizationScalar(), 1.0, 1e-9);
@@ -78,72 +70,6 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectPathAtAnchorPoints) {
     EXPECT_NEAR(ltf->applyTransferFunction(-1.0), -1.0, kTolerance);
     EXPECT_NEAR(ltf->applyTransferFunction(0.0), 0.5, kTolerance);
     EXPECT_NEAR(ltf->applyTransferFunction(1.0), 1.0, kTolerance);
-}
-
-//==============================================================================
-// Cache Path Tests
-//==============================================================================
-
-TEST_F(LayeredTransferFunctionSplineTest, CachePathAfterUpdate) {
-    // Set up spline
-    ltf->getSplineLayer().setAnchors(linearAnchors);
-    ltf->setSplineLayerEnabled(true);
-
-    // Cache invalid initially
-    EXPECT_FALSE(ltf->isCompositeCacheValid());
-
-    // Rebuild cache
-    ltf->updateComposite();
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    // Evaluate (should use cached path)
-    double result = ltf->applyTransferFunction(0.0);
-    EXPECT_NEAR(result, 0.0, kTolerance);
-}
-
-TEST_F(LayeredTransferFunctionSplineTest, CachedAndDirectPathsMatch) {
-    ltf->getSplineLayer().setAnchors(threePtAnchors);
-    ltf->setSplineLayerEnabled(true);
-
-    // Get direct path result
-    double directResult = ltf->applyTransferFunction(0.25);
-
-    // Rebuild cache
-    ltf->updateComposite();
-
-    // Get cached path result
-    double cachedResult = ltf->applyTransferFunction(0.25);
-
-    // Should match within tolerance
-    EXPECT_NEAR(directResult, cachedResult, kTolerance);
-}
-
-//==============================================================================
-// Cache Invalidation Tests
-//==============================================================================
-
-TEST_F(LayeredTransferFunctionSplineTest, CacheInvalidationOnAnchorChange) {
-    ltf->getSplineLayer().setAnchors(linearAnchors);
-    ltf->setSplineLayerEnabled(true);
-    ltf->updateComposite();
-
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    // Modify anchors
-    auto modifiedAnchors = linearAnchors;
-    modifiedAnchors[1].y = 0.5;
-    ltf->getSplineLayer().setAnchors(modifiedAnchors);
-
-    // Cache should still be valid (only invalidated by invalidateCompositeCache())
-    // Note: SplineMode is responsible for calling invalidateCompositeCache()
-}
-
-TEST_F(LayeredTransferFunctionSplineTest, ExplicitCacheInvalidation) {
-    ltf->updateComposite();
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    ltf->invalidateCompositeCache();
-    EXPECT_FALSE(ltf->isCompositeCacheValid());
 }
 
 //==============================================================================
@@ -196,12 +122,10 @@ TEST_F(LayeredTransferFunctionSplineTest, UpdateCompositeInSplineMode) {
     ltf->getSplineLayer().setAnchors(threePtAnchors);
     ltf->setSplineLayerEnabled(true);
 
-    // Update composite (should cache spline evaluation)
+    // Update composite
     ltf->updateComposite();
 
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    // Verify cached values match direct evaluation
+    // Verify composite values match direct evaluation
     for (int i = 0; i < ltf->getTableSize(); i += 16) {
         double x = ltf->normalizeIndex(i);
         double cached = ltf->getCompositeValue(i);
@@ -222,26 +146,6 @@ TEST_F(LayeredTransferFunctionSplineTest, UpdateCompositePreservesSplineShape) {
     // Middle of curve should be close to 0.5 (from threePtAnchors)
     EXPECT_GT(midValue, 0.4);
     EXPECT_LT(midValue, 0.6);
-}
-
-//==============================================================================
-// Base Layer Interaction Tests
-//==============================================================================
-
-TEST_F(LayeredTransferFunctionSplineTest, BaseLayerChangesInvalidateCache) {
-    ltf->updateComposite();
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    ltf->setBaseLayerValue(0, 0.5);
-    EXPECT_FALSE(ltf->isCompositeCacheValid());
-}
-
-TEST_F(LayeredTransferFunctionSplineTest, CoefficientChangesInvalidateCache) {
-    ltf->updateComposite();
-    EXPECT_TRUE(ltf->isCompositeCacheValid());
-
-    ltf->setCoefficient(1, 0.5);
-    EXPECT_FALSE(ltf->isCompositeCacheValid());
 }
 
 //==============================================================================

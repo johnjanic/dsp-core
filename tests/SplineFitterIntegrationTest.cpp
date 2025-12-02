@@ -280,7 +280,6 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     SplineFitter::computeTangents(modifiedAnchors, config);
     ltf->getSplineLayer().setAnchors(modifiedAnchors);
-    ltf->invalidateCompositeCache();
     ltf->updateComposite();
 
     // STEP g: Bake and refit
@@ -1173,7 +1172,6 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
                                                    {1.0, 1.0, false, 0.0}};
     SplineFitter::computeTangents(userEditedAnchors, config);
     ltf->getSplineLayer().setAnchors(userEditedAnchors);
-    ltf->invalidateCompositeCache();
 
     // Verify the spline layer has the user's curve
     double yAtOrigin = ltf->getSplineLayer().evaluate(0.0);
