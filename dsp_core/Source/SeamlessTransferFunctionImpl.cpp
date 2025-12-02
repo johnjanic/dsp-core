@@ -388,55 +388,108 @@ void LUTRendererThread::processJobs() {
     }
 }
 
+namespace {
+    /**
+     * Compute normalization scalar for harmonic mode
+     *
+     * Scans base layer + harmonics to find max absolute value,
+     * then returns 1.0 / max to normalize composite to [-1, 1].
+     *
+     * Respects deferred normalization during paint strokes (uses frozen scalar).
+     *
+     * @param baseLayer Full base layer data (16384 values)
+     * @param coefficients Harmonic coefficients [0] = WT mix, [1..40] = harmonics
+     * @param harmonicLayer Reference to harmonic layer for evaluation
+     * @param normalizationEnabled If false, returns 1.0 (no scaling)
+     * @param deferNormalization If true, uses frozenScalar (paint stroke mode)
+     * @param frozenScalar Scalar to use when deferNormalization=true
+     * @return Normalization scalar in range (0, 1], or 1.0 if disabled
+     */
+    double computeNormalizationScalar(
+        const std::array<double, TABLE_SIZE>& baseLayer,
+        const std::array<double, 41>& coefficients,
+        HarmonicLayer& harmonicLayer,
+        bool normalizationEnabled,
+        bool deferNormalization,
+        double frozenScalar
+    ) {
+        // If normalization disabled, return identity scalar
+        if (!normalizationEnabled) {
+            return 1.0;
+        }
+
+        // If deferred (during paint strokes), use frozen scalar
+        if (deferNormalization) {
+            return frozenScalar;
+        }
+
+        // Convert coefficients array to vector for HarmonicLayer API
+        std::vector<double> coeffsVec(coefficients.begin(), coefficients.end());
+
+        // Compute max absolute value across entire composite
+        double maxAbsValue = 0.0;
+
+        for (int i = 0; i < TABLE_SIZE; ++i) {
+            // Map index to x-coordinate
+            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+
+            // Get base layer value
+            const double baseValue = baseLayer[i];
+
+            // Evaluate harmonics at x
+            const double harmonicValue = harmonicLayer.evaluate(x, coeffsVec, TABLE_SIZE);
+
+            // Compute unnormalized composite
+            const double unnormalized = coefficients[0] * baseValue + harmonicValue;
+
+            // Track maximum absolute value
+            maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
+        }
+
+        // Compute normalization scalar (avoid division by zero)
+        constexpr double epsilon = 1e-12;
+        return (maxAbsValue > epsilon) ? (1.0 / maxAbsValue) : 1.0;
+    }
+} // namespace
+
 void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer) {
-    // 1. Restore base layer from job data
+    // Set state in tempLTF (for spline/harmonic evaluation)
     for (int i = 0; i < TABLE_SIZE; ++i) {
         tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
     }
-
-    // 2. Set coefficients
     tempLTF->setHarmonicCoefficients(job.coefficients);
-
-    // 3. Set spline anchors (use wrapper method for consistency)
     tempLTF->setSplineAnchors(job.splineAnchors);
-
-    // 4. Set spline layer mode
     tempLTF->setSplineLayerEnabled(job.splineLayerEnabled);
-
-    // 5. CRITICAL: Handle deferred normalization state
-    if (job.normalizationEnabled) {
-        tempLTF->setNormalizationEnabled(true);
-        if (job.deferNormalization) {
-            // Restore frozen normalization scalar
-            tempLTF->setNormalizationScalar(job.frozenNormalizationScalar);
-            tempLTF->setDeferNormalization(true);
-        } else {
-            // Normal normalization (will compute scalar)
-            tempLTF->setDeferNormalization(false);
-        }
-    } else {
-        // Normalization disabled (scalar locked to 1.0)
-        tempLTF->setNormalizationEnabled(false);
-    }
-
-    // 6. Set interpolation/extrapolation modes
     tempLTF->setInterpolationMode(job.interpolationMode);
     tempLTF->setExtrapolationMode(job.extrapolationMode);
 
-    // 7. Render LUT based on mode
+    // Mode-specific rendering
     if (job.splineLayerEnabled) {
-        // SPLINE MODE: Direct evaluation (bypass compositeTable)
-        // Spline evaluation is direct (no normalization layer), so read directly from SplineLayer
+        // SPLINE MODE: Direct evaluation (no normalization)
         for (int i = 0; i < TABLE_SIZE; ++i) {
             const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
             outputBuffer->data[i] = tempLTF->getSplineLayer().evaluate(x);
         }
     } else {
-        // HARMONIC MODE: Use compositeTable (normalization included)
-        // Harmonic mode needs normalization, which happens in updateComposite()
-        tempLTF->updateComposite();
+        // HARMONIC MODE: Compute normalization, then generate composite
+        const double normScalar = computeNormalizationScalar(
+            job.baseLayerData,
+            job.coefficients,
+            tempLTF->getHarmonicLayer(),
+            job.normalizationEnabled,
+            job.deferNormalization,
+            job.frozenNormalizationScalar
+        );
+
+        // Convert coefficients array to vector for HarmonicLayer API
+        std::vector<double> coeffsVec(job.coefficients.begin(), job.coefficients.end());
+
         for (int i = 0; i < TABLE_SIZE; ++i) {
-            outputBuffer->data[i] = tempLTF->getCompositeValue(i);
+            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+            const double baseValue = job.baseLayerData[i];
+            const double harmonicValue = tempLTF->getHarmonicLayer().evaluate(x, coeffsVec, TABLE_SIZE);
+            const double unnormalized = job.coefficients[0] * baseValue + harmonicValue;
+            outputBuffer->data[i] = normScalar * unnormalized;
         }
     }
 

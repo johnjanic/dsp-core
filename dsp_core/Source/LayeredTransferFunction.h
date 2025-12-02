@@ -9,30 +9,31 @@
 namespace dsp_core {
 
 /**
- * LayeredTransferFunction - Multi-layer waveshaping compositor
+ * LayeredTransferFunction - Multi-layer waveshaping state container
  *
- * Combines a user-drawn base layer with a harmonic layer to produce
- * a composite transfer function for audio processing.
+ * Stores UI state for transfer function editing: base layer (wavetable), harmonic
+ * coefficients, and spline anchors. The renderer (SeamlessTransferFunction) uses
+ * this state to generate production-ready LUTs at 25Hz for audio processing.
  *
  * Architecture:
- *   Base Layer (wavetable) + Harmonic Layer (coefficients) → Composite Table
+ *   UI State → Renderer (25Hz) → Production LUT → Audio Thread
  *
- * Mixing formula (unnormalized):
+ * Mixing formula (computed on-demand by renderer):
  *   UnNormMix[i] = wavetableCoeff × Base[i] + Σ(harmonicCoeff[n] × Harmonic_n[i])
- *   where wavetableCoeff = harmonicLayer.getCoefficient(0)
+ *   where wavetableCoeff = coefficients[0]
  *
- * Normalization (applied separately to preserve layer data):
+ * Normalization (applied by renderer, not stored here):
  *   maxAbsValue = max(abs(UnNormMix[i]))
  *   normalizationScalar = 1.0 / maxAbsValue
- *   Composite[i] = normalizationScalar × UnNormMix[i]
+ *   Output[i] = normalizationScalar × UnNormMix[i]
  *
  * Critical: Layers (baseTable, harmonic evaluations) are NEVER modified by normalization.
  * This allows seamless coefficient mixing in TransferFunctionController.
  *
  * Thread safety:
- *   - Base layer uses atomics for lock-free reads/writes
- *   - Composite uses atomics for lock-free reads by audio thread
- *   - updateComposite() should be called from UI thread only
+ *   - Base layer uses atomics for lock-free reads
+ *   - All mutations should be from message thread only
+ *   - Version counter tracks changes for renderer polling
  */
 class LayeredTransferFunction {
   public:
@@ -62,8 +63,20 @@ class LayeredTransferFunction {
         return static_cast<int>(coefficients.size());
     }
 
-    // Composite (final output for audio processing)
-    double getCompositeValue(int index) const;
+    /**
+     * Compute composite value on-demand at specific index
+     *
+     * Computes: normScalar * (wtCoeff * baseValue + harmonicValue)
+     *
+     * This method computes the composite on-demand from UI state (base layer + harmonics).
+     * Used for baking operations and legacy interpolation methods.
+     *
+     * Thread-safe: Can be called from any thread (reads atomics with acquire ordering)
+     *
+     * @param index Table index [0, tableSize)
+     * @return Composite value with normalization applied, or 0.0 if index out of bounds
+     */
+    double computeCompositeAt(int index) const;
 
     // Normalization scalar (read-only access)
     double getNormalizationScalar() const {
@@ -71,34 +84,15 @@ class LayeredTransferFunction {
     }
 
     //==========================================================================
-    // Composition
+    // Normalization Control
     //==========================================================================
-
-    /**
-     * Recompute composite from layers
-     *
-     * Call after ANY edit to base or harmonic layer coefficients.
-     *
-     * Algorithm:
-     *   1. Compute unnormalized mix: UnNorm[i] = wtCoeff*Base[i] + Σ(hCoeff[n]*H_n[i])
-     *   2. Find maxAbsValue = max(abs(UnNorm[i]))
-     *   3. Compute normalizationScalar = 1.0 / maxAbsValue
-     *   4. Store normalized composite: Composite[i] = normalizationScalar * UnNorm[i]
-     *
-     * Critical: Base layer and harmonic evaluations remain unchanged.
-     *
-     * If normalization is deferred (via setDeferNormalization), the normalization scalar
-     * remains frozen and the composite is computed using the existing scalar. This prevents
-     * visual shifting during paint strokes.
-     */
-    void updateComposite();
 
     /**
      * Enable or disable deferred normalization
      *
-     * When enabled, updateComposite() will freeze the normalization scalar and only
-     * update the composite table using the existing scalar. This prevents visual shifting
-     * during multi-point operations like paint strokes.
+     * When enabled, the renderer will use the frozen normalization scalar instead of
+     * recalculating it. This prevents visual shifting during multi-point operations
+     * like paint strokes.
      *
      * When disabled, normalization resumes normal behavior (recalculating the scalar).
      *
@@ -186,9 +180,9 @@ class LayeredTransferFunction {
      *
      * @return true if baking occurred (harmonics were non-zero), false if no-op
      *
-     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
-     * as processBlock() to ensure audio-thread-safe composite updates. The baking writes
-     * to base layer and then calls updateComposite(), which swaps the new curve atomically.
+     * THREAD SAFETY: Call from message thread only. The baking writes to base layer
+     * and increments the version counter, triggering the renderer to generate a new
+     * production LUT at the next 25Hz poll.
      */
     bool bakeHarmonicsToBase();
 
@@ -200,10 +194,10 @@ class LayeredTransferFunction {
      *   - Base layer contains the composite values (visually identical curve)
      *   - All harmonic coefficients are set to zero
      *   - WT mix coefficient is set to 1.0 (enables base layer)
-     *   - Normalization scalar is recalculated
+     *   - Normalization scalar will be recalculated by renderer
      *
-     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
-     * as processBlock() to ensure audio-thread-safe composite updates.
+     * THREAD SAFETY: Call from message thread only. Increments version counter
+     * to trigger renderer update at next 25Hz poll.
      */
     void bakeCompositeToBase();
 
@@ -375,11 +369,9 @@ class LayeredTransferFunction {
     // Layers (NEVER normalized directly - preserved as-is)
     std::vector<std::atomic<double>> baseTable; // User-drawn wavetable
 
-    // Composite output (what audio thread reads)
-    std::vector<std::atomic<double>> compositeTable;
-
     // Normalization scalar (applied to mix, not to layers)
-    std::atomic<double> normalizationScalar{1.0};
+    // Mutable to allow updates from const methods (e.g., computeCompositeAt)
+    mutable std::atomic<double> normalizationScalar{1.0};
 
     // Normalization deferral (prevents visual shifting during paint strokes)
     bool deferNormalization = false;
@@ -393,9 +385,6 @@ class LayeredTransferFunction {
     // Version counter for dirty detection (used by SeamlessTransferFunction)
     std::atomic<uint64_t> versionCounter{0};
 
-    // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
-    mutable std::vector<double> unnormalizedMixBuffer;
-
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
 
@@ -407,13 +396,6 @@ class LayeredTransferFunction {
     double interpolateLinear(double x) const;
     double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
-
-    // Mode-specific composite update helpers
-    void updateCompositeSplineMode();
-    void updateCompositeHarmonicMode();
-
-    // Normalization computation (extracted for clarity)
-    double computeNormalizationScalar(double maxAbsValue);
 };
 
 } // namespace dsp_core
