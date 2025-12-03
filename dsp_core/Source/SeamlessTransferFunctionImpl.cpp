@@ -575,11 +575,20 @@ RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
     // Copy modes and normalization state
     job.splineLayerEnabled = ltf.isSplineLayerEnabled();
     job.normalizationEnabled = ltf.isNormalizationEnabled();
-    job.deferNormalization = ltf.isNormalizationDeferred(); // CRITICAL: Capture deferred state
-    job.frozenNormalizationScalar = ltf.getNormalizationScalar();
+    job.deferNormalization = ltf.isPaintStrokeActive(); // CRITICAL: Freeze scalar during paint strokes
+    job.renderingMode = ltf.getRenderingMode();
+
+    // OPTIMIZATION: Only capture frozenNormalizationScalar for Harmonic mode
+    // Paint mode doesn't use normalization (direct base read)
+    // Spline mode doesn't use normalization (direct spline evaluation)
+    if (job.renderingMode == dsp_core::RenderingMode::Harmonic) {
+        job.frozenNormalizationScalar = ltf.getNormalizationScalar();
+    } else {
+        job.frozenNormalizationScalar = 1.0; // Unused but set to safe default
+    }
+
     job.interpolationMode = ltf.getInterpolationMode();
     job.extrapolationMode = ltf.getExtrapolationMode();
-    job.renderingMode = ltf.getRenderingMode();
 
     // Stamp version
     job.version = ltf.getVersion();

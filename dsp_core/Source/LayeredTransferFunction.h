@@ -101,22 +101,39 @@ class LayeredTransferFunction {
     //==========================================================================
 
     /**
-     * Enable or disable deferred normalization
+     * Compute and cache normalization scalar explicitly
      *
-     * When enabled, the renderer will use the frozen normalization scalar instead of
-     * recalculating it. This prevents visual shifting during multi-point operations
-     * like paint strokes.
+     * Scans the entire composite (base + harmonics) to find max absolute value,
+     * then caches the normalization scalar (1.0 / max).
      *
-     * When disabled, normalization resumes normal behavior (recalculating the scalar).
+     * Use this BEFORE baking operations to ensure baked values are properly normalized.
+     * The cached scalar will be used by computeCompositeAt() until the next call.
      *
-     * @param shouldDefer If true, freeze normalization scalar; if false, resume normal behavior
+     * Thread-safe: Can be called from message thread (before baking) or worker thread (during rendering).
      */
-    void setDeferNormalization(bool shouldDefer);
+    void updateNormalizationScalar();
 
     /**
-     * Check if normalization is currently deferred
+     * Set paint stroke active state (message thread only)
+     *
+     * When true, renderer will use the frozen normalization scalar instead of
+     * recomputing it. This prevents visual shifting during paint strokes.
+     *
+     * Call updateNormalizationScalar() BEFORE setting this to true to cache the
+     * correct scalar for the paint stroke.
+     *
+     * @param active If true, freeze normalization during rendering; if false, compute fresh
      */
-    bool isNormalizationDeferred() const;
+    void setPaintStrokeActive(bool active);
+
+    /**
+     * Check if paint stroke is currently active (message thread only)
+     *
+     * Used by renderer to determine whether to use frozen scalar or compute fresh.
+     *
+     * @return true if paint stroke active (use frozen scalar), false otherwise
+     */
+    bool isPaintStrokeActive() const;
 
     /**
      * Enable or disable automatic normalization
@@ -138,26 +155,22 @@ class LayeredTransferFunction {
     bool isNormalizationEnabled() const;
 
     /**
-     * Enable or disable spline layer (mutually exclusive with harmonic layer)
+     * Enable or disable spline layer (LEGACY API - delegates to setRenderingMode)
      *
-     * When enabled:
-     *   - Audio thread uses direct spline evaluation
-     *   - Normalization is locked to 1.0 (identity)
-     *   - Cache is invalidated
+     * This is a convenience wrapper for:
+     *   setSplineLayerEnabled(true)  → setRenderingMode(RenderingMode::Spline)
+     *   setSplineLayerEnabled(false) → setRenderingMode(RenderingMode::Paint)
      *
-     * When disabled:
-     *   - Audio thread uses base + harmonics
-     *   - Normalization resumes normal behavior
+     * DEPRECATED: Use setRenderingMode() directly for clarity.
      *
-     * CRITICAL: Call bakeCompositeToBase() before enabling spline layer
-     * to ensure harmonics are zeroed.
-     *
-     * @param enabled If true, enable spline mode; if false, use harmonic mode
+     * @param enabled If true, enable spline mode; if false, use paint mode
      */
     void setSplineLayerEnabled(bool enabled);
 
     /**
-     * Check if spline layer is currently enabled
+     * Check if spline layer is currently enabled (LEGACY API)
+     *
+     * DEPRECATED: Use getRenderingMode() == RenderingMode::Spline instead.
      */
     bool isSplineLayerEnabled() const;
 
@@ -433,19 +446,18 @@ class LayeredTransferFunction {
     std::vector<std::atomic<double>> baseTable; // User-drawn wavetable
 
     // Normalization scalar (applied to mix, not to layers)
-    // Mutable to allow updates from const methods (e.g., computeCompositeAt)
+    // Cached value computed by updateNormalizationScalar() or set by renderer
     mutable std::atomic<double> normalizationScalar{1.0};
-
-    // Normalization deferral (prevents visual shifting during paint strokes)
-    bool deferNormalization = false;
 
     // Normalization enable/disable (allows bypassing auto-normalization for creative effects)
     bool normalizationEnabled = true; // Default: enabled (safe behavior)
 
-    // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
-    std::atomic<bool> splineLayerEnabled{false};
+    // Paint stroke active flag (prevents normalization recomputation during strokes)
+    // Message thread only - not atomic (single-threaded access)
+    bool paintStrokeActive = false;
 
     // Rendering mode (determines evaluation path for LUT rendering)
+    // This is the single source of truth for which evaluation path to use
     std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Paint)};
 
     // Version counter for dirty detection (used by SeamlessTransferFunction)

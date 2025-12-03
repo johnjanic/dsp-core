@@ -28,6 +28,8 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesToRange) {
         ltf->setBaseLayerValue(i, 10.0); // Way out of range
     }
 
+    // Compute normalization scalar (simulates what renderer does)
+    ltf->updateNormalizationScalar();
 
     // Composite should be normalized to [-1, 1]
     for (int i = 0; i < 256; ++i) {
@@ -42,6 +44,9 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_NormalizesNegativeValues) {
     for (int i = 0; i < 256; ++i) {
         ltf->setBaseLayerValue(i, -5.0); // Way out of range
     }
+
+    // Compute normalization scalar (simulates what renderer does)
+    ltf->updateNormalizationScalar();
 
 
     // Composite should be normalized to [-1, 1]
@@ -70,21 +75,22 @@ TEST_F(LayeredTransferFunctionTest, UpdateComposite_MaintainsRelativeProportions
 // Deferred Normalization Tests
 // ============================================================================
 
-TEST_F(LayeredTransferFunctionTest, DeferNormalization_FreezesScalar) {
+TEST_F(LayeredTransferFunctionTest, PaintStrokeActive_FreezesScalar) {
     // Set initial state
     ltf->setBaseLayerValue(100, 0.5);
     ltf->setCoefficient(0, 1.0); // 100% WT mix
+    ltf->updateNormalizationScalar();
     double composite1 = ltf->computeCompositeAt(100);
     double scalar1 = ltf->getNormalizationScalar();
 
-    // Enable deferred normalization
-    ltf->setDeferNormalization(true);
-    EXPECT_TRUE(ltf->isNormalizationDeferred());
+    // Enable paint stroke mode (freezes normalization)
+    ltf->setPaintStrokeActive(true);
+    EXPECT_TRUE(ltf->isPaintStrokeActive());
 
     // Change base layer significantly
     ltf->setBaseLayerValue(100, 5.0);
 
-    // Normalization scalar should be frozen
+    // Normalization scalar should be frozen (we haven't called updateNormalizationScalar again)
     double scalar2 = ltf->getNormalizationScalar();
     EXPECT_NEAR(scalar1, scalar2, 1e-6);
 
@@ -93,14 +99,15 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_FreezesScalar) {
     EXPECT_NE(composite1, composite2); // Value changed
 }
 
-TEST_F(LayeredTransferFunctionTest, DeferNormalization_ResumesAfterDisable) {
+TEST_F(LayeredTransferFunctionTest, PaintStrokeActive_CanUpdateAfterDisable) {
     // Set initial state
     ltf->setBaseLayerValue(100, 0.5);
     ltf->setCoefficient(0, 1.0);
+    ltf->updateNormalizationScalar();
     double scalar1 = ltf->getNormalizationScalar();
 
-    // Enable deferred normalization
-    ltf->setDeferNormalization(true);
+    // Enable paint stroke mode
+    ltf->setPaintStrokeActive(true);
 
     // Change base layer
     ltf->setBaseLayerValue(100, 5.0);
@@ -109,11 +116,12 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_ResumesAfterDisable) {
     double scalar2 = ltf->getNormalizationScalar();
     EXPECT_NEAR(scalar1, scalar2, 1e-6);
 
-    // Disable deferred normalization
-    ltf->setDeferNormalization(false);
-    EXPECT_FALSE(ltf->isNormalizationDeferred());
+    // Disable paint stroke mode
+    ltf->setPaintStrokeActive(false);
+    EXPECT_FALSE(ltf->isPaintStrokeActive());
 
-    // Update composite again - scalar should now update
+    // Now we can update scalar
+    ltf->updateNormalizationScalar();
     double scalar3 = ltf->getNormalizationScalar();
     EXPECT_NE(scalar1, scalar3); // Scalar should have changed
 }
@@ -127,24 +135,27 @@ TEST_F(LayeredTransferFunctionTest, DeferNormalization_PreventsVisualJumping) {
         ltf->setBaseLayerValue(i, 0.5);
     }
 
+    // Compute and cache normalization scalar before paint stroke
+    ltf->updateNormalizationScalar();
     double initialScalar = ltf->getNormalizationScalar();
 
-    // Begin paint stroke (defer normalization)
-    ltf->setDeferNormalization(true);
+    // Begin paint stroke (freeze normalization)
+    ltf->setPaintStrokeActive(true);
 
     // Paint several points with large values
     for (int i = 100; i < 110; ++i) {
         ltf->setBaseLayerValue(i, 2.0);
     }
 
-    // Scalar should remain frozen
+    // Scalar should remain frozen (we haven't called updateNormalizationScalar again)
     double paintingScalar = ltf->getNormalizationScalar();
     EXPECT_NEAR(initialScalar, paintingScalar, 1e-6);
 
     // End paint stroke
-    ltf->setDeferNormalization(false);
+    ltf->setPaintStrokeActive(false);
 
-    // Now scalar can update
+    // Now we can update scalar (renderer would do this at next 25Hz poll)
+    ltf->updateNormalizationScalar();
     double finalScalar = ltf->getNormalizationScalar();
     EXPECT_LT(finalScalar, initialScalar); // Larger values require smaller scalar
 }
@@ -410,13 +421,17 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_TransfersCompositeToBase) {
     }
     ltf->setCoefficient(3, 0.5); // Add 3rd harmonic
 
+    // Compute normalization scalar BEFORE capturing composite
+    // This simulates what the renderer does before baking
+    ltf->updateNormalizationScalar();
+
     // Capture composite BEFORE baking
     std::vector<double> compositeBefore(256);
     for (int i = 0; i < 256; ++i) {
         compositeBefore[i] = ltf->computeCompositeAt(i);
     }
 
-    // Bake
+    // Bake (this calls updateNormalizationScalar() internally)
     bool baked = ltf->bakeHarmonicsToBase();
 
     EXPECT_TRUE(baked);
@@ -490,27 +505,28 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_RecalculatesNormalizationScala
     }
     ltf->setCoefficient(3, 0.5);
 
+    // Compute normalization scalar BEFORE capturing composite
+    ltf->updateNormalizationScalar();
+
     // Capture composite values (for visual continuity check)
-    // NOTE: In the on-demand computation model, we must call computeCompositeAt()
-    // first to trigger normalization computation
     std::vector<double> compositeBefore(256);
     for (int i = 0; i < 256; ++i) {
         compositeBefore[i] = ltf->computeCompositeAt(i);
     }
 
-    // Capture normalization scalar before baking (after computation has been triggered)
+    // Capture normalization scalar before baking
     double normScalarBefore = ltf->getNormalizationScalar();
     EXPECT_LT(normScalarBefore, 1.0); // Should be scaled down
 
-    // Bake
+    // Bake (calls updateNormalizationScalar() internally at the end)
     ltf->bakeHarmonicsToBase();
 
-    // Normalization scalar recalculates because base layer now contains normalized values
-    // This is correct behavior - the scalar adapts to the new base layer state
+    // Normalization scalar is automatically recalculated by bakeHarmonicsToBase()
+    // After baking, base layer contains normalized values, so scalar should be ~1.0
     double normScalarAfter = ltf->getNormalizationScalar();
     EXPECT_NEAR(normScalarAfter, 1.0, 0.1); // Should be close to 1.0 now
 
-    // What matters is visual continuity (composite unchanged)
+    // Visual continuity: composite should be unchanged after baking
     for (int i = 0; i < 256; ++i) {
         EXPECT_DOUBLE_EQ(compositeBefore[i], ltf->computeCompositeAt(i));
     }
@@ -523,16 +539,20 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_VisualContinuityBitLevel) {
     ltf->setCoefficient(3, 0.5);
     ltf->setCoefficient(5, 0.2);
 
+    // Compute normalization scalar BEFORE capturing composite
+    ltf->updateNormalizationScalar();
+
     // Capture composite BEFORE baking
     std::vector<double> compositeBefore(256);
     for (int i = 0; i < 256; ++i) {
         compositeBefore[i] = ltf->computeCompositeAt(i);
     }
 
-    // Bake
+    // Bake (calls updateNormalizationScalar() internally at the end)
     ltf->bakeHarmonicsToBase();
 
     // Composite AFTER baking should be identical (bit-level)
+    // Normalization scalar is automatically recalculated by bakeHarmonicsToBase()
     for (int i = 0; i < 256; ++i) {
         double compositeAfter = ltf->computeCompositeAt(i);
         EXPECT_DOUBLE_EQ(compositeBefore[i], compositeAfter) << "Visual discontinuity at index " << i;

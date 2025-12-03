@@ -141,71 +141,46 @@ double LayeredTransferFunction::computeCompositeAt(int index) const {
     const double wtCoeff = coefficients[0];
     const double unnormalized = wtCoeff * baseValue + harmonicValue;
 
-    // Apply normalization if enabled
-    if (!normalizationEnabled) {
-        return unnormalized;
-    }
-
-    // If normalization is deferred, use frozen scalar
-    if (deferNormalization) {
+    // Apply cached normalization scalar if enabled
+    if (normalizationEnabled) {
         const double normScalar = normalizationScalar.load(std::memory_order_acquire);
         return normScalar * unnormalized;
     }
 
-    // Otherwise, compute normalization scalar on-the-fly
-    // This requires scanning the entire table to find max absolute value
+    return unnormalized;
+}
+
+void LayeredTransferFunction::updateNormalizationScalar() {
+    // If normalization disabled, set scalar to 1.0 (identity)
+    if (!normalizationEnabled) {
+        normalizationScalar.store(1.0, std::memory_order_release);
+        return;
+    }
+
+    // Compute max absolute value across entire composite
     double maxAbsValue = 0.0;
+    const double wtCoeff = coefficients[0];
+
     for (int i = 0; i < tableSize; ++i) {
-        const double xi = normalizeIndex(i);
-        const double baseVal = baseTable[i].load(std::memory_order_acquire);
-        const double harmVal = harmonicLayer->evaluate(xi, coefficients, tableSize);
-        const double unnorm = wtCoeff * baseVal + harmVal;
-        maxAbsValue = std::max(maxAbsValue, std::abs(unnorm));
+        const double x = normalizeIndex(i);
+        const double baseValue = baseTable[i].load(std::memory_order_acquire);
+        const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+        const double unnormalized = wtCoeff * baseValue + harmonicValue;
+        maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
     }
 
+    // Update cached normalization scalar
     constexpr double kNormalizationEpsilon = 1e-12;
-    if (maxAbsValue < kNormalizationEpsilon) {
-        return unnormalized;
-    }
-
-    const double normScalar = 1.0 / maxAbsValue;
-
-    // Store the computed scalar so getNormalizationScalar() returns a meaningful value
-    // This is safe to do from a const method because normalizationScalar is atomic
+    const double normScalar = (maxAbsValue > kNormalizationEpsilon) ? (1.0 / maxAbsValue) : 1.0;
     normalizationScalar.store(normScalar, std::memory_order_release);
-
-    return normScalar * unnormalized;
 }
 
-void LayeredTransferFunction::setDeferNormalization(bool shouldDefer) {
-    deferNormalization = shouldDefer;
-
-    // When exiting deferred mode, recompute and store normalization scalar
-    if (!shouldDefer && normalizationEnabled) {
-        // Compute max absolute value across entire composite
-        double maxAbsValue = 0.0;
-        const double wtCoeff = coefficients[0];
-
-        for (int i = 0; i < tableSize; ++i) {
-            const double x = normalizeIndex(i);
-            const double baseValue = baseTable[i].load(std::memory_order_acquire);
-            const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-            const double unnormalized = wtCoeff * baseValue + harmonicValue;
-            maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
-        }
-
-        // Update normalization scalar
-        constexpr double kNormalizationEpsilon = 1e-12;
-        const double normScalar = (maxAbsValue > kNormalizationEpsilon) ? (1.0 / maxAbsValue) : 1.0;
-        normalizationScalar.store(normScalar, std::memory_order_release);
-
-        const uint64_t newVersion = versionCounter.fetch_add(1, std::memory_order_release) + 1;
-        DBG("[MODEL:" + juce::String(instanceId) + "] Paint stroke complete, version incremented to " + juce::String(static_cast<int64_t>(newVersion)));
-    }
+void LayeredTransferFunction::setPaintStrokeActive(bool active) {
+    paintStrokeActive = active;
 }
 
-bool LayeredTransferFunction::isNormalizationDeferred() const {
-    return deferNormalization;
+bool LayeredTransferFunction::isPaintStrokeActive() const {
+    return paintStrokeActive;
 }
 
 void LayeredTransferFunction::setNormalizationEnabled(bool enabled) {
@@ -220,26 +195,10 @@ bool LayeredTransferFunction::isNormalizationEnabled() const {
 }
 
 void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
-    // Legacy API - delegates to RenderingMode for consistency
+    // LEGACY API - Simply delegates to RenderingMode (single source of truth)
     // When enabled: use Spline rendering mode
-    // When disabled: use Paint rendering mode (harmonics should be baked)
-    //
-    // Entering spline mode:
-    // - Harmonics are kept intact (hidden but present for undo)
-    // - Spline will fit to the current normalized composite (base + harmonics)
-    // - Spline evaluation bypasses normalization (user controls amplitude via anchors)
-    //
-    // CRITICAL: We do NOT modify normalizationScalar here!
-    // - normalizationScalar only affects harmonic mode evaluation
-    // - Spline mode evaluation doesn't use normalizationScalar (direct PCHIP)
-    // - SplineFitter needs the correct normScalar to read normalized composite
-    // - Premature reset to 1.0 caused bug where SplineFitter fit unnormalized values
-
-    // Delegate to RenderingMode (source of truth)
+    // When disabled: use Paint rendering mode (harmonics should be baked by mode-exit contract)
     setRenderingMode(enabled ? RenderingMode::Spline : RenderingMode::Paint);
-
-    // Also update legacy flag for backward compatibility in RenderJob serialization
-    splineLayerEnabled.store(enabled, std::memory_order_release);
 }
 
 bool LayeredTransferFunction::hasNonZeroHarmonics() const {
@@ -258,108 +217,63 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
         return false;
     }
 
-    // CRITICAL: Compute and freeze normalization scalar BEFORE modifying coefficients
+    // Step 1: Compute and cache normalization scalar BEFORE baking
     // This ensures baked values match what the user sees on screen
-    if (normalizationEnabled) {
-        double maxAbsValue = 0.0;
-        const double wtCoeff = coefficients[0];
+    updateNormalizationScalar();
 
-        for (int i = 0; i < tableSize; ++i) {
-            const double x = normalizeIndex(i);
-            const double baseValue = baseTable[i].load(std::memory_order_acquire);
-            const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-            const double unnormalized = wtCoeff * baseValue + harmonicValue;
-            maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
-        }
-
-        constexpr double kNormalizationEpsilon = 1e-12;
-        const double normScalar = (maxAbsValue > kNormalizationEpsilon) ? (1.0 / maxAbsValue) : 1.0;
-        normalizationScalar.store(normScalar, std::memory_order_release);
-
-        // Enable deferred normalization so computeCompositeAt() uses the frozen scalar
-        deferNormalization = true;
-    }
-
-    // Capture composite curve (base + harmonics with normalization applied)
-    // This preserves the visual appearance of the curve exactly
+    // Step 2: Bake composite curve (base + harmonics with normalization applied)
+    // computeCompositeAt() will use the cached scalar we just computed
     for (int i = 0; i < tableSize; ++i) {
-        const double compositeValue = computeCompositeAt(i);  // Uses frozen normalization scalar
+        const double compositeValue = computeCompositeAt(i);
         setBaseLayerValue(i, compositeValue);
     }
 
-    // Set WT coefficient to 1.0 (CRITICAL: enables the baked base layer)
+    // Step 3: Set WT coefficient to 1.0 (CRITICAL: enables the baked base layer)
     // If WT was 0 during harmonic editing, the baked base layer would be invisible
     coefficients[0] = 1.0;
 
-    // Zero out all harmonic coefficients (h1..h40)
+    // Step 4: Zero out all harmonic coefficients (h1..h40)
     for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
         coefficients[i] = 0.0;
     }
 
-    // Disable deferred normalization to allow recalculation
-    // The baked base layer contains normalized values, so the new normalization scalar
-    // will be ~1.0, and visual continuity is preserved because:
-    //   composite = normScalar_new * (WT * baked_base)
-    //            = normScalar_new * (1.0 * (normScalar_old * unnormalized))
-    //            ≈ 1.0 * (normScalar_old * unnormalized)  [since normScalar_new ≈ 1.0]
-    if (normalizationEnabled) {
-        setDeferNormalization(false);  // Recalculates and stores new normalization scalar
-    }
+    // Step 5: Recalculate normalization scalar for the new state
+    // After baking, base layer contains normalized values, so scalar should be ~1.0
+    updateNormalizationScalar();
 
-    // Increment version to trigger renderer update
-    // Renderer will generate composite from base layer with WT mix = 1.0
+    // Step 6: Increment version to trigger renderer update
+    // Renderer will generate LUT from baked base layer with WT mix = 1.0
     versionCounter.fetch_add(1, std::memory_order_release);
 
     return true;
 }
 
 void LayeredTransferFunction::bakeCompositeToBase() {
-    // CRITICAL: Compute and freeze normalization scalar BEFORE modifying coefficients
+    // Step 1: Compute and cache normalization scalar BEFORE baking
     // This ensures baked values match what the user sees on screen
-    if (normalizationEnabled) {
-        double maxAbsValue = 0.0;
-        const double wtCoeff = coefficients[0];
+    updateNormalizationScalar();
 
-        for (int i = 0; i < tableSize; ++i) {
-            const double x = normalizeIndex(i);
-            const double baseValue = baseTable[i].load(std::memory_order_acquire);
-            const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
-            const double unnormalized = wtCoeff * baseValue + harmonicValue;
-            maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
-        }
-
-        constexpr double kNormalizationEpsilon = 1e-12;
-        const double normScalar = (maxAbsValue > kNormalizationEpsilon) ? (1.0 / maxAbsValue) : 1.0;
-        normalizationScalar.store(normScalar, std::memory_order_release);
-
-        // Enable deferred normalization so computeCompositeAt() uses the frozen scalar
-        deferNormalization = true;
-    }
-
-    // Capture composite curve (base + harmonics with normalization applied)
-    // This preserves the visual appearance of the curve exactly
+    // Step 2: Bake composite curve (base + harmonics with normalization applied)
+    // computeCompositeAt() will use the cached scalar we just computed
     for (int i = 0; i < tableSize; ++i) {
-        const double compositeValue = computeCompositeAt(i);  // Uses frozen normalization scalar
+        const double compositeValue = computeCompositeAt(i);
         setBaseLayerValue(i, compositeValue);
     }
 
-    // Set WT coefficient to 1.0 (enable base layer)
+    // Step 3: Set WT coefficient to 1.0 (enable base layer)
     coefficients[0] = 1.0;
 
-    // Zero out all harmonic coefficients (h1..h40)
+    // Step 4: Zero out all harmonic coefficients (h1..h40)
     for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
         coefficients[i] = 0.0;
     }
 
-    // Disable deferred normalization to allow recalculation
-    // The baked base layer contains normalized values, so the new normalization scalar
-    // will be ~1.0, and visual continuity is preserved
-    if (normalizationEnabled) {
-        setDeferNormalization(false);  // Recalculates and stores new normalization scalar
-    }
+    // Step 5: Recalculate normalization scalar for the new state
+    // After baking, base layer contains normalized values, so scalar should be ~1.0
+    updateNormalizationScalar();
 
-    // Increment version to trigger renderer update
-    // Renderer will generate composite from base layer with WT mix = 1.0
+    // Step 6: Increment version to trigger renderer update
+    // Renderer will generate LUT from baked base layer with WT mix = 1.0
     versionCounter.fetch_add(1, std::memory_order_release);
 }
 
@@ -667,11 +581,10 @@ double LayeredTransferFunction::evaluateForRendering(double x, double normScalar
 
         case RenderingMode::Paint:
         {
-            // Paint mode: Direct base layer output (no normalization)
-            // Harmonics are assumed to be baked into base layer
-            const double wtCoeff = coefficients[0];
-            const double baseValue = getBaseValueAt(x);
-            return wtCoeff * baseValue;  // NO NORMALIZATION
+            // Paint mode: Direct base layer output (no normalization, no harmonics)
+            // Invariant: Harmonics should be baked into base layer (wtCoeff = 1.0, harmonics = 0)
+            // We skip wtCoeff multiplication for performance (always 1.0 in Paint mode)
+            return getBaseValueAt(x);  // Direct base read, NO NORMALIZATION
         }
 
         case RenderingMode::Harmonic:
@@ -680,6 +593,14 @@ double LayeredTransferFunction::evaluateForRendering(double x, double normScalar
             // Harmonic mode: Base + harmonics with normalization
             const double wtCoeff = coefficients[0];
             const double baseValue = getBaseValueAt(x);
+
+            // OPTIMIZATION: Early-exit if all harmonics are zero
+            // Saves 40 coefficient loads + harmonic evaluation (sin/cos computations)
+            if (!hasNonZeroHarmonics()) {
+                const double unnormalized = wtCoeff * baseValue;
+                return normScalar * unnormalized;  // Base only, WITH NORMALIZATION
+            }
+
             const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
             const double unnormalized = wtCoeff * baseValue + harmonicValue;
             return normScalar * unnormalized;  // WITH NORMALIZATION
