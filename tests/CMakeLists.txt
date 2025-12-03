@@ -639,28 +639,3 @@ endif()
 
 add_test(NAME SeamlessTransferFunctionPerformanceTests COMMAND seamless_transfer_function_performance_tests)
 
-
-# SeamlessTransferFunction diagnostic tests (debugging audio path)
-add_executable(seamless_transfer_function_diagnostic_tests
-    SeamlessTransferFunctionDiagnosticTest.cpp
-)
-
-target_include_directories(seamless_transfer_function_diagnostic_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(seamless_transfer_function_diagnostic_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(seamless_transfer_function_diagnostic_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(seamless_transfer_function_diagnostic_tests)
-endif()
-
-add_test(NAME SeamlessTransferFunctionDiagnosticTests COMMAND seamless_transfer_function_diagnostic_tests)

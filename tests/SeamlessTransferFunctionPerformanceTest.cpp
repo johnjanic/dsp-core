@@ -68,7 +68,9 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
         std::vector<double> samples(tc.expectedCrossfadeSamples + 100);
         for (auto& s : samples) s = 0.5;
 
-        stf->processBlock(samples.data(), static_cast<int>(samples.size()));
+        double* channelPointers[] = {samples.data()};
+        juce::AudioBuffer<double> buffer(channelPointers, 1, static_cast<int>(samples.size()));
+        stf->processBuffer(buffer);
 
         // Verify smooth transition (no clicks)
         for (size_t i = 1; i < samples.size(); ++i) {
@@ -105,7 +107,9 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_TradeoffAnalys
 
     std::vector<double> samples(expectedCrossfadeSamples);
     for (auto& s : samples) s = 0.0;
-    stf->processBlock(samples.data(), static_cast<int>(samples.size()));
+    double* channelPointers[] = {samples.data()};
+    juce::AudioBuffer<double> buffer(channelPointers, 1, static_cast<int>(samples.size()));
+    stf->processBuffer(buffer);
 
     // Verify smooth crossfade
     bool smooth = true;
@@ -149,7 +153,9 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     // Process audio block (this triggers LUT swap if ready)
     double samples[512];
     for (int i = 0; i < 512; ++i) samples[i] = 0.5;
-    stf->processBlock(samples, 512);
+    double* channelPointers[] = {samples};
+    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
+    stf->processBuffer(buffer);
 
     // Wait for another polling cycle to ensure LUT is updated
     std::this_thread::sleep_for(std::chrono::milliseconds(45));
@@ -184,7 +190,6 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_SplineFitting) {
         editingModel.setBaseLayerValue(i, y);
     }
 
-    editingModel.updateComposite();
 
     auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -251,9 +256,11 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_WorkerThreadPriority
 
     // Process audio simultaneously
     double samples[512];
+    double* channelPointers[] = {samples};
+    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
     for (int i = 0; i < 100; ++i) {
         for (int j = 0; j < 512; ++j) samples[j] = 0.5;
-        stf->processBlock(samples, 512);
+        stf->processBuffer(buffer);
     }
 
     // If test completes without hanging, worker priority is correct
@@ -285,13 +292,15 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Heavy editing load (should not accumulate memory)
+    double samples[512];
+    double* channelPointers[] = {samples};
+    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
     for (int i = 0; i < 1000; ++i) {
         editingModel.setCoefficient(1, 0.5 + i * 0.0001);
 
         // Process audio
-        double samples[512];
         for (int j = 0; j < 512; ++j) samples[j] = 0.5;
-        stf->processBlock(samples, 512);
+        stf->processBuffer(buffer);
 
         if (i % 100 == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));

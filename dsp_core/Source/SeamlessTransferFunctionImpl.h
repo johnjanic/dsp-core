@@ -231,6 +231,9 @@ struct RenderJob {
     LayeredTransferFunction::ExtrapolationMode extrapolationMode{
         LayeredTransferFunction::ExtrapolationMode::Clamp};
 
+    // Rendering mode (determines evaluation path: Paint/Harmonic/Spline)
+    RenderingMode renderingMode{RenderingMode::Paint};
+
     // Version stamp
     uint64_t version{0};
 };

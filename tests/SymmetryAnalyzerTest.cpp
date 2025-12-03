@@ -24,7 +24,6 @@ class SymmetryAnalyzerTest : public ::testing::Test {
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::pow(x, power));
         }
-        ltf->updateComposite();
     }
 
     // Helper: Set curve to tanh
@@ -33,7 +32,6 @@ class SymmetryAnalyzerTest : public ::testing::Test {
             double x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::tanh(steepness * x));
         }
-        ltf->updateComposite();
     }
 
     // Helper: Set curve to harmonic (Chebyshev polynomial)
@@ -54,7 +52,6 @@ class SymmetryAnalyzerTest : public ::testing::Test {
 
             ltf->setBaseLayerValue(i, y);
         }
-        ltf->updateComposite();
     }
 };
 
@@ -126,7 +123,6 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_TanhWithBump_ApproximateSymmetry) {
             ltf->setBaseLayerValue(i, currentY + 0.15); // Larger bump to break perfect symmetry
         }
     }
-    ltf->updateComposite();
 
     // Execute
     auto result = SymmetryAnalyzer::analyzeOddSymmetry(*ltf);
@@ -206,7 +202,6 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_ConfigThresholds_AffectClassification) {
             ltf->setBaseLayerValue(i, currentY + 0.01); // Tiny bump
         }
     }
-    ltf->updateComposite();
 
     // Execute with Config 1: perfectThreshold = 0.99 (default)
     SymmetryAnalyzer::Config config1;

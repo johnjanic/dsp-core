@@ -10,7 +10,6 @@ TEST(ZeroCrossingSolverTest, LinearOffsetCurve) {
         double x = ltf.normalizeIndex(i);
         ltf.setBaseLayerValue(i, x + 0.3);
     }
-    ltf.updateComposite();
 
     auto result = dsp_core::Services::ZeroCrossingSolver::solve(ltf, 0.01);
 
@@ -27,7 +26,6 @@ TEST(ZeroCrossingSolverTest, NoZeroCrossing) {
         double x = ltf.normalizeIndex(i);
         ltf.setBaseLayerValue(i, 0.5 * std::tanh(x) + 0.6);
     }
-    ltf.updateComposite();
 
     auto result = dsp_core::Services::ZeroCrossingSolver::solve(ltf);
 
@@ -44,7 +42,6 @@ TEST(ZeroCrossingSolverTest, MultipleZeros) {
         double x = ltf.normalizeIndex(i);
         ltf.setBaseLayerValue(i, std::sin(3.0 * M_PI * x));
     }
-    ltf.updateComposite();
 
     auto result = dsp_core::Services::ZeroCrossingSolver::solve(ltf, 0.01);
 
@@ -60,7 +57,6 @@ TEST(ZeroCrossingSolverTest, TanhCurve) {
         double x = ltf.normalizeIndex(i);
         ltf.setBaseLayerValue(i, std::tanh(3.0 * x));
     }
-    ltf.updateComposite();
 
     auto result = dsp_core::Services::ZeroCrossingSolver::solve(ltf, 0.02);
 

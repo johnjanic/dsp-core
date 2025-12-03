@@ -9,6 +9,19 @@
 namespace dsp_core {
 
 /**
+ * RenderingMode - Determines which layer evaluation path to use
+ *
+ * Paint    → Direct base layer (no normalization, harmonics baked)
+ * Harmonic → Base + harmonics with normalization (harmonics non-zero)
+ * Spline   → Direct spline evaluation (bypasses base+harmonics)
+ */
+enum class RenderingMode {
+    Paint,      // Direct base layer output (no normalization)
+    Harmonic,   // Base + harmonics with normalization
+    Spline      // Direct spline evaluation
+};
+
+/**
  * LayeredTransferFunction - Multi-layer waveshaping state container
  *
  * Stores UI state for transfer function editing: base layer (wavetable), harmonic
@@ -148,6 +161,27 @@ class LayeredTransferFunction {
      */
     bool isSplineLayerEnabled() const;
 
+    /**
+     * Set rendering mode (determines evaluation path for LUT rendering)
+     *
+     * Paint    → Direct base layer (no normalization)
+     * Harmonic → Base + harmonics with normalization
+     * Spline   → Direct spline evaluation
+     *
+     * Thread-safe: Can be called from any thread
+     *
+     * @param mode The rendering mode to use
+     */
+    void setRenderingMode(RenderingMode mode);
+
+    /**
+     * Get current rendering mode
+     *
+     * Thread-safe: Can be called from any thread
+     *
+     * @return Current rendering mode
+     */
+    RenderingMode getRenderingMode() const;
 
     //==========================================================================
     // Harmonic Layer Baking
@@ -257,6 +291,35 @@ class LayeredTransferFunction {
      * @return base + harmonics (with current normalization applied)
      */
     double evaluateBaseAndHarmonics(double x) const;
+
+    /**
+     * Evaluate transfer function for rendering based on current mode
+     *
+     * This is the primary evaluation method used by LUT renderer. It routes to the
+     * appropriate evaluation path based on current rendering mode:
+     *
+     * Paint Mode:
+     *   - Returns: wtCoeff * baseValue
+     *   - No normalization applied
+     *   - Harmonics assumed baked into base layer
+     *
+     * Harmonic Mode:
+     *   - Returns: normScalar * (wtCoeff * baseValue + harmonicValue)
+     *   - Normalization applied to composite
+     *   - Evaluates both base and harmonic layers
+     *
+     * Spline Mode:
+     *   - Returns: splineLayer.evaluate(x)
+     *   - Direct spline evaluation
+     *   - Bypasses base + harmonics entirely
+     *
+     * Thread-safe: Can be called from any thread (reads atomics with acquire ordering)
+     *
+     * @param x Normalized input in [minValue, maxValue]
+     * @param normScalar Normalization scalar computed by renderer
+     * @return Evaluated output value
+     */
+    double evaluateForRendering(double x, double normScalar) const;
 
     /**
      * Process block of samples in-place
@@ -382,6 +445,9 @@ class LayeredTransferFunction {
     // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
     std::atomic<bool> splineLayerEnabled{false};
 
+    // Rendering mode (determines evaluation path for LUT rendering)
+    std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Paint)};
+
     // Version counter for dirty detection (used by SeamlessTransferFunction)
     std::atomic<uint64_t> versionCounter{0};
 
@@ -396,6 +462,16 @@ class LayeredTransferFunction {
     double interpolateLinear(double x) const;
     double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
+
+    /**
+     * Get base layer value at normalized position x using current interpolation mode
+     *
+     * This is a helper for evaluateForRendering() to read base layer values.
+     *
+     * @param x Normalized input in [minValue, maxValue]
+     * @return Interpolated base layer value
+     */
+    double getBaseValueAt(double x) const;
 };
 
 } // namespace dsp_core

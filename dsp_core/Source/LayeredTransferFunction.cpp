@@ -220,6 +220,10 @@ bool LayeredTransferFunction::isNormalizationEnabled() const {
 }
 
 void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
+    // Legacy API - delegates to RenderingMode for consistency
+    // When enabled: use Spline rendering mode
+    // When disabled: use Paint rendering mode (harmonics should be baked)
+    //
     // Entering spline mode:
     // - Harmonics are kept intact (hidden but present for undo)
     // - Spline will fit to the current normalized composite (base + harmonics)
@@ -231,8 +235,11 @@ void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
     // - SplineFitter needs the correct normScalar to read normalized composite
     // - Premature reset to 1.0 caused bug where SplineFitter fit unnormalized values
 
+    // Delegate to RenderingMode (source of truth)
+    setRenderingMode(enabled ? RenderingMode::Spline : RenderingMode::Paint);
+
+    // Also update legacy flag for backward compatibility in RenderJob serialization
     splineLayerEnabled.store(enabled, std::memory_order_release);
-    versionCounter.fetch_add(1, std::memory_order_release);
 }
 
 bool LayeredTransferFunction::hasNonZeroHarmonics() const {
@@ -379,7 +386,27 @@ void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, N
 }
 
 bool LayeredTransferFunction::isSplineLayerEnabled() const {
-    return splineLayerEnabled.load(std::memory_order_acquire);
+    // Legacy API - delegates to RenderingMode (source of truth)
+    return getRenderingMode() == RenderingMode::Spline;
+}
+
+void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {
+    const auto oldMode = getRenderingMode();
+    renderingMode.store(static_cast<int>(mode), std::memory_order_release);
+    versionCounter.fetch_add(1, std::memory_order_release);
+
+    // DIAGNOSTIC: Log rendering mode changes to track bug
+    const char* oldModeStr = (oldMode == RenderingMode::Paint) ? "Paint" :
+                             (oldMode == RenderingMode::Harmonic) ? "Harmonic" : "Spline";
+    const char* newModeStr = (mode == RenderingMode::Paint) ? "Paint" :
+                             (mode == RenderingMode::Harmonic) ? "Harmonic" : "Spline";
+    DBG("[LTF:" + juce::String(instanceId) + "] setRenderingMode: " +
+        juce::String(oldModeStr) + " → " + juce::String(newModeStr) +
+        " (version=" + juce::String(static_cast<int64_t>(versionCounter.load())) + ")");
+}
+
+RenderingMode LayeredTransferFunction::getRenderingMode() const {
+    return static_cast<RenderingMode>(renderingMode.load(std::memory_order_acquire));
 }
 
 double LayeredTransferFunction::normalizeIndex(int index) const {
@@ -562,6 +589,44 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
     // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 }
 
+double LayeredTransferFunction::getBaseValueAt(double x) const {
+    // Map x to table index
+    const double tableIndex = ((x - minValue) / (maxValue - minValue)) * (tableSize - 1);
+
+    // Handle out-of-bounds based on extrapolation mode
+    if (extrapMode == ExtrapolationMode::Clamp) {
+        if (tableIndex <= 0.0)
+            return baseTable[0].load(std::memory_order_relaxed);
+        if (tableIndex >= tableSize - 1)
+            return baseTable[tableSize - 1].load(std::memory_order_relaxed);
+    }
+
+    // Get integer and fractional parts
+    const int idx = static_cast<int>(tableIndex);
+    const double frac = tableIndex - idx;
+
+    // Bounds check
+    if (idx < 0 || idx >= tableSize - 1) {
+        // Linear extrapolation (only reached if extrapMode == Linear)
+        if (idx < 0) {
+            const double y0 = baseTable[0].load(std::memory_order_relaxed);
+            const double y1 = baseTable[1].load(std::memory_order_relaxed);
+            const double slope = y1 - y0;
+            return y0 + slope * tableIndex;
+        } else {
+            const double y0 = baseTable[tableSize - 2].load(std::memory_order_relaxed);
+            const double y1 = baseTable[tableSize - 1].load(std::memory_order_relaxed);
+            const double slope = y1 - y0;
+            return y0 + slope * (tableIndex - (tableSize - 2));
+        }
+    }
+
+    // Linear interpolation (sufficient for base layer reading)
+    const double y0 = baseTable[idx].load(std::memory_order_relaxed);
+    const double y1 = baseTable[idx + 1].load(std::memory_order_relaxed);
+    return y0 + frac * (y1 - y0);
+}
+
 double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     // CRITICAL: Always evaluate base + harmonics, ignoring spline layer state
     // Used by SplineFitter to read the normalized composite when entering spline mode
@@ -590,6 +655,36 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     // Apply normalization scalar to match what user sees on screen
     const double normScalar = normalizationScalar.load(std::memory_order_acquire);
     return normScalar * result;
+}
+
+double LayeredTransferFunction::evaluateForRendering(double x, double normScalar) const {
+    const RenderingMode mode = getRenderingMode();
+
+    switch (mode) {
+        case RenderingMode::Spline:
+            // Direct spline evaluation (bypasses base + harmonics)
+            return splineLayer->evaluate(x);
+
+        case RenderingMode::Paint:
+        {
+            // Paint mode: Direct base layer output (no normalization)
+            // Harmonics are assumed to be baked into base layer
+            const double wtCoeff = coefficients[0];
+            const double baseValue = getBaseValueAt(x);
+            return wtCoeff * baseValue;  // NO NORMALIZATION
+        }
+
+        case RenderingMode::Harmonic:
+        default:
+        {
+            // Harmonic mode: Base + harmonics with normalization
+            const double wtCoeff = coefficients[0];
+            const double baseValue = getBaseValueAt(x);
+            const double harmonicValue = harmonicLayer->evaluate(x, coefficients, tableSize);
+            const double unnormalized = wtCoeff * baseValue + harmonicValue;
+            return normScalar * unnormalized;  // WITH NORMALIZATION
+        }
+    }
 }
 
 juce::ValueTree LayeredTransferFunction::toValueTree() const {

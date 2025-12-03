@@ -453,7 +453,7 @@ namespace {
 } // namespace
 
 void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer) {
-    // Set state in tempLTF (for spline/harmonic evaluation)
+    // Set state in tempLTF
     for (int i = 0; i < TABLE_SIZE; ++i) {
         tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
     }
@@ -462,35 +462,22 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
     tempLTF->setSplineLayerEnabled(job.splineLayerEnabled);
     tempLTF->setInterpolationMode(job.interpolationMode);
     tempLTF->setExtrapolationMode(job.extrapolationMode);
+    tempLTF->setRenderingMode(job.renderingMode);
 
-    // Mode-specific rendering
-    if (job.splineLayerEnabled) {
-        // SPLINE MODE: Direct evaluation (no normalization)
-        for (int i = 0; i < TABLE_SIZE; ++i) {
-            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
-            outputBuffer->data[i] = tempLTF->getSplineLayer().evaluate(x);
-        }
-    } else {
-        // HARMONIC MODE: Compute normalization, then generate composite
-        const double normScalar = computeNormalizationScalar(
-            job.baseLayerData,
-            job.coefficients,
-            tempLTF->getHarmonicLayer(),
-            job.normalizationEnabled,
-            job.deferNormalization,
-            job.frozenNormalizationScalar
-        );
+    // Compute normalization scalar (used by Harmonic mode, ignored by Paint/Spline modes)
+    const double normScalar = computeNormalizationScalar(
+        job.baseLayerData,
+        job.coefficients,
+        tempLTF->getHarmonicLayer(),
+        job.normalizationEnabled,
+        job.deferNormalization,
+        job.frozenNormalizationScalar
+    );
 
-        // Convert coefficients array to vector for HarmonicLayer API
-        std::vector<double> coeffsVec(job.coefficients.begin(), job.coefficients.end());
-
-        for (int i = 0; i < TABLE_SIZE; ++i) {
-            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
-            const double baseValue = job.baseLayerData[i];
-            const double harmonicValue = tempLTF->getHarmonicLayer().evaluate(x, coeffsVec, TABLE_SIZE);
-            const double unnormalized = job.coefficients[0] * baseValue + harmonicValue;
-            outputBuffer->data[i] = normScalar * unnormalized;
-        }
+    // SIMPLIFIED LOOP - LayeredTransferFunction handles mode switching internally
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+        outputBuffer->data[i] = tempLTF->evaluateForRendering(x, normScalar);
     }
 
     outputBuffer->version = job.version;
@@ -592,6 +579,7 @@ RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
     job.frozenNormalizationScalar = ltf.getNormalizationScalar();
     job.interpolationMode = ltf.getInterpolationMode();
     job.extrapolationMode = ltf.getExtrapolationMode();
+    job.renderingMode = ltf.getRenderingMode();
 
     // Stamp version
     job.version = ltf.getVersion();

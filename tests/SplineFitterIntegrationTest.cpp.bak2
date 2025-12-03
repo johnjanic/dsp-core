@@ -233,7 +233,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     std::vector<double> originalState;
     originalState.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        originalState.push_back(ltf->computeCompositeAt(i));
+        originalState.push_back(ltf->getCompositeValue(i));
     }
 
     // STEP b: Bake to 16k samples
@@ -251,7 +251,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     std::vector<double> splineState;
     splineState.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        splineState.push_back(ltf->computeCompositeAt(i));
+        splineState.push_back(ltf->getCompositeValue(i));
     }
 
     double fitError = computeMaxError(originalState, splineState);
@@ -399,7 +399,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     std::vector<double> originalShape;
     originalShape.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        originalShape.push_back(ltf->computeCompositeAt(i));
+        originalShape.push_back(ltf->getCompositeValue(i));
     }
 
     // Bake to base
@@ -421,7 +421,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     std::vector<double> firstFit;
     firstFit.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        firstFit.push_back(ltf->computeCompositeAt(i));
+        firstFit.push_back(ltf->getCompositeValue(i));
     }
 
     double firstError = computeMaxError(originalShape, firstFit);
@@ -449,7 +449,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     std::vector<double> secondFit;
     secondFit.reserve(static_cast<size_t>(ltf->getTableSize()));
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        secondFit.push_back(ltf->computeCompositeAt(i));
+        secondFit.push_back(ltf->getCompositeValue(i));
     }
 
     double secondError = computeMaxError(originalShape, secondFit);

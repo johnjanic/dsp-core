@@ -22,7 +22,6 @@ TEST_F(DCOffsetCompensatorTest, TransientPreservation) {
         double x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, std::tanh(3.0 * x) + 0.3);
     }
-    ltf->updateComposite();
 
     compensator->prepareToPlay(48000.0, 512);
     compensator->notifyTransferFunctionChanged(false);
@@ -46,7 +45,6 @@ TEST_F(DCOffsetCompensatorTest, SilenceDecayCompensation) {
         double x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x + 0.5);
     }
-    ltf->updateComposite();
 
     compensator->prepareToPlay(48000.0, 512);
     compensator->notifyTransferFunctionChanged(false);
@@ -82,7 +80,6 @@ TEST_F(DCOffsetCompensatorTest, BypassMode) {
         double x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, std::tanh(3.0 * x) + 0.3);
     }
-    ltf->updateComposite();
 
     compensator->prepareToPlay(48000.0, 512);
     compensator->notifyTransferFunctionChanged(false);
@@ -110,7 +107,6 @@ TEST_F(DCOffsetCompensatorTest, StereoIndependence) {
         double x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x + 0.4);
     }
-    ltf->updateComposite();
 
     compensator->prepareToPlay(48000.0, 512);
     compensator->notifyTransferFunctionChanged(false);
