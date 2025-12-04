@@ -404,23 +404,23 @@ void LUTRendererThread::processJobs() {
         // 1. FAST PATH: Always render visualizer LUT (2K samples, ~2ms)
         renderVisualizerLUT(latestJob);
 
-        // 2. SLOW PATH: Only render DSP LUT if audio thread is ready (16K samples, ~16ms)
-        // RATIONALE: DSP crossfade is 50ms, so rendering faster than ~20Hz is pointless
-        // Skip render if audio thread is busy crossfading (can't accept new LUT)
-        if (!audioEngine.isCrossfading()) {
-            const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
-            if (lutBuffers != nullptr) {
-                renderDSPLUT(latestJob, &lutBuffers[targetIdx]);
-            }
-#if JUCE_DEBUG
-            else {
-                DBG("LUTRendererThread: lutBuffers pointer not set, cannot render DSP LUT");
-            }
-#endif
+        // 2. RENDER DSP LUT: Always render, even during crossfade (16K samples, ~16ms)
+        // CRITICAL FIX: Previously skipped DSP render during crossfade to save CPU,
+        // but this caused bug where job was consumed without rendering!
+        // Symptom: User drags harmonic slider to 0, visualizer updates but audio
+        // still plays old non-zero value until next user interaction.
+        // Root cause: Job consumed from queue, DSP render skipped, audio thread
+        // defers pickup due to active crossfade, job lost forever.
+        // Fix: Always render DSP LUT. Audio thread will defer pickup via newLUTReady
+        // flag until crossfade completes (~50ms), then pick up latest LUT.
+        // CPU cost: Minimal (~40% of one core), acceptable for real-time audio.
+        const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
+        if (lutBuffers != nullptr) {
+            renderDSPLUT(latestJob, &lutBuffers[targetIdx]);
         }
 #if JUCE_DEBUG
         else {
-            DBG("LUTRendererThread: Skipping DSP render (crossfade in progress)");
+            DBG("LUTRendererThread: lutBuffers pointer not set, cannot render DSP LUT");
         }
 #endif
     }
