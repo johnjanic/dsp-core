@@ -59,18 +59,19 @@ TEST_F(AudioEngineTest, Constructor_AllBuffersInitialized) {
 
 /**
  * Test: Crossfade duration scales correctly with sample rate
- * Expected: 10ms at 44.1kHz = 441 samples, 10ms at 48kHz = 480 samples
+ * Expected: 50ms at 44.1kHz = 2205 samples, 50ms at 48kHz = 2400 samples
  */
 TEST_F(AudioEngineTest, PrepareToPlay_CrossfadeDurationScalesWithSampleRate) {
     // 44.1 kHz
     engine->prepareToPlay(44100.0, 512);
-    double buffer[1] = {0.0};
-    engine->processBlock(buffer, 1);
+    juce::AudioBuffer<double> buffer(1, 1);
+    buffer.clear();
+    engine->processBuffer(buffer);
     // We can't directly check crossfadeSamples (private), but we can verify behavior
 
     // 48 kHz
     engine->prepareToPlay(48000.0, 512);
-    // Expected: 480 samples at 48kHz (10ms)
+    // Expected: 2400 samples at 48kHz (50ms)
     // We'll verify this by triggering a crossfade and counting samples
 }
 
@@ -79,7 +80,7 @@ TEST_F(AudioEngineTest, PrepareToPlay_CrossfadeDurationScalesWithSampleRate) {
  * Expected: If crossfadePosition >= new crossfadeSamples, crossfade completes
  */
 TEST_F(AudioEngineTest, PrepareToPlay_ClampsPositionOnSampleRateChange) {
-    // Start at 96kHz (960 samples for 10ms)
+    // Start at 96kHz (4800 samples for 50ms)
     engine->prepareToPlay(96000.0, 512);
 
     // Simulate crossfade in progress by manually swapping buffers
@@ -90,14 +91,16 @@ TEST_F(AudioEngineTest, PrepareToPlay_ClampsPositionOnSampleRateChange) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Trigger crossfade
-    double samples[960];
-    for (int i = 0; i < 960; ++i) samples[i] = 0.0;
-    engine->processBlock(samples, 500); // Partially through crossfade
+    juce::AudioBuffer<double> buffer(1, 500);
+    buffer.clear();
+    engine->processBuffer(buffer); // Partially through crossfade
 
-    // Now change sample rate to 44.1kHz (441 samples)
-    // The crossfade should complete immediately if position >= 441
+    // Now change sample rate to 44.1kHz (2205 samples)
+    // The crossfade should complete immediately if position >= 2205
     engine->prepareToPlay(44100.0, 512);
-    engine->processBlock(samples, 1);
+    juce::AudioBuffer<double> buffer2(1, 1);
+    buffer2.clear();
+    engine->processBuffer(buffer2);
 
     // If we're still crossfading, position should be clamped
     // (Hard to verify without accessing private state, but no crash is good)
@@ -128,31 +131,28 @@ TEST_F(AudioEngineTest, Crossfade_GainsSumToOne) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Process samples and verify crossfade
-    const int expectedCrossfadeSamples = static_cast<int>(44100.0 * 10.0 / 1000.0); // 441 samples
-    double samples[441];
+    const int expectedCrossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205 samples
+    juce::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
+    buffer.clear(); // Test with x = 0.0
 
-    for (int i = 0; i < expectedCrossfadeSamples; ++i) {
-        samples[i] = 0.0; // Test with x = 0.0
-    }
-
-    engine->processBlock(samples, expectedCrossfadeSamples);
+    engine->processBuffer(buffer);
 
     // Verify smooth transition from 0.0 (identity at x=0) to 0.5 (new LUT)
     // First sample should start crossfade
-    EXPECT_NEAR(samples[0], 0.0, 0.1) << "First sample should be close to old LUT value";
+    EXPECT_NEAR(buffer.getSample(0, 0), 0.0, 0.1) << "First sample should be close to old LUT value";
 
     // Last sample should be at new LUT value
-    EXPECT_NEAR(samples[expectedCrossfadeSamples - 1], 0.5, 0.01)
+    EXPECT_NEAR(buffer.getSample(0, expectedCrossfadeSamples - 1), 0.5, 0.01)
         << "Last sample should be close to new LUT value";
 
     // Middle samples should be interpolated
     const int midIdx = expectedCrossfadeSamples / 2;
-    EXPECT_NEAR(samples[midIdx], 0.25, 0.05) << "Middle sample should be halfway between LUTs";
+    EXPECT_NEAR(buffer.getSample(0, midIdx), 0.25, 0.05) << "Middle sample should be halfway between LUTs";
 }
 
 /**
  * Test: Crossfade completes in correct sample count
- * Expected: After 441 samples at 44.1kHz, crossfade is done
+ * Expected: After 2205 samples at 44.1kHz, crossfade is done
  */
 TEST_F(AudioEngineTest, Crossfade_CompletesInCorrectSampleCount) {
     engine->prepareToPlay(44100.0, 512);
@@ -168,23 +168,26 @@ TEST_F(AudioEngineTest, Crossfade_CompletesInCorrectSampleCount) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Process exactly the crossfade duration
-    const int crossfadeSamples = static_cast<int>(44100.0 * 10.0 / 1000.0); // 441
-    double samples[441];
-    for (int i = 0; i < crossfadeSamples; ++i) samples[i] = 0.5;
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205
+    juce::AudioBuffer<double> buffer(1, crossfadeSamples);
+    for (int i = 0; i < crossfadeSamples; ++i) {
+        buffer.setSample(0, i, 0.5);
+    }
 
-    engine->processBlock(samples, crossfadeSamples);
+    engine->processBuffer(buffer);
 
     // After crossfade, output should be from new LUT
-    double testSample = 0.5;
-    engine->processBlock(&testSample, 1);
-    EXPECT_NEAR(testSample, 1.0, 1e-6) << "After crossfade, should use new LUT value";
+    juce::AudioBuffer<double> testBuffer(1, 1);
+    testBuffer.setSample(0, 0, 0.5);
+    engine->processBuffer(testBuffer);
+    EXPECT_NEAR(testBuffer.getSample(0, 0), 1.0, 1e-6) << "After crossfade, should use new LUT value";
 }
 
 /**
- * Test: New LUT aborts active crossfade and starts fresh
- * Expected: If crossfading and new LUT arrives, old crossfade stops
+ * Test: New LUT defers during active crossfade
+ * Expected: If crossfading and new LUT arrives, update is deferred until crossfade completes
  */
-TEST_F(AudioEngineTest, Crossfade_NewLUTAbortsActiveCrossfade) {
+TEST_F(AudioEngineTest, Crossfade_NewLUTDefersUntilComplete) {
     engine->prepareToPlay(44100.0, 512);
 
     // Set up first new LUT
@@ -196,11 +199,11 @@ TEST_F(AudioEngineTest, Crossfade_NewLUTAbortsActiveCrossfade) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Start crossfade
-    double samples[100];
-    for (int i = 0; i < 100; ++i) samples[i] = 0.0;
-    engine->processBlock(samples, 100); // Partially through crossfade
+    juce::AudioBuffer<double> buffer(1, 100);
+    buffer.clear();
+    engine->processBuffer(buffer); // Partially through crossfade
 
-    // NOW send a second new LUT
+    // NOW send a second new LUT while crossfade is in progress
     const int secondaryIdx = engine->getWorkerTargetIndexReference().load(std::memory_order_acquire);
     for (int i = 0; i < dsp_core::TABLE_SIZE; ++i) {
         buffers[secondaryIdx].data[i] = 0.8;
@@ -208,18 +211,32 @@ TEST_F(AudioEngineTest, Crossfade_NewLUTAbortsActiveCrossfade) {
     buffers[secondaryIdx].version = 2;
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
-    // Process one more block - should abort old crossfade and start new one
-    engine->processBlock(samples, 100);
+    // Process more samples - update is deferred, first crossfade continues
+    juce::AudioBuffer<double> buffer2(1, 100);
+    buffer2.clear();
+    engine->processBuffer(buffer2);
 
-    // After completing the NEW crossfade, output should be 0.8
-    const int crossfadeSamples = static_cast<int>(44100.0 * 10.0 / 1000.0);
-    double remaining[441];
-    for (int i = 0; i < crossfadeSamples; ++i) remaining[i] = 0.0;
-    engine->processBlock(remaining, crossfadeSamples);
+    // Complete the FIRST crossfade - output should be 0.5 (first LUT)
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
+    juce::AudioBuffer<double> remaining(1, crossfadeSamples);
+    remaining.clear();
+    engine->processBuffer(remaining);
 
-    double testSample = 0.0;
-    engine->processBlock(&testSample, 1);
-    EXPECT_NEAR(testSample, 0.8, 1e-6) << "Should use second new LUT after abort";
+    juce::AudioBuffer<double> testBuffer(1, 1);
+    testBuffer.setSample(0, 0, 0.0);
+    engine->processBuffer(testBuffer);
+    EXPECT_NEAR(testBuffer.getSample(0, 0), 0.5, 1e-6) << "Should complete first crossfade to 0.5";
+
+    // Now the deferred LUT should trigger a new crossfade
+    // Complete the SECOND crossfade - output should be 0.8 (second LUT)
+    juce::AudioBuffer<double> remaining2(1, crossfadeSamples + 1);
+    remaining2.clear();
+    engine->processBuffer(remaining2);
+
+    juce::AudioBuffer<double> testBuffer2(1, 1);
+    testBuffer2.setSample(0, 0, 0.0);
+    engine->processBuffer(testBuffer2);
+    EXPECT_NEAR(testBuffer2.getSample(0, 0), 0.8, 1e-6) << "Should use second LUT after deferred update";
 }
 
 // ============================================================================
@@ -247,10 +264,10 @@ TEST_F(AudioEngineTest, Interpolation_LinearIsAccurate) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Skip crossfade
-    const int crossfadeSamples = static_cast<int>(44100.0 * 10.0 / 1000.0);
-    double skipSamples[441];
-    for (int i = 0; i < crossfadeSamples; ++i) skipSamples[i] = 0.0;
-    engine->processBlock(skipSamples, crossfadeSamples);
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
+    juce::AudioBuffer<double> skipBuffer(1, crossfadeSamples);
+    skipBuffer.clear();
+    engine->processBuffer(skipBuffer);
 
     // Test interpolation at various points
     const std::vector<double> testInputs = {-0.75, -0.25, 0.0, 0.33, 0.99};
@@ -281,10 +298,10 @@ TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Skip crossfade
-    const int crossfadeSamples = static_cast<int>(44100.0 * 10.0 / 1000.0);
-    double skipSamples[441];
-    for (int i = 0; i < crossfadeSamples; ++i) skipSamples[i] = 0.0;
-    engine->processBlock(skipSamples, crossfadeSamples);
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
+    juce::AudioBuffer<double> skipBuffer(1, crossfadeSamples);
+    skipBuffer.clear();
+    engine->processBuffer(skipBuffer);
 
     // Test interpolation (should be more accurate than linear for curves)
     const std::vector<double> testInputs = {-0.5, 0.0, 0.5};
@@ -322,8 +339,8 @@ TEST_F(AudioEngineTest, Extrapolation_ClampModeClamps) {
  */
 TEST_F(AudioEngineTest, ProcessBlock_HandlesEmptyBlock) {
     engine->prepareToPlay(44100.0, 512);
-    double samples[1];
-    EXPECT_NO_THROW(engine->processBlock(samples, 0));
+    juce::AudioBuffer<double> buffer(1, 0);
+    EXPECT_NO_THROW(engine->processBuffer(buffer));
 }
 
 } // namespace dsp_core_test

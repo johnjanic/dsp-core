@@ -196,9 +196,9 @@ class AudioEngine {
  *   - Spline anchors copied (not referenced)
  *   - Preserves dsp-core module purity
  *
- * Deferred Normalization Handling:
- *   - deferNormalization = true: Use frozenNormalizationScalar directly
- *   - deferNormalization = false: Recompute scalar during rendering
+ * Paint Stroke Normalization Handling:
+ *   - paintStrokeActive = true: Use frozenNormalizationScalar directly
+ *   - paintStrokeActive = false: Recompute scalar during rendering
  *   - This distinction is CRITICAL for correct paint stroke rendering
  *
  * Interpolation/Extrapolation Modes:
@@ -218,11 +218,10 @@ struct RenderJob {
     std::vector<SplineAnchor> splineAnchors;
 
     // Mode flags
-    bool splineLayerEnabled{false};
     bool normalizationEnabled{false};
-    bool deferNormalization{false}; // CRITICAL: Distinguishes frozen vs computed scalar
+    bool paintStrokeActive{false}; // CRITICAL: Distinguishes frozen vs computed scalar
 
-    // Frozen normalization scalar (used when deferNormalization = true)
+    // Frozen normalization scalar (used when paintStrokeActive = true)
     double frozenNormalizationScalar{1.0};
 
     // Interpolation/extrapolation modes
@@ -341,11 +340,11 @@ class LUTRendererThread : public juce::Thread {
      *   1. Restore base layer from job.baseLayerData
      *   2. Set coefficients from job.coefficients
      *   3. Set spline anchors from job.splineAnchors
-     *   4. Set spline layer mode from job.splineLayerEnabled
-     *   5. Restore normalization state (handle deferred vs computed)
-     *   6. Set interpolation/extrapolation modes
-     *   7. Render composite (updateComposite)
-     *   8. Copy composite to output buffer
+     *   4. Set interpolation/extrapolation modes
+     *   5. Set rendering mode from job.renderingMode (Paint/Harmonic/Spline)
+     *   6. Compute normalization scalar (Harmonic mode only)
+     *   7. Render LUT via evaluateForRendering()
+     *   8. Copy LUT to output buffer
      *   9. Signal audio thread (newLUTReady = true)
      *  10. Update visualizer LUT (async on message thread)
      *

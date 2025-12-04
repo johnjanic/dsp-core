@@ -395,14 +395,14 @@ namespace {
      * Scans base layer + harmonics to find max absolute value,
      * then returns 1.0 / max to normalize composite to [-1, 1].
      *
-     * Respects deferred normalization during paint strokes (uses frozen scalar).
+     * Respects paint stroke freezing (uses frozen scalar when active).
      *
      * @param baseLayer Full base layer data (16384 values)
      * @param coefficients Harmonic coefficients [0] = WT mix, [1..40] = harmonics
      * @param harmonicLayer Reference to harmonic layer for evaluation
      * @param normalizationEnabled If false, returns 1.0 (no scaling)
-     * @param deferNormalization If true, uses frozenScalar (paint stroke mode)
-     * @param frozenScalar Scalar to use when deferNormalization=true
+     * @param paintStrokeActive If true, uses frozenScalar (paint stroke mode)
+     * @param frozenScalar Scalar to use when paintStrokeActive=true
      * @return Normalization scalar in range (0, 1], or 1.0 if disabled
      */
     double computeNormalizationScalar(
@@ -410,7 +410,7 @@ namespace {
         const std::array<double, 41>& coefficients,
         HarmonicLayer& harmonicLayer,
         bool normalizationEnabled,
-        bool deferNormalization,
+        bool paintStrokeActive,
         double frozenScalar
     ) {
         // If normalization disabled, return identity scalar
@@ -418,8 +418,8 @@ namespace {
             return 1.0;
         }
 
-        // If deferred (during paint strokes), use frozen scalar
-        if (deferNormalization) {
+        // If paint stroke active, use frozen scalar
+        if (paintStrokeActive) {
             return frozenScalar;
         }
 
@@ -459,7 +459,6 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
     }
     tempLTF->setHarmonicCoefficients(job.coefficients);
     tempLTF->setSplineAnchors(job.splineAnchors);
-    tempLTF->setSplineLayerEnabled(job.splineLayerEnabled);
     tempLTF->setInterpolationMode(job.interpolationMode);
     tempLTF->setExtrapolationMode(job.extrapolationMode);
     tempLTF->setRenderingMode(job.renderingMode);
@@ -470,7 +469,7 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
         job.coefficients,
         tempLTF->getHarmonicLayer(),
         job.normalizationEnabled,
-        job.deferNormalization,
+        job.paintStrokeActive,
         job.frozenNormalizationScalar
     );
 
@@ -573,9 +572,8 @@ RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
     job.splineAnchors = ltf.getSplineLayer().getAnchors();
 
     // Copy modes and normalization state
-    job.splineLayerEnabled = ltf.isSplineLayerEnabled();
     job.normalizationEnabled = ltf.isNormalizationEnabled();
-    job.deferNormalization = ltf.isPaintStrokeActive(); // CRITICAL: Freeze scalar during paint strokes
+    job.paintStrokeActive = ltf.isPaintStrokeActive(); // CRITICAL: Freeze scalar during paint strokes
     job.renderingMode = ltf.getRenderingMode();
 
     // OPTIMIZATION: Only capture frozenNormalizationScalar for Harmonic mode
