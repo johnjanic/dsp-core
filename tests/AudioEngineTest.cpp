@@ -343,4 +343,181 @@ TEST_F(AudioEngineTest, ProcessBlock_HandlesEmptyBlock) {
     EXPECT_NO_THROW(engine->processBuffer(buffer));
 }
 
+// ============================================================================
+// Smoothstep S-Curve Crossfade Tests
+// ============================================================================
+
+/**
+ * Helper function to test smoothstep (duplicates internal implementation)
+ * Used for unit testing the smoothstep curve properties
+ */
+namespace {
+    inline double smoothstep(double t) {
+        t = std::clamp(t, 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
+} // namespace
+
+/**
+ * Test: Smoothstep endpoints
+ * Expected: smoothstep(0.0) = 0.0, smoothstep(1.0) = 1.0
+ */
+TEST_F(AudioEngineTest, Smoothstep_Endpoints) {
+    EXPECT_DOUBLE_EQ(smoothstep(0.0), 0.0) << "smoothstep(0) should equal 0";
+    EXPECT_DOUBLE_EQ(smoothstep(1.0), 1.0) << "smoothstep(1) should equal 1";
+}
+
+/**
+ * Test: Smoothstep midpoint
+ * Expected: smoothstep(0.5) = 0.5 (symmetric curve)
+ */
+TEST_F(AudioEngineTest, Smoothstep_Midpoint) {
+    EXPECT_DOUBLE_EQ(smoothstep(0.5), 0.5) << "smoothstep(0.5) should equal 0.5 (symmetric)";
+}
+
+/**
+ * Test: Smoothstep is monotonically increasing
+ * Expected: For all t1 < t2, smoothstep(t1) < smoothstep(t2)
+ */
+TEST_F(AudioEngineTest, Smoothstep_MonotonicallyIncreasing) {
+    for (int i = 0; i < 100; ++i) {
+        double t1 = i / 100.0;
+        double t2 = (i + 1) / 100.0;
+        EXPECT_LT(smoothstep(t1), smoothstep(t2))
+            << "smoothstep should be strictly increasing: t1=" << t1 << " t2=" << t2;
+    }
+}
+
+/**
+ * Test: Smoothstep has slow start and end (S-curve property)
+ * Expected: Derivative near endpoints is much smaller than at midpoint
+ */
+TEST_F(AudioEngineTest, Smoothstep_SlowStartAndEnd) {
+    // Measure approximate derivatives at start, middle, and end
+    const double epsilon = 0.01;
+
+    // Start derivative: [0.0, 0.01]
+    double deltaStart = smoothstep(epsilon) - smoothstep(0.0);
+
+    // Middle derivative: [0.5, 0.51]
+    double deltaMid = smoothstep(0.5 + epsilon) - smoothstep(0.5);
+
+    // End derivative: [0.99, 1.0]
+    double deltaEnd = smoothstep(1.0) - smoothstep(1.0 - epsilon);
+
+    // S-curve property: Middle should be steeper than start/end
+    EXPECT_LT(deltaStart, deltaMid / 5.0) << "Start should be much slower than middle";
+    EXPECT_LT(deltaEnd, deltaMid / 5.0) << "End should be much slower than middle";
+
+    // Start and end should be roughly symmetric
+    EXPECT_NEAR(deltaStart, deltaEnd, 0.001) << "Start and end slopes should be symmetric";
+}
+
+/**
+ * Test: Smoothstep clamping
+ * Expected: Values outside [0, 1] clamp to boundaries
+ */
+TEST_F(AudioEngineTest, Smoothstep_Clamping) {
+    EXPECT_DOUBLE_EQ(smoothstep(-0.5), 0.0) << "smoothstep(-0.5) should clamp to 0";
+    EXPECT_DOUBLE_EQ(smoothstep(1.5), 1.0) << "smoothstep(1.5) should clamp to 1";
+    EXPECT_DOUBLE_EQ(smoothstep(-999.0), 0.0) << "Large negative should clamp to 0";
+    EXPECT_DOUBLE_EQ(smoothstep(999.0), 1.0) << "Large positive should clamp to 1";
+}
+
+/**
+ * Test: S-curve crossfade produces smooth transitions
+ * Expected: Crossfade using smoothstep has slow start/end, fast middle
+ */
+TEST_F(AudioEngineTest, SCurveCrossfade_SmoothTransition) {
+    engine->prepareToPlay(44100.0, 512);
+
+    // Set up two different LUTs
+    dsp_core::LUTBuffer* buffers = engine->getLUTBuffers();
+
+    // Buffer 0 (primary): identity (y = x) → outputs 0.0 at x=0
+    // Buffer 2 (worker target): constant 1.0 → outputs 1.0 at x=0
+    for (int i = 0; i < dsp_core::TABLE_SIZE; ++i) {
+        buffers[2].data[i] = 1.0;
+    }
+    buffers[2].version = 1;
+
+    // Signal new LUT ready
+    engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
+
+    // Process crossfade and capture output progression
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205 samples
+    juce::AudioBuffer<double> buffer(1, crossfadeSamples);
+
+    // Fill buffer with x=0.0 (so output = mix of 0.0 and 1.0)
+    for (int i = 0; i < crossfadeSamples; ++i) {
+        buffer.setSample(0, i, 0.0);
+    }
+
+    engine->processBuffer(buffer);
+
+    // Analyze crossfade progression
+    const double startOutput = buffer.getSample(0, 0);
+    const double earlyOutput = buffer.getSample(0, 100);  // ~4.5% through
+    const double midOutput = buffer.getSample(0, crossfadeSamples / 2);  // 50% through
+    const double lateOutput = buffer.getSample(0, crossfadeSamples - 100);  // ~95.5% through
+    const double endOutput = buffer.getSample(0, crossfadeSamples - 1);
+
+    // Verify endpoints
+    EXPECT_NEAR(startOutput, 0.0, 0.05) << "Start should be close to old LUT (0.0)";
+    EXPECT_NEAR(endOutput, 1.0, 0.05) << "End should be close to new LUT (1.0)";
+
+    // Verify S-curve property: slow start
+    double deltaEarly = earlyOutput - startOutput;  // Change over first 100 samples
+    double deltaMid = midOutput - buffer.getSample(0, crossfadeSamples / 2 - 100);  // Change over middle 200 samples
+
+    EXPECT_LT(deltaEarly, deltaMid / 2.0) << "Early transition should be slower than middle";
+
+    // Verify midpoint is approximately 0.5 (symmetric crossfade)
+    EXPECT_NEAR(midOutput, 0.5, 0.1) << "Midpoint should be approximately halfway";
+
+    // Verify S-curve property: slow end
+    double deltaLate = endOutput - lateOutput;  // Change over last 100 samples
+    EXPECT_LT(deltaLate, deltaMid / 2.0) << "Late transition should be slower than middle";
+}
+
+/**
+ * Test: S-curve crossfade gains still sum to 1.0
+ * Expected: Conservation of energy - no dips or peaks in loudness
+ */
+TEST_F(AudioEngineTest, SCurveCrossfade_GainsConserved) {
+    engine->prepareToPlay(44100.0, 512);
+
+    // Set up two LUTs with known values
+    dsp_core::LUTBuffer* buffers = engine->getLUTBuffers();
+
+    // Both LUTs return 1.0 at x=1.0
+    for (int i = 0; i < dsp_core::TABLE_SIZE; ++i) {
+        const double x = dsp_core::MIN_VALUE + (i / static_cast<double>(dsp_core::TABLE_SIZE - 1)) *
+                                                    (dsp_core::MAX_VALUE - dsp_core::MIN_VALUE);
+        buffers[0].data[i] = x;  // Identity
+        buffers[2].data[i] = x;  // Also identity (no change expected)
+    }
+    buffers[2].version = 1;
+
+    // Signal new LUT ready
+    engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
+
+    // Process crossfade with x=0.5
+    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
+    juce::AudioBuffer<double> buffer(1, crossfadeSamples);
+
+    for (int i = 0; i < crossfadeSamples; ++i) {
+        buffer.setSample(0, i, 0.5);
+    }
+
+    engine->processBuffer(buffer);
+
+    // Since both LUTs return 0.5 at x=0.5, output should be constant 0.5
+    // This verifies gains sum to 1.0 (otherwise we'd see a dip or peak)
+    for (int i = 0; i < crossfadeSamples; ++i) {
+        EXPECT_NEAR(buffer.getSample(0, i), 0.5, 1e-6)
+            << "Sample " << i << " should be 0.5 (gains sum to 1.0)";
+    }
+}
+
 } // namespace dsp_core_test

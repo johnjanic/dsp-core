@@ -4,6 +4,29 @@
 
 namespace dsp_core {
 
+namespace {
+    /**
+     * Smoothstep interpolation (cubic Hermite)
+     *
+     * Provides ease-in/ease-out S-curve with zero derivative at endpoints.
+     * Used for perceptually smooth crossfading between LUTs.
+     *
+     * Formula: t² × (3 - 2t)
+     * Properties: C¹ continuous, symmetric, computationally cheap
+     *
+     * @param t Normalized position [0, 1]
+     * @return Smoothed position [0, 1]
+     */
+    inline double smoothstep(double t) {
+        // Clamp to [0, 1] (defensive programming - shouldn't happen in normal operation)
+        t = std::clamp(t, 0.0, 1.0);
+
+        // Smoothstep formula: t² × (3 - 2t)
+        // Expanded: 3t² - 2t³
+        return t * t * (3.0 - 2.0 * t);
+    }
+} // namespace
+
 //==============================================================================
 // AudioEngine Implementation
 //==============================================================================
@@ -40,8 +63,9 @@ void AudioEngine::prepareToPlay(double sampleRate, int samplesPerBlock) {
 
 double AudioEngine::applyTransferFunction(double x) const {
     if (crossfading) {
-        // Linear crossfade between old and new LUT
-        const double alpha = static_cast<double>(crossfadePosition) / crossfadeSamples;
+        // S-curve crossfade between old and new LUT
+        const double t = static_cast<double>(crossfadePosition) / crossfadeSamples;
+        const double alpha = smoothstep(t);
         const double gainOld = 1.0 - alpha;
         const double gainNew = alpha;
         return gainOld * evaluateLUT(oldLUT, x) + gainNew * evaluateLUT(newLUT, x);
@@ -66,8 +90,9 @@ void AudioEngine::processBuffer(juce::AudioBuffer<double>& buffer) const {
     // CRITICAL: Crossfade position advances once per sample, NOT per channel
     for (int i = 0; i < numSamples; ++i) {
         if (crossfading) {
-            // Calculate crossfade gains (same for all channels)
-            const double alpha = static_cast<double>(crossfadePosition) / crossfadeSamples;
+            // Calculate S-curve crossfade gains (same for all channels)
+            const double t = static_cast<double>(crossfadePosition) / crossfadeSamples;
+            const double alpha = smoothstep(t);
             const double gainOld = 1.0 - alpha;
             const double gainNew = alpha;
 
