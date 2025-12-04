@@ -99,6 +99,108 @@ class LayeredTransferFunction {
     //==========================================================================
     // Normalization Control
     //==========================================================================
+    //
+    // NORMALIZATION PATTERNS
+    //
+    // Normalization ensures transfer function output stays within [-1, 1] range
+    // by scaling the composite curve (base + harmonics) by a computed scalar.
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // WHEN NORMALIZATION HAPPENS
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // 1. Harmonic mode (every worker render):
+    //    - Worker scans 16,384 points: maxAbs = max(|wtCoeff*base + harmonics|)
+    //    - Computes: normScalar = 1.0 / maxAbs
+    //    - Renders LUT: output[i] = normScalar * (wtCoeff*base[i] + harmonics[i])
+    //    - Cost: ~1-2ms for full scan + render
+    //
+    // 2. Paint mode (after paint stroke ends):
+    //    - Controller calls updateNormalizationScalar()
+    //    - Scans updated base layer: maxAbs = max(|base[i]|)
+    //    - Caches scalar for next render
+    //    - Cost: ~0.5ms (scan only, no render)
+    //
+    // 3. Baking operations (before capturing composite):
+    //    - bakeHarmonicsToBase() calls updateNormalizationScalar()
+    //    - Ensures baked values match what user sees on screen
+    //    - computeCompositeAt() uses cached scalar
+    //    - Cost: ~0.5ms (included in 5ms baking time)
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // FREEZING DURING PAINT STROKES
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // PROBLEM: Without freezing, curve "shrinks" as you paint
+    //   User paints large peak → max increases → normScalar decreases → entire
+    //   curve scales down → visually confusing (curve shifts while painting)
+    //
+    // SOLUTION: Freeze normalization during active stroke
+    //   1. BEFORE stroke: updateNormalizationScalar() (cache current max)
+    //   2. START stroke: setPaintStrokeActive(true) (freeze scalar)
+    //   3. DURING stroke: Add points (max grows, but scalar stays frozen)
+    //   4. END stroke: setPaintStrokeActive(false) (worker re-scans on next render)
+    //
+    // RESULT: Curve grows naturally without shrinking
+    //   - New points appear at painted positions
+    //   - Existing points stay fixed
+    //   - After stroke ends, worker renormalizes once (smooth transition)
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // CACHING STRATEGY
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // normalizationScalar (atomic<double>):
+    //   - Stores result of last scan (1.0 / maxAbsValue)
+    //   - Read by: computeCompositeAt(), evaluateBaseAndHarmonics()
+    //   - Written by: updateNormalizationScalar(), worker thread
+    //   - Memory ordering: acquire/release (lock-free, thread-safe)
+    //
+    // Invalidation triggers:
+    //   - Paint stroke end: Worker re-scans on next 25Hz poll
+    //   - Harmonic slider drag: Worker re-scans every render
+    //   - Mode switch: Worker re-scans in new mode
+    //
+    // Cache lifetime:
+    //   - Harmonic mode: ~40ms (25Hz worker updates)
+    //   - Paint mode: Until next stroke (could be minutes)
+    //   - Frozen: Indefinite (until setPaintStrokeActive(false))
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // API USAGE PATTERNS
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // Pattern 1: Paint stroke (message thread)
+    //   updateNormalizationScalar();        // Cache before stroke
+    //   setPaintStrokeActive(true);          // Freeze
+    //   for (each mouse point)
+    //     setBaseLayerValue(i, value);       // Add points (max grows)
+    //   setPaintStrokeActive(false);         // Un-freeze (worker re-scans)
+    //
+    // Pattern 2: Baking (message thread)
+    //   updateNormalizationScalar();         // Ensure correct scalar
+    //   BatchUpdateGuard guard(ltf);
+    //   for (i = 0; i < 16384; ++i)
+    //     setBaseLayerValue(i, computeCompositeAt(i));  // Uses cached scalar
+    //
+    // Pattern 3: Worker rendering (worker thread)
+    //   if (paintStrokeActive)
+    //     normScalar = getFrozenScalar();    // Use cached value
+    //   else
+    //     normScalar = computeFreshScalar(); // Re-scan
+    //   renderLUT(normScalar);
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // DISABLING NORMALIZATION
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // setNormalizationEnabled(false):
+    //   - Fixes scalar at 1.0 (identity)
+    //   - Allows output > ±1.0 (creative distortion)
+    //   - WARNING: Can cause clipping in audio output
+    //   - Use case: Precise mathematical relationships, no auto-scaling
+    //
+    //==========================================================================
 
     /**
      * Compute and cache normalization scalar explicitly
@@ -352,12 +454,12 @@ class LayeredTransferFunction {
         // NOTE: Interpolation mode affects LUT evaluation, not LUT contents, but
         // we re-render anyway for simplicity (see Task 3 design rationale in
         // seamless-transfer-function-changes.md)
-        versionCounter.fetch_add(1, std::memory_order_release);
+        incrementVersionIfNotBatching();
     }
     void setExtrapolationMode(ExtrapolationMode mode) {
         extrapMode = mode;
         // Increment version to trigger LUT re-render with new extrapolation mode
-        versionCounter.fetch_add(1, std::memory_order_release);
+        incrementVersionIfNotBatching();
     }
 
     InterpolationMode getInterpolationMode() const {
@@ -384,6 +486,31 @@ class LayeredTransferFunction {
     uint64_t getVersion() const {
         return versionCounter.load(std::memory_order_acquire);
     }
+
+    /**
+     * Begin batch update (defer version counter increment until endBatchUpdate)
+     *
+     * Use this to group multiple mutations into a single version increment.
+     * Common use cases:
+     *   - Baking operations (16,384 base layer writes → 1 version increment)
+     *   - Preset loading (multiple state changes → 1 version increment)
+     *
+     * CRITICAL: Always use BatchUpdateGuard RAII wrapper instead of calling this directly.
+     * Manual calls risk forgetting to call endBatchUpdate(), which breaks dirty tracking.
+     *
+     * Thread safety: Message thread only (not thread-safe)
+     */
+    void beginBatchUpdate();
+
+    /**
+     * End batch update (increment version counter once for all batched mutations)
+     *
+     * CRITICAL: Always use BatchUpdateGuard RAII wrapper instead of calling this directly.
+     * Manual calls risk exception-safety issues and inconsistent state.
+     *
+     * Thread safety: Message thread only (not thread-safe)
+     */
+    void endBatchUpdate();
 
     /**
      * Set spline anchors (wrapper that increments version counter)
@@ -460,8 +587,63 @@ class LayeredTransferFunction {
     // This is the single source of truth for which evaluation path to use
     std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Paint)};
 
-    // Version counter for dirty detection (used by SeamlessTransferFunction)
+    /**
+     * Version counter for dirty detection (used by SeamlessTransferFunction)
+     *
+     * INCREMENTS:
+     *   - Single mutations: Version increments IMMEDIATELY after each mutation
+     *     Example: ltf.setBaseLayerValue(0, 1.0); // version++
+     *
+     *   - Batched mutations: Version increments ONCE when batch ends
+     *     Example:
+     *       {
+     *           BatchUpdateGuard guard(ltf);
+     *           ltf.setBaseLayerValue(0, 1.0);  // No increment
+     *           ltf.setBaseLayerValue(1, 2.0);  // No increment
+     *           // ... 16,382 more writes ...
+     *       } // version++ (ONCE for all 16,384 writes)
+     *
+     * MEMORY ORDERING:
+     *   - Reads:  memory_order_acquire (ensures visibility of all prior writes)
+     *   - Writes: memory_order_release (ensures all writes visible to readers)
+     *   - Atomic operations guarantee lock-free, thread-safe dirty detection
+     *
+     * NOT SERIALIZED:
+     *   - Version counter is runtime-only (never saved to presets/ValueTree)
+     *   - Resets to 0 on plugin load, increments from there
+     *   - Renderer only cares about "changed since last render", not absolute value
+     *
+     * USAGE PATTERNS:
+     *   - Interactive edits (paint strokes, slider drags): Single mutations OK
+     *     Version increments per-sample or per-drag are negligible overhead (~1ns)
+     *
+     *   - Expensive operations (baking, preset loading): Use BatchUpdateGuard
+     *     Prevents 16,384+ version increments, improves clarity (not performance)
+     *
+     * CRITICAL INVARIANT:
+     *   - All mutation methods MUST call incrementVersionIfNotBatching()
+     *   - Never call versionCounter.fetch_add() directly (breaks batching)
+     *   - See incrementVersionIfNotBatching() implementation below
+     */
     std::atomic<uint64_t> versionCounter{0};
+
+    // Batch update control (message thread only, not atomic)
+    bool batchUpdateActive{false};
+
+    /**
+     * Increment version counter if not in batch mode
+     *
+     * Helper to consolidate version increment logic. All mutation methods should
+     * call this instead of directly incrementing versionCounter.
+     *
+     * When batchUpdateActive = true:  No-op (defer increment until endBatchUpdate)
+     * When batchUpdateActive = false: Increment immediately (default behavior)
+     */
+    void incrementVersionIfNotBatching() {
+        if (!batchUpdateActive) {
+            versionCounter.fetch_add(1, std::memory_order_release);
+        }
+    }
 
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
@@ -484,6 +666,42 @@ class LayeredTransferFunction {
      * @return Interpolated base layer value
      */
     double getBaseValueAt(double x) const;
+};
+
+/**
+ * BatchUpdateGuard - RAII wrapper for batch updates
+ *
+ * Automatically calls beginBatchUpdate() on construction and endBatchUpdate() on destruction.
+ * This ensures exception-safe cleanup and prevents forgetting to end the batch update.
+ *
+ * Usage:
+ *   {
+ *       BatchUpdateGuard guard(ltf);
+ *       ltf.setBaseLayerValue(0, 1.0);  // No version increment
+ *       ltf.setBaseLayerValue(1, 2.0);  // No version increment
+ *       // ... thousands of mutations ...
+ *   } // guard destructor increments version ONCE
+ *
+ * CRITICAL: Always use this instead of calling beginBatchUpdate/endBatchUpdate directly.
+ */
+class BatchUpdateGuard {
+  public:
+    explicit BatchUpdateGuard(LayeredTransferFunction& ltf) : ltf(ltf) {
+        ltf.beginBatchUpdate();
+    }
+
+    ~BatchUpdateGuard() {
+        ltf.endBatchUpdate();
+    }
+
+    // Non-copyable, non-movable (RAII guard pattern)
+    BatchUpdateGuard(const BatchUpdateGuard&) = delete;
+    BatchUpdateGuard& operator=(const BatchUpdateGuard&) = delete;
+    BatchUpdateGuard(BatchUpdateGuard&&) = delete;
+    BatchUpdateGuard& operator=(BatchUpdateGuard&&) = delete;
+
+  private:
+    LayeredTransferFunction& ltf;
 };
 
 } // namespace dsp_core

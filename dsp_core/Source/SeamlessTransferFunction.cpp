@@ -35,9 +35,9 @@ class SeamlessTransferFunction::Impl {
         // audioEngine initialized to identity LUTs (in AudioEngine constructor)
         // renderer and poller are null (created in startSeamlessUpdates)
 
-        // Initialize visualizer LUT to identity (same as editingModel)
-        for (int i = 0; i < TABLE_SIZE; ++i) {
-            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+        // Initialize visualizer LUT to identity (2048 samples)
+        for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
+            const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
             visualizerLUT[i] = x;
         }
     }
@@ -56,7 +56,8 @@ class SeamlessTransferFunction::Impl {
     // NOTE: Visualizer shows the latest rendered LUT (target curve that audio
     // is crossfading toward or has reached). This may be ahead of what's
     // currently playing if a crossfade is still in progress.
-    std::array<double, TABLE_SIZE> visualizerLUT;
+    // VISUALIZER_LUT_SIZE = 2048 samples (vs 16384 for DSP - 8x smaller, ~8x faster to render)
+    std::array<double, VISUALIZER_LUT_SIZE> visualizerLUT;
     std::function<void()> visualizerCallback;
 };
 
@@ -143,6 +144,7 @@ void SeamlessTransferFunction::startSeamlessUpdates() {
     };
 
     pimpl->renderer = std::make_unique<LUTRendererThread>(
+        pimpl->audioEngine,
         pimpl->audioEngine.getWorkerTargetIndexReference(),
         pimpl->audioEngine.getNewLUTReadyFlag(),
         visualizerCallback);
@@ -188,7 +190,7 @@ void SeamlessTransferFunction::notifyEditingModelChanged() {
     }
 }
 
-const std::array<double, SeamlessTransferFunction::TABLE_SIZE>&
+const std::array<double, VISUALIZER_LUT_SIZE>&
 SeamlessTransferFunction::getVisualizerLUT() const {
     return pimpl->visualizerLUT;
 }

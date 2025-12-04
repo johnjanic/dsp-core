@@ -653,4 +653,107 @@ TEST_F(LayeredTransferFunctionTest, GetSetHarmonicCoefficients_RoundTrip) {
     }
 }
 
+// ============================================================================
+// Batch Update Tests
+// ============================================================================
+
+TEST_F(LayeredTransferFunctionTest, BatchUpdate_DefersVersionIncrement) {
+    uint64_t versionBefore = ltf->getVersion();
+
+    // Start batch mode
+    ltf->beginBatchUpdate();
+
+    // Perform multiple mutations - version should NOT increment
+    ltf->setBaseLayerValue(0, 1.0);
+    ltf->setBaseLayerValue(1, 2.0);
+    ltf->setCoefficient(1, 0.5);
+
+    uint64_t versionDuring = ltf->getVersion();
+    EXPECT_EQ(versionDuring, versionBefore); // No increment during batch
+
+    // End batch mode - version should increment ONCE
+    ltf->endBatchUpdate();
+
+    uint64_t versionAfter = ltf->getVersion();
+    EXPECT_EQ(versionAfter, versionBefore + 1); // Exactly one increment
+}
+
+TEST_F(LayeredTransferFunctionTest, BatchUpdateGuard_IncrementsOnDestruction) {
+    uint64_t versionBefore = ltf->getVersion();
+
+    {
+        dsp_core::BatchUpdateGuard guard(*ltf);
+
+        // Mutations within guard scope
+        ltf->setBaseLayerValue(0, 1.0);
+        ltf->setBaseLayerValue(1, 2.0);
+        ltf->setCoefficient(1, 0.5);
+
+        uint64_t versionDuring = ltf->getVersion();
+        EXPECT_EQ(versionDuring, versionBefore); // No increment yet
+
+    } // Guard destructor runs here
+
+    uint64_t versionAfter = ltf->getVersion();
+    EXPECT_EQ(versionAfter, versionBefore + 1); // Exactly one increment
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeHarmonicsToBase_IncrementsVersionOnce) {
+    // Set up harmonics that need baking
+    ltf->setCoefficient(1, 0.3); // Add 1st harmonic
+    ltf->setCoefficient(2, 0.2); // Add 2nd harmonic
+    ltf->setCoefficient(0, 1.0); // WT mix
+
+    uint64_t versionBefore = ltf->getVersion();
+
+    // Bake harmonics - should increment version ONCE (not 16,384+ times!)
+    bool baked = ltf->bakeHarmonicsToBase();
+    EXPECT_TRUE(baked);
+
+    uint64_t versionAfter = ltf->getVersion();
+
+    // Critical: Version should increment exactly ONCE despite 16,384 base layer writes
+    EXPECT_EQ(versionAfter, versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, BakeCompositeToBase_IncrementsVersionOnce) {
+    // Set up harmonics that need baking
+    ltf->setCoefficient(1, 0.3); // Add 1st harmonic
+    ltf->setCoefficient(0, 0.8); // WT mix
+
+    uint64_t versionBefore = ltf->getVersion();
+
+    // Bake composite - should increment version ONCE (not 16,384+ times!)
+    ltf->bakeCompositeToBase();
+
+    uint64_t versionAfter = ltf->getVersion();
+
+    // Critical: Version should increment exactly ONCE despite 16,384 base layer writes
+    EXPECT_EQ(versionAfter, versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, BatchUpdate_NestedGuardsNotSupported) {
+    // This test documents that nested batch updates aren't supported
+    // (The implementation doesn't have a depth counter, so nested calls won't work correctly)
+
+    uint64_t versionBefore = ltf->getVersion();
+
+    ltf->beginBatchUpdate();
+    ltf->setBaseLayerValue(0, 1.0);
+
+    // Calling beginBatchUpdate again is a no-op (already in batch mode)
+    ltf->beginBatchUpdate();
+    ltf->setBaseLayerValue(1, 2.0);
+
+    // First endBatchUpdate increments version and exits batch mode
+    ltf->endBatchUpdate();
+    uint64_t versionAfterFirst = ltf->getVersion();
+    EXPECT_EQ(versionAfterFirst, versionBefore + 1);
+
+    // Second endBatchUpdate is a no-op (not in batch mode anymore)
+    ltf->endBatchUpdate();
+    uint64_t versionAfterSecond = ltf->getVersion();
+    EXPECT_EQ(versionAfterSecond, versionAfterFirst); // No change
+}
+
 } // namespace dsp_core_test

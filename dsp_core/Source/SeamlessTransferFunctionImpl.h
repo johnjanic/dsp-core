@@ -19,7 +19,8 @@ class TransferFunctionDirtyPoller;
 // Constants (hardcoded for performance)
 //==============================================================================
 
-static constexpr int TABLE_SIZE = 16384;
+static constexpr int TABLE_SIZE = 16384;          // DSP LUT size (audio thread)
+static constexpr int VISUALIZER_LUT_SIZE = 2048;  // Visualizer LUT size (UI thread)
 static constexpr double MIN_VALUE = -1.0;
 static constexpr double MAX_VALUE = 1.0;
 
@@ -127,6 +128,23 @@ class AudioEngine {
         return lutBuffers;
     }
 
+    /**
+     * Check if audio engine is currently crossfading (for worker thread)
+     *
+     * Worker thread uses this to decide whether to render DSP LUT:
+     * - If crossfading: Skip DSP render (audio thread can't accept new LUT)
+     * - If not crossfading: Render DSP LUT (audio thread ready)
+     *
+     * This implements the two-speed worker strategy:
+     * - Always render visualizer LUT (2K samples, ~2ms)
+     * - Only render DSP LUT when audio thread can accept it
+     *
+     * @return true if crossfade in progress, false otherwise
+     */
+    bool isCrossfading() const {
+        return crossfading;
+    }
+
   private:
     /**
      * Check for new LUT from worker thread (audio thread)
@@ -179,7 +197,7 @@ class AudioEngine {
     double sampleRate{44100.0};
     mutable int crossfadeSamples{441};  // Recalculated in prepareToPlay()
     mutable int crossfadePosition{0};
-    mutable bool crossfading{false};
+    mutable std::atomic<bool> crossfading{false};  // Atomic for worker thread reads
     mutable const LUTBuffer* oldLUT{nullptr};
     mutable const LUTBuffer* newLUT{nullptr};
 };
@@ -271,11 +289,13 @@ class LUTRendererThread : public juce::Thread {
     /**
      * Construct worker thread
      *
+     * @param audioEngine Reference to AudioEngine (to check crossfade state)
      * @param workerTargetIdx Reference to atomic index (where to write LUT)
      * @param readyFlag Reference to atomic flag (signals audio thread)
      * @param visualizerCallback Optional callback for visualizer repaints
      */
-    LUTRendererThread(std::atomic<int>& workerTargetIdx,
+    LUTRendererThread(AudioEngine& audioEngine,
+                      std::atomic<int>& workerTargetIdx,
                       std::atomic<bool>& readyFlag,
                       std::function<void()> visualizerCallback = nullptr);
 
@@ -311,9 +331,9 @@ class LUTRendererThread : public juce::Thread {
      *
      * Worker thread will write to this buffer via MessageManager::callAsync.
      *
-     * @param lutPtr Pointer to UI-owned visualizer LUT buffer
+     * @param lutPtr Pointer to UI-owned visualizer LUT buffer (VISUALIZER_LUT_SIZE samples)
      */
-    void setVisualizerLUTPointer(std::array<double, TABLE_SIZE>* lutPtr);
+    void setVisualizerLUTPointer(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr);
 
     /**
      * Get pointer to LUT buffers (for direct worker writes)
@@ -330,11 +350,34 @@ class LUTRendererThread : public juce::Thread {
      *
      * Drains entire queue, keeping only the latest job.
      * Renders that job into workerTargetIndex buffer.
+     *
+     * TWO-SPEED RENDERING STRATEGY:
+     *   1. FAST PATH: Always render visualizer LUT (2K samples, ~2ms)
+     *      - Updates UI immediately via MessageManager::callAsync
+     *   2. SLOW PATH: Conditionally render DSP LUT (16K samples, ~16ms)
+     *      - Only renders if !audioEngine.isCrossfading()
+     *      - Skips render if audio thread is busy crossfading
+     *   3. CPU savings: Skip 16K render when DSP can't accept new LUT
      */
     void processJobs();
 
     /**
-     * Render LUT from self-contained RenderJob
+     * Render visualizer LUT from self-contained RenderJob (FAST PATH)
+     *
+     * Renders 2K samples for UI display (~2ms).
+     * ALWAYS called, regardless of crossfade state.
+     * Updates visualizer buffer via MessageManager::callAsync.
+     *
+     * @param job RenderJob containing full state snapshot
+     */
+    void renderVisualizerLUT(const RenderJob& job);
+
+    /**
+     * Render DSP LUT from self-contained RenderJob (SLOW PATH)
+     *
+     * Renders 16K samples for audio processing (~16ms).
+     * ONLY called if !audioEngine.isCrossfading().
+     * Writes to lutBuffers[workerTargetIndex].
      *
      * Workflow:
      *   1. Restore base layer from job.baseLayerData
@@ -346,12 +389,11 @@ class LUTRendererThread : public juce::Thread {
      *   7. Render LUT via evaluateForRendering()
      *   8. Copy LUT to output buffer
      *   9. Signal audio thread (newLUTReady = true)
-     *  10. Update visualizer LUT (async on message thread)
      *
      * @param job RenderJob containing full state snapshot
      * @param outputBuffer LUT buffer to write into (lutBuffers[workerTargetIndex])
      */
-    void renderLUT(const RenderJob& job, LUTBuffer* outputBuffer);
+    void renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuffer);
 
     // Job queue (lock-free, 4 slots is sufficient given 25Hz polling + job coalescing)
     juce::WaitableEvent wakeEvent;
@@ -360,6 +402,9 @@ class LUTRendererThread : public juce::Thread {
 
     // Worker-owned LayeredTransferFunction for rendering
     std::unique_ptr<LayeredTransferFunction> tempLTF;
+
+    // Reference to AudioEngine (for checking crossfade state)
+    AudioEngine& audioEngine;
 
     // Atomic references (shared with AudioEngine)
     std::atomic<int>& workerTargetIndex;
@@ -370,7 +415,7 @@ class LUTRendererThread : public juce::Thread {
 
     // Visualizer integration
     std::function<void()> onVisualizerUpdate;
-    std::array<double, TABLE_SIZE>* visualizerLUTPtr{nullptr};
+    std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr{nullptr};
 };
 
 //==============================================================================

@@ -38,7 +38,8 @@ namespace dsp_core {
 class SeamlessTransferFunction {
   public:
     // Constants (hardcoded for performance - not configurable)
-    static constexpr int TABLE_SIZE = 16384;
+    static constexpr int TABLE_SIZE = 16384;          // DSP LUT size (audio thread)
+    static constexpr int VISUALIZER_LUT_SIZE = 2048;  // Visualizer LUT size (UI thread)
     static constexpr double MIN_VALUE = -1.0;
     static constexpr double MAX_VALUE = 1.0;
 
@@ -186,9 +187,11 @@ class SeamlessTransferFunction {
      * or has reached). This may be ahead of what's currently playing if a crossfade
      * is still in progress.
      *
-     * @return Const reference to visualizer LUT buffer
+     * SIZE: VISUALIZER_LUT_SIZE (2048 samples) - optimized for UI rendering
+     *
+     * @return Const reference to visualizer LUT buffer (2048 samples)
      */
-    const std::array<double, TABLE_SIZE>& getVisualizerLUT() const;
+    const std::array<double, VISUALIZER_LUT_SIZE>& getVisualizerLUT() const;
 
     /**
      * Set visualizer callback (message thread only)

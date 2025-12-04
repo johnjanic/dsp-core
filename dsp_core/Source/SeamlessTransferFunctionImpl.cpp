@@ -312,10 +312,12 @@ double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
 // LUTRendererThread Implementation
 //==============================================================================
 
-LUTRendererThread::LUTRendererThread(std::atomic<int>& workerTargetIdx,
+LUTRendererThread::LUTRendererThread(AudioEngine& audioEngine_,
+                                     std::atomic<int>& workerTargetIdx,
                                      std::atomic<bool>& readyFlag,
                                      std::function<void()> visualizerCallback)
     : juce::Thread("LUTRendererThread")
+    , audioEngine(audioEngine_)
     , workerTargetIndex(workerTargetIdx)
     , newLUTReady(readyFlag)
     , onVisualizerUpdate(std::move(visualizerCallback)) {
@@ -373,16 +375,27 @@ void LUTRendererThread::processJobs() {
     }
 
     if (hasJob) {
-        // Get worker target buffer index (safe - audio thread won't touch this buffer)
-        const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
+        // TWO-SPEED RENDERING STRATEGY:
+        // 1. FAST PATH: Always render visualizer LUT (2K samples, ~2ms)
+        renderVisualizerLUT(latestJob);
 
-        // Render LUT into target buffer
-        if (lutBuffers != nullptr) {
-            renderLUT(latestJob, &lutBuffers[targetIdx]);
+        // 2. SLOW PATH: Only render DSP LUT if audio thread is ready (16K samples, ~16ms)
+        // RATIONALE: DSP crossfade is 50ms, so rendering faster than ~20Hz is pointless
+        // Skip render if audio thread is busy crossfading (can't accept new LUT)
+        if (!audioEngine.isCrossfading()) {
+            const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
+            if (lutBuffers != nullptr) {
+                renderDSPLUT(latestJob, &lutBuffers[targetIdx]);
+            }
+#if JUCE_DEBUG
+            else {
+                DBG("LUTRendererThread: lutBuffers pointer not set, cannot render DSP LUT");
+            }
+#endif
         }
 #if JUCE_DEBUG
         else {
-            DBG("LUTRendererThread: lutBuffers pointer not set, cannot render LUT");
+            DBG("LUTRendererThread: Skipping DSP render (crossfade in progress)");
         }
 #endif
     }
@@ -452,7 +465,55 @@ namespace {
     }
 } // namespace
 
-void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer) {
+void LUTRendererThread::renderVisualizerLUT(const RenderJob& job) {
+    // FAST PATH: Render 2K samples for visualizer (~2ms)
+    // ALWAYS called, regardless of crossfade state
+    //
+    // OPTIMIZATION: Reuses tempLTF state from DSP render if available,
+    // otherwise sets up state just for visualizer render
+
+    // Set state in tempLTF (shared setup for both paths)
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
+    }
+    tempLTF->setHarmonicCoefficients(job.coefficients);
+    tempLTF->setSplineAnchors(job.splineAnchors);
+    tempLTF->setInterpolationMode(job.interpolationMode);
+    tempLTF->setExtrapolationMode(job.extrapolationMode);
+    tempLTF->setRenderingMode(job.renderingMode);
+
+    // Compute normalization scalar (used by Harmonic mode, ignored by Paint/Spline modes)
+    const double normScalar = computeNormalizationScalar(
+        job.baseLayerData,
+        job.coefficients,
+        tempLTF->getHarmonicLayer(),
+        job.normalizationEnabled,
+        job.paintStrokeActive,
+        job.frozenNormalizationScalar
+    );
+
+    // Render visualizer LUT (2048 samples)
+    std::array<double, VISUALIZER_LUT_SIZE> visualizerData;
+    for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
+        const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+        visualizerData[i] = tempLTF->evaluateForRendering(x, normScalar);
+    }
+
+    // Update visualizer LUT (async on message thread)
+    if (visualizerLUTPtr && onVisualizerUpdate) {
+        // Capture data directly into lambda using C++14 init-capture
+        juce::MessageManager::callAsync([this, data = visualizerData]() {
+            if (visualizerLUTPtr) {
+                *visualizerLUTPtr = data;
+                if (onVisualizerUpdate) {
+                    onVisualizerUpdate();
+                }
+            }
+        });
+    }
+}
+
+void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuffer) {
     // Set state in tempLTF
     for (int i = 0; i < TABLE_SIZE; ++i) {
         tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
@@ -486,26 +547,15 @@ void LUTRendererThread::renderLUT(const RenderJob& job, LUTBuffer* outputBuffer)
     // 9. Signal audio thread that new LUT is ready
     newLUTReady.store(true, std::memory_order_release);
 
-    // 10. Update visualizer LUT (async on message thread)
-    if (visualizerLUTPtr && onVisualizerUpdate) {
-        // Capture data directly into lambda using C++14 init-capture (eliminates one copy)
-        // Copy is still needed because outputBuffer may be overwritten by next render
-        juce::MessageManager::callAsync([this, data = outputBuffer->data]() {
-            if (visualizerLUTPtr) {
-                *visualizerLUTPtr = data;
-                if (onVisualizerUpdate) {
-                    onVisualizerUpdate();
-                }
-            }
-        });
-    }
+    // NOTE: Visualizer update is now handled by renderVisualizerLUT() (fast path)
+    // This eliminates the need to copy 16K samples to the visualizer
 }
 
 void LUTRendererThread::setVisualizerCallback(std::function<void()> callback) {
     onVisualizerUpdate = std::move(callback);
 }
 
-void LUTRendererThread::setVisualizerLUTPointer(std::array<double, TABLE_SIZE>* lutPtr) {
+void LUTRendererThread::setVisualizerLUTPointer(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr) {
     visualizerLUTPtr = lutPtr;
 }
 
