@@ -40,7 +40,7 @@ AudioEngine::AudioEngine() {
             lutBuffers[bufIdx].data[i] = x;
         }
         lutBuffers[bufIdx].version = 0;
-        lutBuffers[bufIdx].interpolationMode = LayeredTransferFunction::InterpolationMode::Linear;
+        lutBuffers[bufIdx].interpolationMode = LayeredTransferFunction::InterpolationMode::CatmullRom;
         lutBuffers[bufIdx].extrapolationMode = LayeredTransferFunction::ExtrapolationMode::Clamp;
     }
 }
@@ -63,12 +63,13 @@ void AudioEngine::prepareToPlay(double sampleRate, int samplesPerBlock) {
 
 double AudioEngine::applyTransferFunction(double x) const {
     if (crossfading) {
-        // S-curve crossfade between old and new LUT
+        // S-curve crossfade between old and new LUT (OPTIMIZED)
         const double t = static_cast<double>(crossfadePosition) / crossfadeSamples;
         const double alpha = smoothstep(t);
         const double gainOld = 1.0 - alpha;
         const double gainNew = alpha;
-        return gainOld * evaluateLUT(oldLUT, x) + gainNew * evaluateLUT(newLUT, x);
+        // OPTIMIZATION: Mix samples first, then interpolate (not the other way around)
+        return evaluateCrossfade(oldLUT, newLUT, x, gainOld, gainNew);
     } else {
         // No crossfade: use primary LUT
         const int idx = primaryIndex.load(std::memory_order_acquire);
@@ -96,21 +97,18 @@ void AudioEngine::processBuffer(juce::AudioBuffer<double>& buffer) const {
             const double gainOld = 1.0 - alpha;
             const double gainNew = alpha;
 
-            // Apply crossfade to all channels
+            // Apply crossfade to all channels (OPTIMIZED)
             for (int ch = 0; ch < numChannels; ++ch) {
                 double* channelData = buffer.getWritePointer(ch);
                 const double input = channelData[i];
-                const double oldValue = evaluateLUT(oldLUT, input);
-                const double newValue = evaluateLUT(newLUT, input);
-                channelData[i] = gainOld * oldValue + gainNew * newValue;
+                // OPTIMIZATION: Mix samples first, then interpolate (saves one polynomial eval)
+                channelData[i] = evaluateCrossfade(oldLUT, newLUT, input, gainOld, gainNew);
 
                 // Debug first channel first sample
                 if (shouldDebug && i == 0 && ch == 0) {
                     DBG("[CROSSFADE] pos=" + juce::String(crossfadePosition) +
                         " alpha=" + juce::String(alpha, 4) +
                         " input=" + juce::String(input, 6) +
-                        " old=" + juce::String(oldValue, 6) +
-                        " new=" + juce::String(newValue, 6) +
                         " output=" + juce::String(channelData[i], 6));
                 }
             }
@@ -331,6 +329,118 @@ double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
     return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
                   (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
     // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+}
+
+double AudioEngine::interpolate4Samples(LayeredTransferFunction::InterpolationMode mode,
+                                       double y0, double y1, double y2, double y3, double t) const {
+    switch (mode) {
+    case LayeredTransferFunction::InterpolationMode::Linear:
+        // Linear only uses y1 and y2
+        return y1 + t * (y2 - y1);
+
+    case LayeredTransferFunction::InterpolationMode::Cubic: {
+        // Cubic interpolation formula
+        const double a0 = y3 - y2 - y0 + y1;
+        const double a1 = y0 - y1 - a0;
+        const double a2 = y2 - y0;
+        const double a3 = y1;
+        return a0 * t * t * t + a1 * t * t + a2 * t + a3;
+    }
+
+    case LayeredTransferFunction::InterpolationMode::CatmullRom:
+        // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+        // Standard Catmull-Rom interpolation formula
+        return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
+                      (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+        // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+
+    default:
+        return y1 + t * (y2 - y1); // Fallback to linear
+    }
+}
+
+double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* newLUT,
+                                     double x, double gainOld, double gainNew) const {
+    // CRITICAL OPTIMIZATION: Mix samples BEFORE interpolation
+    // Both LUTs share the same fractional index, so we can:
+    // 1. Map x → fractional index ONCE
+    // 2. Fetch 4 samples from each LUT
+    // 3. Mix corresponding samples
+    // 4. Do ONE interpolation on mixed samples
+    //
+    // This saves one expensive polynomial evaluation per sample!
+
+    // Map x to table index (shared by both LUTs)
+    const double x_proj = (x - MIN_VALUE) / (MAX_VALUE - MIN_VALUE) * (TABLE_SIZE - 1);
+    const int index = static_cast<int>(x_proj);
+    const double t = x_proj - index;
+
+    // Determine interpolation mode (use newLUT's mode - it's the target state)
+    const auto interpMode = newLUT->interpolationMode;
+    const auto extrapMode = newLUT->extrapolationMode;
+
+    // Fast path: Clamp mode (most common)
+    if (extrapMode == LayeredTransferFunction::ExtrapolationMode::Clamp) {
+        const int idx0 = std::clamp(index - 1, 0, TABLE_SIZE - 1);
+        const int idx1 = std::clamp(index, 0, TABLE_SIZE - 1);
+        const int idx2 = std::clamp(index + 1, 0, TABLE_SIZE - 1);
+        const int idx3 = std::clamp(index + 2, 0, TABLE_SIZE - 1);
+
+        // Fetch 4 samples from old LUT
+        const double old_y0 = oldLUT->data[idx0];
+        const double old_y1 = oldLUT->data[idx1];
+        const double old_y2 = oldLUT->data[idx2];
+        const double old_y3 = oldLUT->data[idx3];
+
+        // Fetch 4 samples from new LUT
+        const double new_y0 = newLUT->data[idx0];
+        const double new_y1 = newLUT->data[idx1];
+        const double new_y2 = newLUT->data[idx2];
+        const double new_y3 = newLUT->data[idx3];
+
+        // Mix corresponding samples
+        const double mixed_y0 = gainOld * old_y0 + gainNew * new_y0;
+        const double mixed_y1 = gainOld * old_y1 + gainNew * new_y1;
+        const double mixed_y2 = gainOld * old_y2 + gainNew * new_y2;
+        const double mixed_y3 = gainOld * old_y3 + gainNew * new_y3;
+
+        // Do ONE interpolation on mixed samples
+        return interpolate4Samples(interpMode, mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
+    }
+
+    // Linear extrapolation path (rare)
+    auto getSample = [](const LUTBuffer* lut, int i) -> double {
+        if (i < 0) {
+            const double slope = lut->data[1] - lut->data[0];
+            return lut->data[0] + slope * i;
+        }
+        if (i >= TABLE_SIZE) {
+            const double slope = lut->data[TABLE_SIZE - 1] - lut->data[TABLE_SIZE - 2];
+            return lut->data[TABLE_SIZE - 1] + slope * (i - TABLE_SIZE + 1);
+        }
+        return lut->data[i];
+    };
+
+    // Fetch 4 samples from old LUT (with extrapolation)
+    const double old_y0 = getSample(oldLUT, index - 1);
+    const double old_y1 = getSample(oldLUT, index);
+    const double old_y2 = getSample(oldLUT, index + 1);
+    const double old_y3 = getSample(oldLUT, index + 2);
+
+    // Fetch 4 samples from new LUT (with extrapolation)
+    const double new_y0 = getSample(newLUT, index - 1);
+    const double new_y1 = getSample(newLUT, index);
+    const double new_y2 = getSample(newLUT, index + 1);
+    const double new_y3 = getSample(newLUT, index + 2);
+
+    // Mix corresponding samples
+    const double mixed_y0 = gainOld * old_y0 + gainNew * new_y0;
+    const double mixed_y1 = gainOld * old_y1 + gainNew * new_y1;
+    const double mixed_y2 = gainOld * old_y2 + gainNew * new_y2;
+    const double mixed_y3 = gainOld * old_y3 + gainNew * new_y3;
+
+    // Do ONE interpolation on mixed samples
+    return interpolate4Samples(interpMode, mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
 }
 
 //==============================================================================
