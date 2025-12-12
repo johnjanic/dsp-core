@@ -268,7 +268,6 @@ TEST_F(DynamicOutputBiasingTest, ComputesBiasCorrectly) {
         // Asymmetric tanh-like function
         ltf_->setBaseLayerValue(i, std::tanh(x + 0.5));
     }
-    ltf_->updateComposite();
 
     // Prepare after setting up transfer function
     biasing_->prepareToPlay(48000.0, 512);
@@ -285,7 +284,6 @@ TEST_F(DynamicOutputBiasingTest, CompensatesDuringSlowFade) {
         double x = ltf_->normalizeIndex(i);
         ltf_->setBaseLayerValue(i, std::tanh(x + 0.5)); // Asymmetric function
     }
-    ltf_->updateComposite();
 
     // Prepare after setting up transfer function
     biasing_->prepareToPlay(48000.0, 512);
@@ -326,7 +324,6 @@ TEST_F(DynamicOutputBiasingTest, TransientDisablesCompensation) {
     for (int i = 0; i < 256; ++i) {
         ltf_->setBaseLayerValue(i, 0.3);
     }
-    ltf_->updateComposite();
     biasing_->prepareToPlay(48000.0, 512);
 
     // First: silence (fade should ramp up)
@@ -374,7 +371,6 @@ TEST_F(DynamicOutputBiasingTest, CanBeDisabled) {
     for (int i = 0; i < 256; ++i) {
         ltf_->setBaseLayerValue(i, 0.5);
     }
-    ltf_->updateComposite();
     biasing_->prepareToPlay(48000.0, 512);
 
     // Disable
@@ -408,7 +404,6 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
     for (int i = 0; i < 256; ++i) {
         ltf_->setBaseLayerValue(i, 0.2);
     }
-    ltf_->updateComposite();
 
     // Prepare and get initial bias
     biasing_->prepareToPlay(48000.0, 512);
@@ -420,7 +415,6 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
     for (int i = 0; i < 256; ++i) {
         ltf_->setBaseLayerValue(i, -0.5); // Change to -0.5
     }
-    ltf_->updateComposite();
     biasing_->notifyTransferFunctionChanged();
     double bias2 = biasing_->getCurrentBias();
 
@@ -434,7 +428,6 @@ TEST_F(DynamicOutputBiasingTest, RateLimiting) {
     for (int i = 0; i < 256; ++i) {
         ltf_->setBaseLayerValue(i, -0.8); // Change to -0.8
     }
-    ltf_->updateComposite();
 
     biasing_->notifyTransferFunctionChanged();
     double bias3 = biasing_->getCurrentBias();

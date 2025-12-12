@@ -9,30 +9,44 @@
 namespace dsp_core {
 
 /**
- * LayeredTransferFunction - Multi-layer waveshaping compositor
+ * RenderingMode - Determines which layer evaluation path to use
  *
- * Combines a user-drawn base layer with a harmonic layer to produce
- * a composite transfer function for audio processing.
+ * Paint    → Direct base layer (no normalization, harmonics baked)
+ * Harmonic → Base + harmonics with normalization (harmonics non-zero)
+ * Spline   → Direct spline evaluation (bypasses base+harmonics)
+ */
+enum class RenderingMode {
+    Paint,      // Direct base layer output (no normalization)
+    Harmonic,   // Base + harmonics with normalization
+    Spline      // Direct spline evaluation
+};
+
+/**
+ * LayeredTransferFunction - Multi-layer waveshaping state container
+ *
+ * Stores UI state for transfer function editing: base layer (wavetable), harmonic
+ * coefficients, and spline anchors. The renderer (SeamlessTransferFunction) uses
+ * this state to generate production-ready LUTs at 25Hz for audio processing.
  *
  * Architecture:
- *   Base Layer (wavetable) + Harmonic Layer (coefficients) → Composite Table
+ *   UI State → Renderer (25Hz) → Production LUT → Audio Thread
  *
- * Mixing formula (unnormalized):
+ * Mixing formula (computed on-demand by renderer):
  *   UnNormMix[i] = wavetableCoeff × Base[i] + Σ(harmonicCoeff[n] × Harmonic_n[i])
- *   where wavetableCoeff = harmonicLayer.getCoefficient(0)
+ *   where wavetableCoeff = coefficients[0]
  *
- * Normalization (applied separately to preserve layer data):
+ * Normalization (applied by renderer, not stored here):
  *   maxAbsValue = max(abs(UnNormMix[i]))
  *   normalizationScalar = 1.0 / maxAbsValue
- *   Composite[i] = normalizationScalar × UnNormMix[i]
+ *   Output[i] = normalizationScalar × UnNormMix[i]
  *
  * Critical: Layers (baseTable, harmonic evaluations) are NEVER modified by normalization.
  * This allows seamless coefficient mixing in TransferFunctionController.
  *
  * Thread safety:
- *   - Base layer uses atomics for lock-free reads/writes
- *   - Composite uses atomics for lock-free reads by audio thread
- *   - updateComposite() should be called from UI thread only
+ *   - Base layer uses atomics for lock-free reads
+ *   - All mutations should be from message thread only
+ *   - Version counter tracks changes for renderer polling
  */
 class LayeredTransferFunction {
   public:
@@ -62,8 +76,20 @@ class LayeredTransferFunction {
         return static_cast<int>(coefficients.size());
     }
 
-    // Composite (final output for audio processing)
-    double getCompositeValue(int index) const;
+    /**
+     * Compute composite value on-demand at specific index
+     *
+     * Computes: normScalar * (wtCoeff * baseValue + harmonicValue)
+     *
+     * This method computes the composite on-demand from UI state (base layer + harmonics).
+     * Used for baking operations and legacy interpolation methods.
+     *
+     * Thread-safe: Can be called from any thread (reads atomics with acquire ordering)
+     *
+     * @param index Table index [0, tableSize)
+     * @return Composite value with normalization applied, or 0.0 if index out of bounds
+     */
+    double computeCompositeAt(int index) const;
 
     // Normalization scalar (read-only access)
     double getNormalizationScalar() const {
@@ -71,45 +97,145 @@ class LayeredTransferFunction {
     }
 
     //==========================================================================
-    // Composition
+    // Normalization Control
+    //==========================================================================
+    //
+    // NORMALIZATION PATTERNS
+    //
+    // Normalization ensures transfer function output stays within [-1, 1] range
+    // by scaling the composite curve (base + harmonics) by a computed scalar.
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // WHEN NORMALIZATION HAPPENS
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // 1. Harmonic mode (every worker render):
+    //    - Worker scans 16,384 points: maxAbs = max(|wtCoeff*base + harmonics|)
+    //    - Computes: normScalar = 1.0 / maxAbs
+    //    - Renders LUT: output[i] = normScalar * (wtCoeff*base[i] + harmonics[i])
+    //    - Cost: ~1-2ms for full scan + render
+    //
+    // 2. Paint mode (after paint stroke ends):
+    //    - Controller calls updateNormalizationScalar()
+    //    - Scans updated base layer: maxAbs = max(|base[i]|)
+    //    - Caches scalar for next render
+    //    - Cost: ~0.5ms (scan only, no render)
+    //
+    // 3. Baking operations (before capturing composite):
+    //    - bakeHarmonicsToBase() calls updateNormalizationScalar()
+    //    - Ensures baked values match what user sees on screen
+    //    - computeCompositeAt() uses cached scalar
+    //    - Cost: ~0.5ms (included in 5ms baking time)
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // FREEZING DURING PAINT STROKES
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // PROBLEM: Without freezing, curve "shrinks" as you paint
+    //   User paints large peak → max increases → normScalar decreases → entire
+    //   curve scales down → visually confusing (curve shifts while painting)
+    //
+    // SOLUTION: Freeze normalization during active stroke
+    //   1. BEFORE stroke: updateNormalizationScalar() (cache current max)
+    //   2. START stroke: setPaintStrokeActive(true) (freeze scalar)
+    //   3. DURING stroke: Add points (max grows, but scalar stays frozen)
+    //   4. END stroke: setPaintStrokeActive(false) (worker re-scans on next render)
+    //
+    // RESULT: Curve grows naturally without shrinking
+    //   - New points appear at painted positions
+    //   - Existing points stay fixed
+    //   - After stroke ends, worker renormalizes once (smooth transition)
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // CACHING STRATEGY
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // normalizationScalar (atomic<double>):
+    //   - Stores result of last scan (1.0 / maxAbsValue)
+    //   - Read by: computeCompositeAt(), evaluateBaseAndHarmonics()
+    //   - Written by: updateNormalizationScalar(), worker thread
+    //   - Memory ordering: acquire/release (lock-free, thread-safe)
+    //
+    // Invalidation triggers:
+    //   - Paint stroke end: Worker re-scans on next 25Hz poll
+    //   - Harmonic slider drag: Worker re-scans every render
+    //   - Mode switch: Worker re-scans in new mode
+    //
+    // Cache lifetime:
+    //   - Harmonic mode: ~40ms (25Hz worker updates)
+    //   - Paint mode: Until next stroke (could be minutes)
+    //   - Frozen: Indefinite (until setPaintStrokeActive(false))
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // API USAGE PATTERNS
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // Pattern 1: Paint stroke (message thread)
+    //   updateNormalizationScalar();        // Cache before stroke
+    //   setPaintStrokeActive(true);          // Freeze
+    //   for (each mouse point)
+    //     setBaseLayerValue(i, value);       // Add points (max grows)
+    //   setPaintStrokeActive(false);         // Un-freeze (worker re-scans)
+    //
+    // Pattern 2: Baking (message thread)
+    //   updateNormalizationScalar();         // Ensure correct scalar
+    //   BatchUpdateGuard guard(ltf);
+    //   for (i = 0; i < 16384; ++i)
+    //     setBaseLayerValue(i, computeCompositeAt(i));  // Uses cached scalar
+    //
+    // Pattern 3: Worker rendering (worker thread)
+    //   if (paintStrokeActive)
+    //     normScalar = getFrozenScalar();    // Use cached value
+    //   else
+    //     normScalar = computeFreshScalar(); // Re-scan
+    //   renderLUT(normScalar);
+    //
+    // ────────────────────────────────────────────────────────────────────────
+    // DISABLING NORMALIZATION
+    // ────────────────────────────────────────────────────────────────────────
+    //
+    // setNormalizationEnabled(false):
+    //   - Fixes scalar at 1.0 (identity)
+    //   - Allows output > ±1.0 (creative distortion)
+    //   - WARNING: Can cause clipping in audio output
+    //   - Use case: Precise mathematical relationships, no auto-scaling
+    //
     //==========================================================================
 
     /**
-     * Recompute composite from layers
+     * Compute and cache normalization scalar explicitly
      *
-     * Call after ANY edit to base or harmonic layer coefficients.
+     * Scans the entire composite (base + harmonics) to find max absolute value,
+     * then caches the normalization scalar (1.0 / max).
      *
-     * Algorithm:
-     *   1. Compute unnormalized mix: UnNorm[i] = wtCoeff*Base[i] + Σ(hCoeff[n]*H_n[i])
-     *   2. Find maxAbsValue = max(abs(UnNorm[i]))
-     *   3. Compute normalizationScalar = 1.0 / maxAbsValue
-     *   4. Store normalized composite: Composite[i] = normalizationScalar * UnNorm[i]
+     * Use this BEFORE baking operations to ensure baked values are properly normalized.
+     * The cached scalar will be used by computeCompositeAt() until the next call.
      *
-     * Critical: Base layer and harmonic evaluations remain unchanged.
-     *
-     * If normalization is deferred (via setDeferNormalization), the normalization scalar
-     * remains frozen and the composite is computed using the existing scalar. This prevents
-     * visual shifting during paint strokes.
+     * Thread-safe: Can be called from message thread (before baking) or worker thread (during rendering).
      */
-    void updateComposite();
+    void updateNormalizationScalar();
 
     /**
-     * Enable or disable deferred normalization
+     * Set paint stroke active state (message thread only)
      *
-     * When enabled, updateComposite() will freeze the normalization scalar and only
-     * update the composite table using the existing scalar. This prevents visual shifting
-     * during multi-point operations like paint strokes.
+     * When true, renderer will use the frozen normalization scalar instead of
+     * recomputing it. This prevents visual shifting during paint strokes.
      *
-     * When disabled, normalization resumes normal behavior (recalculating the scalar).
+     * Call updateNormalizationScalar() BEFORE setting this to true to cache the
+     * correct scalar for the paint stroke.
      *
-     * @param shouldDefer If true, freeze normalization scalar; if false, resume normal behavior
+     * @param active If true, freeze normalization during rendering; if false, compute fresh
      */
-    void setDeferNormalization(bool shouldDefer);
+    void setPaintStrokeActive(bool active);
 
     /**
-     * Check if normalization is currently deferred
+     * Check if paint stroke is currently active (message thread only)
+     *
+     * Used by renderer to determine whether to use frozen scalar or compute fresh.
+     *
+     * @return true if paint stroke active (use frozen scalar), false otherwise
      */
-    bool isNormalizationDeferred() const;
+    bool isPaintStrokeActive() const;
 
     /**
      * Enable or disable automatic normalization
@@ -131,46 +257,46 @@ class LayeredTransferFunction {
     bool isNormalizationEnabled() const;
 
     /**
-     * Enable or disable spline layer (mutually exclusive with harmonic layer)
+     * Enable or disable spline layer (LEGACY API - delegates to setRenderingMode)
      *
-     * When enabled:
-     *   - Audio thread uses direct spline evaluation
-     *   - Normalization is locked to 1.0 (identity)
-     *   - Cache is invalidated
+     * This is a convenience wrapper for:
+     *   setSplineLayerEnabled(true)  → setRenderingMode(RenderingMode::Spline)
+     *   setSplineLayerEnabled(false) → setRenderingMode(RenderingMode::Paint)
      *
-     * When disabled:
-     *   - Audio thread uses base + harmonics
-     *   - Normalization resumes normal behavior
+     * DEPRECATED: Use setRenderingMode() directly for clarity.
      *
-     * CRITICAL: Call bakeCompositeToBase() before enabling spline layer
-     * to ensure harmonics are zeroed.
-     *
-     * @param enabled If true, enable spline mode; if false, use harmonic mode
+     * @param enabled If true, enable spline mode; if false, use paint mode
      */
     void setSplineLayerEnabled(bool enabled);
 
     /**
-     * Check if spline layer is currently enabled
+     * Check if spline layer is currently enabled (LEGACY API)
+     *
+     * DEPRECATED: Use getRenderingMode() == RenderingMode::Spline instead.
      */
     bool isSplineLayerEnabled() const;
 
     /**
-     * Invalidate composite cache (forces direct evaluation)
+     * Set rendering mode (determines evaluation path for LUT rendering)
      *
-     * Called when:
-     *   - Spline anchors change
-     *   - Base layer edited
-     *   - Coefficients changed
-     *   - Layer mode switched
+     * Paint    → Direct base layer (no normalization)
+     * Harmonic → Base + harmonics with normalization
+     * Spline   → Direct spline evaluation
+     *
+     * Thread-safe: Can be called from any thread
+     *
+     * @param mode The rendering mode to use
      */
-    void invalidateCompositeCache();
+    void setRenderingMode(RenderingMode mode);
 
     /**
-     * Check if composite cache is valid
+     * Get current rendering mode
      *
-     * @return true if cached path can be used, false if direct evaluation required
+     * Thread-safe: Can be called from any thread
+     *
+     * @return Current rendering mode
      */
-    bool isCompositeCacheValid() const;
+    RenderingMode getRenderingMode() const;
 
     //==========================================================================
     // Harmonic Layer Baking
@@ -203,9 +329,9 @@ class LayeredTransferFunction {
      *
      * @return true if baking occurred (harmonics were non-zero), false if no-op
      *
-     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
-     * as processBlock() to ensure audio-thread-safe composite updates. The baking writes
-     * to base layer and then calls updateComposite(), which swaps the new curve atomically.
+     * THREAD SAFETY: Call from message thread only. The baking writes to base layer
+     * and increments the version counter, triggering the renderer to generate a new
+     * production LUT at the next 25Hz poll.
      */
     bool bakeHarmonicsToBase();
 
@@ -217,10 +343,10 @@ class LayeredTransferFunction {
      *   - Base layer contains the composite values (visually identical curve)
      *   - All harmonic coefficients are set to zero
      *   - WT mix coefficient is set to 1.0 (enables base layer)
-     *   - Normalization scalar is recalculated
+     *   - Normalization scalar will be recalculated by renderer
      *
-     * THREAD SAFETY: Call from message thread only. Uses same atomic update mechanism
-     * as processBlock() to ensure audio-thread-safe composite updates.
+     * THREAD SAFETY: Call from message thread only. Increments version counter
+     * to trigger renderer update at next 25Hz poll.
      */
     void bakeCompositeToBase();
 
@@ -282,6 +408,35 @@ class LayeredTransferFunction {
     double evaluateBaseAndHarmonics(double x) const;
 
     /**
+     * Evaluate transfer function for rendering based on current mode
+     *
+     * This is the primary evaluation method used by LUT renderer. It routes to the
+     * appropriate evaluation path based on current rendering mode:
+     *
+     * Paint Mode:
+     *   - Returns: wtCoeff * baseValue
+     *   - No normalization applied
+     *   - Harmonics assumed baked into base layer
+     *
+     * Harmonic Mode:
+     *   - Returns: normScalar * (wtCoeff * baseValue + harmonicValue)
+     *   - Normalization applied to composite
+     *   - Evaluates both base and harmonic layers
+     *
+     * Spline Mode:
+     *   - Returns: splineLayer.evaluate(x)
+     *   - Direct spline evaluation
+     *   - Bypasses base + harmonics entirely
+     *
+     * Thread-safe: Can be called from any thread (reads atomics with acquire ordering)
+     *
+     * @param x Normalized input in [minValue, maxValue]
+     * @param normScalar Normalization scalar computed by renderer
+     * @return Evaluated output value
+     */
+    double evaluateForRendering(double x, double normScalar) const;
+
+    /**
      * Process block of samples in-place
      */
     void processBlock(double* samples, int numSamples) const;
@@ -295,9 +450,16 @@ class LayeredTransferFunction {
 
     void setInterpolationMode(InterpolationMode mode) {
         interpMode = mode;
+        // Increment version to trigger LUT re-render with new interpolation mode
+        // NOTE: Interpolation mode affects LUT evaluation, not LUT contents, but
+        // we re-render anyway for simplicity (see Task 3 design rationale in
+        // seamless-transfer-function-changes.md)
+        incrementVersionIfNotBatching();
     }
     void setExtrapolationMode(ExtrapolationMode mode) {
         extrapMode = mode;
+        // Increment version to trigger LUT re-render with new extrapolation mode
+        incrementVersionIfNotBatching();
     }
 
     InterpolationMode getInterpolationMode() const {
@@ -308,6 +470,84 @@ class LayeredTransferFunction {
     }
 
     //==========================================================================
+    // Version Tracking (for seamless LUT updates)
+    //==========================================================================
+
+    /**
+     * Get current version of transfer function
+     *
+     * The version counter increments on every mutation to enable dirty detection.
+     * Used by SeamlessTransferFunction to trigger asynchronous LUT rendering.
+     *
+     * NOTE: Version is NOT serialized - it's a runtime-only dirty tracking mechanism.
+     *
+     * @return Current version number
+     */
+    uint64_t getVersion() const {
+        return versionCounter.load(std::memory_order_acquire);
+    }
+
+    /**
+     * Begin batch update (defer version counter increment until endBatchUpdate)
+     *
+     * Use this to group multiple mutations into a single version increment.
+     * Common use cases:
+     *   - Baking operations (16,384 base layer writes → 1 version increment)
+     *   - Preset loading (multiple state changes → 1 version increment)
+     *
+     * CRITICAL: Always use BatchUpdateGuard RAII wrapper instead of calling this directly.
+     * Manual calls risk forgetting to call endBatchUpdate(), which breaks dirty tracking.
+     *
+     * Thread safety: Message thread only (not thread-safe)
+     */
+    void beginBatchUpdate();
+
+    /**
+     * End batch update (increment version counter once for all batched mutations)
+     *
+     * CRITICAL: Always use BatchUpdateGuard RAII wrapper instead of calling this directly.
+     * Manual calls risk exception-safety issues and inconsistent state.
+     *
+     * Thread safety: Message thread only (not thread-safe)
+     */
+    void endBatchUpdate();
+
+    /**
+     * Set spline anchors (wrapper that increments version counter)
+     *
+     * Use this instead of getSplineLayer().setAnchors() to ensure version tracking works.
+     */
+    void setSplineAnchors(const std::vector<SplineAnchor>& anchors);
+
+    /**
+     * Clear all spline anchors (wrapper that increments version counter)
+     */
+    void clearSplineAnchors();
+
+    /**
+     * Set normalization scalar directly (for worker thread to restore frozen state)
+     *
+     * CRITICAL: Only used by LUT renderer to restore frozen normalization state.
+     * UI code should NOT call this - use setNormalizationEnabled() instead.
+     *
+     * @param scalar The normalization scalar to set
+     */
+    void setNormalizationScalar(double scalar) {
+        normalizationScalar.store(scalar, std::memory_order_release);
+    }
+
+    //==========================================================================
+    // Debugging
+    //==========================================================================
+
+    /**
+     * Get instance ID for debugging (identifies which LayeredTransferFunction instance this is)
+     */
+    int getInstanceId() const {
+        return instanceId;
+    }
+
+    //==========================================================================
     // Serialization
     //==========================================================================
 
@@ -315,6 +555,10 @@ class LayeredTransferFunction {
     void fromValueTree(const juce::ValueTree& vt);
 
   private:
+    // Instance tracking for debugging
+    static std::atomic<int> instanceCounter;
+    int instanceId;
+
     int tableSize;
     double minValue, maxValue;
 
@@ -328,26 +572,78 @@ class LayeredTransferFunction {
     // Layers (NEVER normalized directly - preserved as-is)
     std::vector<std::atomic<double>> baseTable; // User-drawn wavetable
 
-    // Composite output (what audio thread reads)
-    std::vector<std::atomic<double>> compositeTable;
-
     // Normalization scalar (applied to mix, not to layers)
-    std::atomic<double> normalizationScalar{1.0};
-
-    // Normalization deferral (prevents visual shifting during paint strokes)
-    bool deferNormalization = false;
+    // Cached value computed by updateNormalizationScalar() or set by renderer
+    mutable std::atomic<double> normalizationScalar{1.0};
 
     // Normalization enable/disable (allows bypassing auto-normalization for creative effects)
     bool normalizationEnabled = true; // Default: enabled (safe behavior)
 
-    // NEW: Layer mode (mutually exclusive: spline XOR harmonics)
-    std::atomic<bool> splineLayerEnabled{false};
+    // Paint stroke active flag (prevents normalization recomputation during strokes)
+    // Message thread only - not atomic (single-threaded access)
+    bool paintStrokeActive = false;
 
-    // NEW: Cache validity flag (allows direct evaluation when cache invalid)
-    std::atomic<bool> compositeCacheValid{false};
+    // Rendering mode (determines evaluation path for LUT rendering)
+    // This is the single source of truth for which evaluation path to use
+    std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Paint)};
 
-    // Pre-allocated scratch buffer for updateComposite() (eliminates heap allocation)
-    mutable std::vector<double> unnormalizedMixBuffer;
+    /**
+     * Version counter for dirty detection (used by SeamlessTransferFunction)
+     *
+     * INCREMENTS:
+     *   - Single mutations: Version increments IMMEDIATELY after each mutation
+     *     Example: ltf.setBaseLayerValue(0, 1.0); // version++
+     *
+     *   - Batched mutations: Version increments ONCE when batch ends
+     *     Example:
+     *       {
+     *           BatchUpdateGuard guard(ltf);
+     *           ltf.setBaseLayerValue(0, 1.0);  // No increment
+     *           ltf.setBaseLayerValue(1, 2.0);  // No increment
+     *           // ... 16,382 more writes ...
+     *       } // version++ (ONCE for all 16,384 writes)
+     *
+     * MEMORY ORDERING:
+     *   - Reads:  memory_order_acquire (ensures visibility of all prior writes)
+     *   - Writes: memory_order_release (ensures all writes visible to readers)
+     *   - Atomic operations guarantee lock-free, thread-safe dirty detection
+     *
+     * NOT SERIALIZED:
+     *   - Version counter is runtime-only (never saved to presets/ValueTree)
+     *   - Resets to 0 on plugin load, increments from there
+     *   - Renderer only cares about "changed since last render", not absolute value
+     *
+     * USAGE PATTERNS:
+     *   - Interactive edits (paint strokes, slider drags): Single mutations OK
+     *     Version increments per-sample or per-drag are negligible overhead (~1ns)
+     *
+     *   - Expensive operations (baking, preset loading): Use BatchUpdateGuard
+     *     Prevents 16,384+ version increments, improves clarity (not performance)
+     *
+     * CRITICAL INVARIANT:
+     *   - All mutation methods MUST call incrementVersionIfNotBatching()
+     *   - Never call versionCounter.fetch_add() directly (breaks batching)
+     *   - See incrementVersionIfNotBatching() implementation below
+     */
+    std::atomic<uint64_t> versionCounter{0};
+
+    // Batch update control (message thread only, not atomic)
+    bool batchUpdateActive{false};
+
+    /**
+     * Increment version counter if not in batch mode
+     *
+     * Helper to consolidate version increment logic. All mutation methods should
+     * call this instead of directly incrementing versionCounter.
+     *
+     * When batchUpdateActive = true:  No-op (defer increment until endBatchUpdate)
+     * When batchUpdateActive = false: Increment immediately (default behavior)
+     */
+    void incrementVersionIfNotBatching() {
+        if (!batchUpdateActive) {
+            versionCounter.fetch_add(1, std::memory_order_release);
+        }
+    }
 
     InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
@@ -361,20 +657,51 @@ class LayeredTransferFunction {
     double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
 
-    // NEW: Direct evaluation (bypasses composite cache)
-    // Used when cache is invalid (during anchor drag, after edits)
-    double evaluateDirect(double x) const;
+    /**
+     * Get base layer value at normalized position x using current interpolation mode
+     *
+     * This is a helper for evaluateForRendering() to read base layer values.
+     *
+     * @param x Normalized input in [minValue, maxValue]
+     * @return Interpolated base layer value
+     */
+    double getBaseValueAt(double x) const;
+};
 
-    // NEW: Interpolate base layer directly (bypasses composite)
-    // Needed for harmonic mode when cache invalid
-    double interpolateBase(double x) const;
+/**
+ * BatchUpdateGuard - RAII wrapper for batch updates
+ *
+ * Automatically calls beginBatchUpdate() on construction and endBatchUpdate() on destruction.
+ * This ensures exception-safe cleanup and prevents forgetting to end the batch update.
+ *
+ * Usage:
+ *   {
+ *       BatchUpdateGuard guard(ltf);
+ *       ltf.setBaseLayerValue(0, 1.0);  // No version increment
+ *       ltf.setBaseLayerValue(1, 2.0);  // No version increment
+ *       // ... thousands of mutations ...
+ *   } // guard destructor increments version ONCE
+ *
+ * CRITICAL: Always use this instead of calling beginBatchUpdate/endBatchUpdate directly.
+ */
+class BatchUpdateGuard {
+  public:
+    explicit BatchUpdateGuard(LayeredTransferFunction& ltf) : ltf(ltf) {
+        ltf.beginBatchUpdate();
+    }
 
-    // Mode-specific composite update helpers
-    void updateCompositeSplineMode();
-    void updateCompositeHarmonicMode();
+    ~BatchUpdateGuard() {
+        ltf.endBatchUpdate();
+    }
 
-    // Normalization computation (extracted for clarity)
-    double computeNormalizationScalar(double maxAbsValue);
+    // Non-copyable, non-movable (RAII guard pattern)
+    BatchUpdateGuard(const BatchUpdateGuard&) = delete;
+    BatchUpdateGuard& operator=(const BatchUpdateGuard&) = delete;
+    BatchUpdateGuard(BatchUpdateGuard&&) = delete;
+    BatchUpdateGuard& operator=(BatchUpdateGuard&&) = delete;
+
+  private:
+    LayeredTransferFunction& ltf;
 };
 
 } // namespace dsp_core

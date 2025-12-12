@@ -1,18 +1,24 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
+#include "../SeamlessTransferFunction.h"
 #include "../LayeredTransferFunction.h"
 
 namespace dsp_core::audio_pipeline {
 
 /**
- * Applies waveshaping using LayeredTransferFunction.
+ * Applies waveshaping using SeamlessTransferFunction or LayeredTransferFunction.
  * Optimized for stereo processing (no threading overhead).
  */
 class WaveshapingStage : public AudioProcessingStage {
   public:
     /**
-     * @param ltf Reference to transfer function model
+     * @param tf Reference to seamless transfer function (production use)
+     */
+    explicit WaveshapingStage(const dsp_core::SeamlessTransferFunction& tf);
+
+    /**
+     * @param ltf Reference to layered transfer function (testing/profiling use)
      */
     explicit WaveshapingStage(dsp_core::LayeredTransferFunction& ltf);
 
@@ -24,7 +30,8 @@ class WaveshapingStage : public AudioProcessingStage {
     }
 
   private:
-    dsp_core::LayeredTransferFunction& ltf_;
+    const dsp_core::SeamlessTransferFunction* seamlessTransferFunction_{nullptr};
+    dsp_core::LayeredTransferFunction* layeredTransferFunction_{nullptr};
 };
 
 } // namespace dsp_core::audio_pipeline

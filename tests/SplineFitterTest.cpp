@@ -2666,7 +2666,6 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_AsymmetricCurve_AutoDisables) {
         double x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x * x);
     }
-    ltf->updateComposite();
 
     // Config: Auto mode
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -2738,7 +2737,6 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic3_Symmetric) {
         double y = 4.0 * x * x * x - 3.0 * x; // T₃(x)
         ltf->setBaseLayerValue(i, y);
     }
-    ltf->updateComposite();
 
     // Config: Auto mode
     auto config = dsp_core::SplineFitConfig::smooth();
@@ -2791,7 +2789,6 @@ TEST_F(ZeroCrossingTest, SymmetricFitting_Harmonic2_Asymmetric) {
         double y = 2.0 * x * x - 1.0; // T₂(x)
         ltf->setBaseLayerValue(i, y);
     }
-    ltf->updateComposite();
 
     // Config: Auto mode
     auto config = dsp_core::SplineFitConfig::smooth();

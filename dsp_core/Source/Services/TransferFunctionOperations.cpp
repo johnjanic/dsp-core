@@ -12,7 +12,7 @@ void TransferFunctionOperations::invert(LayeredTransferFunction& ltf) {
         ltf.setBaseLayerValue(i, -currentValue);
     }
 
-    ltf.updateComposite();
+    // Version counter incremented by setBaseLayerValue() - renderer will update at next poll
 }
 
 void TransferFunctionOperations::removeDCInstantaneous(LayeredTransferFunction& ltf) {
@@ -25,7 +25,7 @@ void TransferFunctionOperations::removeDCInstantaneous(LayeredTransferFunction& 
         ltf.setBaseLayerValue(i, currentValue - dcOffset);
     }
 
-    ltf.updateComposite();
+    // Version counter incremented by setBaseLayerValue() - renderer will update at next poll
 }
 
 void TransferFunctionOperations::removeDCSteadyState(LayeredTransferFunction& ltf) {
@@ -42,7 +42,7 @@ void TransferFunctionOperations::removeDCSteadyState(LayeredTransferFunction& lt
         ltf.setBaseLayerValue(i, currentValue - average);
     }
 
-    ltf.updateComposite();
+    // Version counter incremented by setBaseLayerValue() - renderer will update at next poll
 }
 
 void TransferFunctionOperations::normalize(LayeredTransferFunction& ltf) {
@@ -65,7 +65,7 @@ void TransferFunctionOperations::normalize(LayeredTransferFunction& ltf) {
         ltf.setBaseLayerValue(i, currentValue * scaleFactor);
     }
 
-    ltf.updateComposite();
+    // Version counter incremented by setBaseLayerValue() - renderer will update at next poll
 }
 
 } // namespace dsp_core::Services

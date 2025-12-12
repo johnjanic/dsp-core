@@ -30,7 +30,6 @@ TEST_F(TransferFunctionOperationsTest, Invert_FlipsAllValues) {
         double x = -1.0 + (2.0 * i / (tableSize - 1));
         ltf->setBaseLayerValue(i, x); // Linear ramp from -1 to 1
     }
-    ltf->updateComposite();
 
     // Invert
     TransferFunctionOperations::invert(*ltf);
@@ -51,7 +50,6 @@ TEST_F(TransferFunctionOperationsTest, Invert_DoubleInvertRestoresOriginal) {
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
-    ltf->updateComposite();
 
     // Double invert
     TransferFunctionOperations::invert(*ltf);
@@ -67,7 +65,6 @@ TEST_F(TransferFunctionOperationsTest, Invert_ZeroLayerUnchanged) {
     // Set base layer to zero explicitly
     const int tableSize = ltf->getTableSize();
     ltf->clearBaseLayer();
-    ltf->updateComposite();
 
     TransferFunctionOperations::invert(*ltf);
 
@@ -89,7 +86,6 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCInstantaneous_CentersAtOrigin) {
         double x = -1.0 + (2.0 * i / (tableSize - 1));
         ltf->setBaseLayerValue(i, x + dcOffset); // Ramp with DC offset
     }
-    ltf->updateComposite();
 
     // Remove DC
     TransferFunctionOperations::removeDCInstantaneous(*ltf);
@@ -106,7 +102,6 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCInstantaneous_ShiftsAllValuesByOf
     for (int i = 0; i < tableSize; ++i) {
         ltf->setBaseLayerValue(i, offset);
     }
-    ltf->updateComposite();
 
     TransferFunctionOperations::removeDCInstantaneous(*ltf);
 
@@ -128,7 +123,6 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_RemovesAverageOffset)
         double val = 0.5 + 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
-    ltf->updateComposite();
 
     TransferFunctionOperations::removeDCSteadyState(*ltf);
 
@@ -150,7 +144,6 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_PreservesShape) {
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
-    ltf->updateComposite();
 
     // Calculate original average
     double origSum = 0.0;
@@ -177,7 +170,6 @@ TEST_F(TransferFunctionOperationsTest, Normalize_ScalesToUnitRange) {
         double val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
-    ltf->updateComposite();
 
     TransferFunctionOperations::normalize(*ltf);
 
@@ -198,7 +190,6 @@ TEST_F(TransferFunctionOperationsTest, Normalize_PreservesRelativeShape) {
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
-    ltf->updateComposite();
 
     // Find original max for expected scale factor
     double origMax = 0.0;
@@ -221,7 +212,6 @@ TEST_F(TransferFunctionOperationsTest, Normalize_AlreadyNormalized_NoChange) {
         double val = std::sin(2.0 * M_PI * i / tableSize); // Already peaks at ±1
         ltf->setBaseLayerValue(i, val);
     }
-    ltf->updateComposite();
 
     // Store original
     std::vector<double> original(tableSize);
@@ -241,7 +231,6 @@ TEST_F(TransferFunctionOperationsTest, Normalize_ZeroLayer_NoOp) {
     // Set base layer to zero explicitly
     const int tableSize = ltf->getTableSize();
     ltf->clearBaseLayer();
-    ltf->updateComposite();
 
     TransferFunctionOperations::normalize(*ltf);
 
@@ -257,7 +246,6 @@ TEST_F(TransferFunctionOperationsTest, Normalize_NegativeOnlyValues) {
     for (int i = 0; i < tableSize; ++i) {
         ltf->setBaseLayerValue(i, -0.5);
     }
-    ltf->updateComposite();
 
     TransferFunctionOperations::normalize(*ltf);
 
@@ -280,7 +268,6 @@ TEST_F(TransferFunctionOperationsTest, ChainedOperations_InvertThenNormalize) {
         double val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
-    ltf->updateComposite();
 
     // Chain operations
     TransferFunctionOperations::invert(*ltf);
