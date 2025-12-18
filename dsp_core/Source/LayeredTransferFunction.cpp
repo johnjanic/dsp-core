@@ -35,8 +35,6 @@ LayeredTransferFunction::LayeredTransferFunction(int tableSize, double minVal, d
       coefficients(kTotalCoefficients, 0.0),        // kTotalCoefficients: [0] = WT, [1..40] = harmonics
       baseTable(tableSize) {
 
-    DBG("[MODEL:" + juce::String(instanceId) + "] LayeredTransferFunction instance created");
-
     // Initialize coefficients
     coefficients[0] = 1.0; // Default WT mix = 1.0 (full base layer)
     // coefficients[1..40] already initialized to 0.0
@@ -64,11 +62,6 @@ double LayeredTransferFunction::getBaseLayerValue(int index) const {
 void LayeredTransferFunction::setBaseLayerValue(int index, double value) {
     if (index >= 0 && index < tableSize) {
         baseTable[index].store(value, std::memory_order_release);
-
-        // Debug: Log a sample of base layer writes at center point
-        if (index == 8192) {
-            DBG("[MODEL:" + juce::String(instanceId) + "] setBaseLayerValue(" + juce::String(index) + ", " + juce::String(value) + ")");
-        }
 
         incrementVersionIfNotBatching();
     }
@@ -327,13 +320,6 @@ void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {
     incrementVersionIfNotBatching();
 
     // DIAGNOSTIC: Log rendering mode changes to track bug
-    const char* oldModeStr = (oldMode == RenderingMode::Paint) ? "Paint" :
-                             (oldMode == RenderingMode::Harmonic) ? "Harmonic" : "Spline";
-    const char* newModeStr = (mode == RenderingMode::Paint) ? "Paint" :
-                             (mode == RenderingMode::Harmonic) ? "Harmonic" : "Spline";
-    DBG("[LTF:" + juce::String(instanceId) + "] setRenderingMode: " +
-        juce::String(oldModeStr) + " → " + juce::String(newModeStr) +
-        " (version=" + juce::String(static_cast<int64_t>(versionCounter.load())) + ")");
 }
 
 RenderingMode LayeredTransferFunction::getRenderingMode() const {
