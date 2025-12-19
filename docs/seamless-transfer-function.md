@@ -670,72 +670,15 @@ controller.onSomeCallback = [this]() {
 
 ---
 
-## Key Lessons from Critical Fixes
+## Historical Notes
 
-### Critical Fix #18: Stereo Crossfade Coherence
+For detailed history of critical fixes (stereo crossfade coherence, visualizer flicker, normalization cleanup, mode transition double-fit bug):
+- [seamless-transfer-function-critical-fixes.md](../../../docs/archive/seamless-transfer-function-critical-fixes.md)
 
-**Problem**: Per-channel processing caused left/right channels to crossfade at different times.
-
-**Solution**: Unified multi-channel processing - crossfade position advances ONCE per sample across ALL channels.
-
-**Files**: Changed API from `processBlock(double*, int)` to `processBuffer(AudioBuffer<double>&)`
-
-### Critical Fix #21: Visualizer Flicker
-
-**Problem**: Dual-update system (immediate preview + worker LUT) caused flicker during rapid slider drags. Worker processed stale queued jobs while immediate preview showed current state.
-
-**Solution**: Removed immediate preview path. Trust 25Hz polling + job coalescing for single-source-of-truth updates.
-
-**Key Insight**: Job coalescing ensures only LATEST state is rendered during rapid edits. ~30ms latency is imperceptible.
-
-### Refactor 2025-12-03: Normalization Architecture Cleanup
-
-**Problem**: Normalization was scattered across layers (model, controller, renderer) with complex "defer normalization" pattern. This caused:
-- O(n²) performance bug in equation mode (268M iterations to render 16K points)
-- ~100 lines of defer normalization management in controller
-- Confusing API: `setDeferNormalization()` / `isNormalizationDeferred()`
-
-**Solution**: Made normalization **renderer's sole responsibility** (computed at max 25Hz) with explicit caching:
-- `computeCompositeAt()` uses cached scalar instead of O(n) scan
-- `updateNormalizationScalar()` explicitly computes/caches scalar before baking
-- `setPaintStrokeActive()` / `isPaintStrokeActive()` cleanly freeze scalar during paint
-- Baking methods automatically handle normalization (compute before, recalculate after)
-
-**Performance Win**: Equation mode now 1600× faster (16K iterations vs 268M).
-
-**Key Insight**: Normalization belongs in the renderer, not the model layer. Explicit caching eliminates hidden O(n) scans.
-
-### Critical Fix #22 (2025-12-03): Mode Transition Double-Fit Bug
-
-**Problem**: Entering Spline mode from Harmonic mode (H3=1.0, WT=0.0) produced a bad fit on first entry, but a good fit on second entry. Investigation revealed **duplicate fitting logic** breaking the mode-exit contract.
-
-**Root Cause**: Two code paths were performing the same job:
-1. `SplineMode::activate()` → `fitCurveToSpline()` (CORRECT ✅)
-2. `enterSplineModeInternal()` → manual bake + manual fit (REDUNDANT ❌)
-
-**Sequence causing the bug**:
-```cpp
-// User clicks Spline mode button
-enterSplineMode() {
-    modeCoordinator_->setEditingMode(Spline);  // Calls bakeHarmonicsToBase() ✅
-       → SplineMode::activate() → fitCurveToSpline()  // Fits H3, sets anchors ✅
-
-    enterSplineModeInternal();  // ❌ REDUNDANT!
-       → bakeCompositeToBase()  // Bakes AGAIN (now with spline mode active)
-       → Entire fit logic  // Fits AGAIN (stale base layer)
-}
-```
-
-**Why Second Fit Worked**: When exiting Spline mode, the correctly-fitted spline was baked to base. Re-entering Spline mode then fitted that correct curve → good result.
-
-**Solution**: Removed ALL baking and fitting logic from `enterSplineModeInternal()`. It now only:
-- Sets `splineLayerEnabled = true` (changes RenderingMode)
-- Fires `onSplineLayerStateChanged` callback for UI sync
-
-**Files Changed**:
-- `modules/transfer_function_editor/transfer_function_editor/Source/Controllers/TransferFunctionController.cpp` (lines 770-809)
-
-**Key Insight**: The mode-exit contract (ModeCoordinator bakes on exit) + mode-entry contract (activate() performs setup) must be strictly enforced. Controller internal methods should ONLY set model flags, no side effects.
+**Key Lessons**:
+- Single source of truth (avoid dual-update systems)
+- Explicit caching (normalization belongs in renderer)
+- Strict lifecycle contracts (mode entry/exit without duplication)
 
 ---
 
