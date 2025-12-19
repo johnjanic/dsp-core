@@ -68,7 +68,7 @@ struct FeatureDetectionConfig {
      * When disabled, only detects extrema (peaks/valleys) - saves CPU
      * Default: false (disabled) - extrema-only detection
      *
-     * Rationale: Phase 4 v5 testing showed that with secondDerivativeThreshold=0.002
+     * Rationale: testing showed that with secondDerivativeThreshold=0.002
      * (optimized to filter artifact inflections), effectively ZERO inflection points
      * are detected anyway. Disabling saves ~30-40% of feature detection CPU time
      * with no impact on anchor count or quality.
@@ -85,10 +85,10 @@ struct FeatureDetectionConfig {
      */
     FeatureDetectionConfig()
         : significanceThreshold(0.001), maxFeatures(100), derivativeThreshold(1e-06),
-          secondDerivativeThreshold(0.002) // Phase 4 v3: Filters artifact inflections (20× higher than 0.0001 default)
+          secondDerivativeThreshold(0.002) // Filters artifact inflections (20× higher than 0.0001 default)
           ,
           extremaInflectionRatio(0.8), enableSignificanceFiltering(false),
-          enableInflectionDetection(false) // Phase 4 v5: Disabled by default - saves CPU with no quality impact
+          enableInflectionDetection(false) // Disabled by default - saves CPU with no quality impact
     {}
 
     bool operator==(const FeatureDetectionConfig&) const = default;

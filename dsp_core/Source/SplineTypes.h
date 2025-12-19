@@ -259,7 +259,7 @@ struct SplineFitConfig {
     double symmetryThreshold = 0.90;
 
     /**
-     * Enable feature-based anchor placement (Phase 3 enhancement).
+     * Enable feature-based anchor placement.
      *
      * ⚠️ EXPERIMENTAL FEATURE - Disabled by default due to backtranslation regressions
      *
@@ -300,7 +300,7 @@ struct SplineFitConfig {
         cfg.positionTolerance = 0.005; // Relaxed from 0.002 for backtranslation stability
         cfg.derivativeTolerance = 0.05;
         cfg.maxAnchors =
-            128; // Phase 4 v3: Optimal for perfect stability (3→3, 4→4) + exceptional quality (0.01% error)
+            128; // Optimal for perfect stability (3→3, 4→4) + exceptional quality (0.01% error)
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
     }

@@ -52,9 +52,7 @@ class LayeredTransferFunction {
   public:
     LayeredTransferFunction(int tableSize, double minVal, double maxVal);
 
-    //==========================================================================
     // Layer Access
-    //==========================================================================
 
     // Base layer (user-drawn wavetable)
     double getBaseLayerValue(int index) const;
@@ -96,9 +94,7 @@ class LayeredTransferFunction {
         return normalizationScalar.load(std::memory_order_acquire);
     }
 
-    //==========================================================================
     // Normalization Control
-    //==========================================================================
     //
     // NORMALIZATION PATTERNS
     //
@@ -199,8 +195,6 @@ class LayeredTransferFunction {
     //   - Allows output > ±1.0 (creative distortion)
     //   - WARNING: Can cause clipping in audio output
     //   - Use case: Precise mathematical relationships, no auto-scaling
-    //
-    //==========================================================================
 
     /**
      * Compute and cache normalization scalar explicitly
@@ -298,9 +292,7 @@ class LayeredTransferFunction {
      */
     RenderingMode getRenderingMode() const;
 
-    //==========================================================================
     // Harmonic Layer Baking
-    //==========================================================================
 
     // Constants
     static constexpr int NUM_HARMONICS = 40;
@@ -364,10 +356,7 @@ class LayeredTransferFunction {
      */
     void setHarmonicCoefficients(const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs);
 
-    //==========================================================================
     // Utilities (same API as TransferFunction for compatibility)
-    //==========================================================================
-
     int getTableSize() const {
         return tableSize;
     }
@@ -383,9 +372,7 @@ class LayeredTransferFunction {
      */
     double normalizeIndex(int index) const;
 
-    //==========================================================================
     // Processing (reads composite - thread-safe)
-    //==========================================================================
 
     /**
      * Apply transfer function to input sample
@@ -441,9 +428,7 @@ class LayeredTransferFunction {
      */
     void processBlock(double* samples, int numSamples) const;
 
-    //==========================================================================
     // Interpolation/Extrapolation Modes (same as TransferFunction)
-    //==========================================================================
 
     enum class InterpolationMode { Linear, Cubic, CatmullRom };
     enum class ExtrapolationMode { Clamp, Linear };
@@ -452,8 +437,8 @@ class LayeredTransferFunction {
         interpMode = mode;
         // Increment version to trigger LUT re-render with new interpolation mode
         // NOTE: Interpolation mode affects LUT evaluation, not LUT contents, but
-        // we re-render anyway for simplicity (see Task 3 design rationale in
-        // seamless-transfer-function-changes.md)
+        // we re-render anyway for simplicity
+
         incrementVersionIfNotBatching();
     }
     void setExtrapolationMode(ExtrapolationMode mode) {
@@ -469,9 +454,7 @@ class LayeredTransferFunction {
         return extrapMode;
     }
 
-    //==========================================================================
     // Version Tracking (for seamless LUT updates)
-    //==========================================================================
 
     /**
      * Get current version of transfer function
@@ -536,9 +519,7 @@ class LayeredTransferFunction {
         normalizationScalar.store(scalar, std::memory_order_release);
     }
 
-    //==========================================================================
     // Debugging
-    //==========================================================================
 
     /**
      * Get instance ID for debugging (identifies which LayeredTransferFunction instance this is)
@@ -547,9 +528,7 @@ class LayeredTransferFunction {
         return instanceId;
     }
 
-    //==========================================================================
     // Serialization
-    //==========================================================================
 
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& vt);

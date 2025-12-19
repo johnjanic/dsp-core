@@ -21,10 +21,7 @@ static constexpr int VISUALIZER_LUT_SIZE = 2048;  // Visualizer LUT size (UI thr
 static constexpr double MIN_VALUE = -1.0;
 static constexpr double MAX_VALUE = 1.0;
 
-//==============================================================================
 // LUTBuffer - Triple-buffered lookup table
-//==============================================================================
-
 struct LUTBuffer {
     std::array<double, TABLE_SIZE> data;
     uint64_t version{0};
@@ -33,10 +30,6 @@ struct LUTBuffer {
     LayeredTransferFunction::ExtrapolationMode extrapolationMode{
         LayeredTransferFunction::ExtrapolationMode::Clamp};
 };
-
-//==============================================================================
-// AudioEngine - Triple-buffered audio thread component with crossfade
-//==============================================================================
 
 /**
  * AudioEngine - Audio thread component for seamless transfer function updates
@@ -241,10 +234,6 @@ class AudioEngine {
     mutable const LUTBuffer* newLUT{nullptr};
 };
 
-//==============================================================================
-// RenderJob - Self-contained snapshot of LayeredTransferFunction state
-//==============================================================================
-
 /**
  * RenderJob - Self-contained transfer function state for worker thread rendering
  *
@@ -293,10 +282,6 @@ struct RenderJob {
     // Version stamp
     uint64_t version{0};
 };
-
-//==============================================================================
-// LUTRendererThread - Worker thread for asynchronous LUT rendering
-//==============================================================================
 
 /**
  * LUTRendererThread - Background worker thread that renders LUTs from RenderJobs
@@ -456,10 +441,6 @@ class LUTRendererThread : public juce::Thread {
     std::function<void()> onVisualizerUpdate;
     std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr{nullptr};
 };
-
-//==============================================================================
-// TransferFunctionDirtyPoller - 25Hz version change detector
-//==============================================================================
 
 /**
  * TransferFunctionDirtyPoller - Timer-based version change detector

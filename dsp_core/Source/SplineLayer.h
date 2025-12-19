@@ -24,9 +24,7 @@ class SplineLayer {
   public:
     SplineLayer();
 
-    //==========================================================================
     // Anchor Management (UI thread only)
-    //==========================================================================
 
     /**
      * Set spline anchors (atomic swap for lock-free reads)
@@ -44,9 +42,7 @@ class SplineLayer {
      */
     std::vector<SplineAnchor> getAnchors() const;
 
-    //==========================================================================
     // Evaluation (thread-safe, lock-free reads)
-    //==========================================================================
 
     /**
      * Evaluate spline at x using PCHIP cubic Hermite interpolation
@@ -58,10 +54,7 @@ class SplineLayer {
      */
     double evaluate(double x) const;
 
-    //==========================================================================
     // Serialization
-    //==========================================================================
-
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& vt);
 

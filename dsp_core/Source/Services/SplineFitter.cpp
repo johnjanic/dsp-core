@@ -333,9 +333,7 @@ double SplineFitter::harmonicMean(double a, double b, double wa, double wb) {
     return (wa + wb) / (wa / a + wb / b);
 }
 
-//==============================================================================
 // Fritsch-Carlson Tangent Computation (Monotone-Preserving)
-//==============================================================================
 
 void SplineFitter::computeFritschCarlsonTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
@@ -394,9 +392,7 @@ void SplineFitter::computeFritschCarlsonTangents(std::vector<SplineAnchor>& anch
     }
 }
 
-//==============================================================================
 // Akima Tangent Computation (Local Weighted Average)
-//==============================================================================
 
 void SplineFitter::computeAkimaTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
@@ -447,9 +443,7 @@ void SplineFitter::computeAkimaTangents(std::vector<SplineAnchor>& anchors, cons
     }
 }
 
-//==============================================================================
 // Finite Difference Tangent Computation (Simple Baseline)
-//==============================================================================
 
 void SplineFitter::computeFiniteDifferenceTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
@@ -484,9 +478,7 @@ void SplineFitter::computeFiniteDifferenceTangents(std::vector<SplineAnchor>& an
     }
 }
 
-//==============================================================================
 // Greedy Spline Fitting (Replaces RDP)
-//==============================================================================
 
 SplineFitter::WorstFitResult SplineFitter::findWorstFitSample(const std::vector<Sample>& samples,
                                                               const std::vector<SplineAnchor>& anchors) {
@@ -645,9 +637,7 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample
     return anchors;
 }
 
-//==============================================================================
 // Anchor Pruning (Optional Post-Processing)
-//==============================================================================
 
 void SplineFitter::pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
                                          double pruningTolerance, const SplineFitConfig& config) {
@@ -684,9 +674,7 @@ void SplineFitter::pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, con
     }
 }
 
-//==============================================================================
 // Zero-Crossing Analysis (Defensive DC Drift Detection)
-//==============================================================================
 
 SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(const LayeredTransferFunction& ltf,
                                                                  const std::vector<SplineAnchor>& anchors,
@@ -713,9 +701,7 @@ SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(const LayeredTr
     return info;
 }
 
-//==============================================================================
 // Helper Methods for Greedy Spline Fitting
-//==============================================================================
 
 std::vector<SplineAnchor> SplineFitter::initializeAnchorsFromIndices(const std::vector<Sample>& samples,
                                                                       const LayeredTransferFunction& ltf,

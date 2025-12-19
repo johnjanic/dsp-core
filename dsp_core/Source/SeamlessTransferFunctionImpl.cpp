@@ -27,9 +27,7 @@ namespace {
     }
 } // namespace
 
-//==============================================================================
 // AudioEngine Implementation
-//==============================================================================
 
 AudioEngine::AudioEngine() {
     for (int bufIdx = 0; bufIdx < 3; ++bufIdx) {
@@ -366,9 +364,7 @@ double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* 
     return interpolate4Samples(interpMode, mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
 }
 
-//==============================================================================
 // LUTRendererThread Implementation
-//==============================================================================
 
 LUTRendererThread::LUTRendererThread(AudioEngine& audioEngine_,
                                      std::atomic<int>& workerTargetIdx,
@@ -556,9 +552,7 @@ void LUTRendererThread::setLUTBuffersPointer(LUTBuffer* lutBuffers_) {
     lutBuffers = lutBuffers_;
 }
 
-//==============================================================================
 // TransferFunctionDirtyPoller Implementation
-//==============================================================================
 
 TransferFunctionDirtyPoller::TransferFunctionDirtyPoller(LayeredTransferFunction& ltf_,
                                                          LUTRendererThread& renderer_)

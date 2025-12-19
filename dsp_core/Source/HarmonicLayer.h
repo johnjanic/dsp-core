@@ -26,10 +26,7 @@ class HarmonicLayer {
 
     explicit HarmonicLayer(int numHarmonics = 40);
 
-    //==========================================================================
     // Configuration
-    //==========================================================================
-
     int getNumHarmonics() const {
         return numHarmonics;
     }
@@ -39,9 +36,7 @@ class HarmonicLayer {
         return algorithm;
     }
 
-    //==========================================================================
     // Evaluation (thread-safe read)
-    //==========================================================================
 
     /**
      * Evaluate harmonic contribution at normalized position x ∈ [-1, 1]
@@ -55,9 +50,7 @@ class HarmonicLayer {
      */
     double evaluate(double x, const std::vector<double>& coefficients, int tableSize) const;
 
-    //==========================================================================
     // Precomputation (call once, or when table size changes)
-    //==========================================================================
 
     /**
      * Precompute basis functions for all harmonics across table
@@ -71,10 +64,7 @@ class HarmonicLayer {
      */
     void precomputeBasisFunctions(int tableSize, double minVal, double maxVal);
 
-    //==========================================================================
     // Serialization
-    //==========================================================================
-
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& vt);
 
