@@ -138,31 +138,6 @@ endif()
 
 add_test(NAME DCBlockingFilterTests COMMAND dc_blocking_filter_tests)
 
-# DynamicOutputBiasing tests
-add_executable(dynamic_output_biasing_tests
-    DynamicOutputBiasingTest.cpp
-)
-
-target_include_directories(dynamic_output_biasing_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(dynamic_output_biasing_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(dynamic_output_biasing_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(dynamic_output_biasing_tests)
-endif()
-
-add_test(NAME DynamicOutputBiasingTests COMMAND dynamic_output_biasing_tests)
-
 # ZeroCrossingSolver tests
 add_executable(zero_crossing_solver_tests
     ZeroCrossingSolverTests.cpp
@@ -187,31 +162,6 @@ else()
 endif()
 
 add_test(NAME ZeroCrossingSolverTests COMMAND zero_crossing_solver_tests)
-
-# DCOffsetCompensator tests
-add_executable(dc_offset_compensator_tests
-    DCOffsetCompensatorTests.cpp
-)
-
-target_include_directories(dc_offset_compensator_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(dc_offset_compensator_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(dc_offset_compensator_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(dc_offset_compensator_tests)
-endif()
-
-add_test(NAME DCOffsetCompensatorTests COMMAND dc_offset_compensator_tests)
 
 # CurveFeatureDetector tests
 add_executable(curve_feature_detector_tests

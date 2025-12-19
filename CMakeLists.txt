@@ -56,14 +56,6 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/OversamplingWrapper.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCBlockingFilter.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCBlockingFilter.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCOffsetCompensator.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DCOffsetCompensator.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/PeakEnvelopeDetector.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/BiasFadeController.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/SilenceDetector.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/SilenceDetector.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DynamicOutputBiasing.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/DynamicOutputBiasing.cpp"
 )
 
 # Add tests subdirectory if testing is enabled

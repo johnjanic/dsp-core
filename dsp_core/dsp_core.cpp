@@ -30,6 +30,3 @@
 #include "Source/audio_pipeline/WaveshapingStage.cpp"
 #include "Source/audio_pipeline/OversamplingWrapper.cpp"
 #include "Source/audio_pipeline/DCBlockingFilter.cpp"
-#include "Source/audio_pipeline/DCOffsetCompensator.cpp"
-#include "Source/audio_pipeline/SilenceDetector.cpp"
-#include "Source/audio_pipeline/DynamicOutputBiasing.cpp"

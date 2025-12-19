@@ -52,8 +52,3 @@
 #include "Source/audio_pipeline/WaveshapingStage.h"
 #include "Source/audio_pipeline/OversamplingWrapper.h"
 #include "Source/audio_pipeline/DCBlockingFilter.h"
-#include "Source/audio_pipeline/DCOffsetCompensator.h"
-#include "Source/audio_pipeline/PeakEnvelopeDetector.h"
-#include "Source/audio_pipeline/BiasFadeController.h"
-#include "Source/audio_pipeline/SilenceDetector.h"
-#include "Source/audio_pipeline/DynamicOutputBiasing.h"
