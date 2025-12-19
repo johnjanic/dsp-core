@@ -223,6 +223,7 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
 
     // Batch update guard: Defer version increment until end of function
     // Without this, setBaseLayerValue() would increment 16,384 times!
+    // NOLINTNEXTLINE(misc-const-correctness) - RAII guard, destructor modifies state
     BatchUpdateGuard guard(*this);
 
     // Step 1: Compute and cache normalization scalar BEFORE baking
@@ -236,7 +237,7 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
         setBaseLayerValue(i, compositeValue);  // No version increment (batched)
     }
 
-    // Step 3: Set WT coefficient to 1.0 (CRITICAL: enables the baked base layer)
+    // Step 3: Set WT coefficient to 1.0 (enables the baked base layer)
     // If WT was 0 during harmonic editing, the baked base layer would be invisible
     coefficients[0] = 1.0;
 
@@ -258,6 +259,7 @@ bool LayeredTransferFunction::bakeHarmonicsToBase() {
 void LayeredTransferFunction::bakeCompositeToBase() {
     // Batch update guard: Defer version increment until end of function
     // Without this, setBaseLayerValue() would increment 16,384 times!
+    // NOLINTNEXTLINE(misc-const-correctness) - RAII guard, destructor modifies state
     BatchUpdateGuard guard(*this);
 
     // Step 1: Compute and cache normalization scalar BEFORE baking
@@ -512,10 +514,12 @@ double LayeredTransferFunction::getBaseValueAt(double x) const {
 
     // Handle out-of-bounds based on extrapolation mode
     if (extrapMode == ExtrapolationMode::Clamp) {
-        if (tableIndex <= 0.0)
+        if (tableIndex <= 0.0) {
             return baseTable[0].load(std::memory_order_relaxed);
-        if (tableIndex >= tableSize - 1)
+        }
+        if (tableIndex >= tableSize - 1) {
             return baseTable[tableSize - 1].load(std::memory_order_relaxed);
+        }
     }
 
     // Get integer and fractional parts
@@ -545,7 +549,7 @@ double LayeredTransferFunction::getBaseValueAt(double x) const {
 }
 
 double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
-    // CRITICAL: Always evaluate base + harmonics, ignoring spline layer state
+    // Always evaluate base + harmonics, ignoring spline layer state
     // Used by SplineFitter to read the normalized composite when entering spline mode
     //
     // normalizationScalar is preserved when entering spline mode (not reset to 1.0),
@@ -577,9 +581,7 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
 /**
  * Evaluate transfer function for LUT rendering based on current mode
  *
- * ============================================================================
  * RENDERING MODE EVALUATION PATHS
- * ============================================================================
  *
  * This method implements three distinct evaluation strategies optimized for
  * different editing workflows. Mode selection happens at runtime via atomic
@@ -674,9 +676,7 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
  *   ✓ Curve refinement after harmonic synthesis
  *   ✓ Manual tweaking of algorithmic results
  *
- * ============================================================================
  * PERFORMANCE COMPARISON (per-sample cost on M1 Max)
- * ============================================================================
  *
  * Paint Mode:    ~5-10 cycles  (baseline)
  * Spline Mode:   ~20-30 cycles (3× Paint, but fewer anchors than harmonics)
@@ -688,8 +688,6 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
  *   Harmonic: ~1.2 ms (with all harmonics active)
  *
  * Worker budget at 25Hz: 40ms (ample headroom for all modes)
- *
- * ============================================================================
  */
 double LayeredTransferFunction::evaluateForRendering(double x, double normScalar) const {
     const RenderingMode mode = getRenderingMode();
@@ -779,7 +777,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     }
 
     // Load coefficients
-    // CRITICAL: Always maintain exactly NUM_HARMONIC_COEFFICIENTS (41) coefficients
+    // Always maintain exactly NUM_HARMONIC_COEFFICIENTS (41) coefficients
     // Old presets may have fewer coefficients - pad with zeros if needed
     coefficients.resize(NUM_HARMONIC_COEFFICIENTS, 0.0); // Reset to 41 zeros
     if (vt.hasProperty("coefficients")) {

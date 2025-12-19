@@ -15,10 +15,7 @@ struct RenderJob;
 class LUTRendererThread;
 class TransferFunctionDirtyPoller;
 
-//==============================================================================
 // Constants (hardcoded for performance)
-//==============================================================================
-
 static constexpr int TABLE_SIZE = 16384;          // DSP LUT size (audio thread)
 static constexpr int VISUALIZER_LUT_SIZE = 2048;  // Visualizer LUT size (UI thread)
 static constexpr double MIN_VALUE = -1.0;

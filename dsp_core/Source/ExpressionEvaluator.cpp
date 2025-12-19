@@ -1,13 +1,3 @@
-/*
-  ==============================================================================
-
-    TransferFunctionEvaluator.cpp
-    Created: 14 May 2025 10:58:31am
-    Author:  janic
-
-  ==============================================================================
-*/
-
 #include "ExpressionEvaluator.h"
 
 namespace dsp_core {

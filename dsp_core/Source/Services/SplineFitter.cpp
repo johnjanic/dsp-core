@@ -8,15 +8,11 @@
 
 namespace dsp_core::Services {
 
-//==============================================================================
-// Main API
-//==============================================================================
-
 SplineFitResult SplineFitter::fitCurve(const LayeredTransferFunction& ltf, const SplineFitConfig& config) {
 
     SplineFitResult result;
 
-    // Step 0: FEATURE-BASED ANCHOR PLACEMENT (Phase 3 - optional)
+    // Step 0: Feature-based anchor placement (optional)
     // Detect and anchor at geometric features (structural correctness)
     // Limit mandatory features to 70% of maxAnchors, reserving 30% for error-driven refinement
     std::vector<int> mandatoryIndices;
@@ -81,10 +77,6 @@ SplineFitResult SplineFitter::fitCurve(const LayeredTransferFunction& ltf, const
     return result;
 }
 
-//==============================================================================
-// Step 1: Sample & Sanitize
-//==============================================================================
-
 std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(const LayeredTransferFunction& ltf,
                                                                   const SplineFitConfig& config) {
 
@@ -93,7 +85,7 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(const LayeredT
     samples.reserve(tableSize * 2); // Reserve extra space for densification
 
     // Raster-to-polyline: sample entire composite (what user sees)
-    // CRITICAL: normalizationScalar is preserved when entering spline mode
+    // normalizationScalar is preserved when entering spline mode
     // evaluateBaseAndHarmonics applies the correct normScalar to return normalized values
     for (int i = 0; i < tableSize; ++i) {
         double x = ltf.normalizeIndex(i);           // Maps to [-1, 1]
@@ -101,8 +93,8 @@ std::vector<SplineFitter::Sample> SplineFitter::sampleAndSanitize(const LayeredT
         samples.push_back({x, y});
     }
 
-    // Phase 2.1 (Simplified): Add midpoint samples for better coverage
-    // CRITICAL: Must sample actual curve, NOT linear interpolation!
+    // Add midpoint samples for better coverage
+    // Must sample actual curve, NOT linear interpolation!
     // Linear interpolation creates false errors for high-frequency curves (e.g., Harmonic 15)
     std::vector<Sample> densified;
     densified.reserve(samples.size() * 2);
@@ -200,9 +192,7 @@ void SplineFitter::clampToRange(std::vector<Sample>& samples) {
     }
 }
 
-//==============================================================================
 // Tangent Computation (Dispatcher)
-//==============================================================================
 
 void SplineFitter::computeTangents(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
@@ -226,9 +216,7 @@ void SplineFitter::computeTangents(std::vector<SplineAnchor>& anchors, const Spl
     }
 }
 
-//==============================================================================
 // PCHIP Tangent Computation (Implementation)
-//==============================================================================
 
 void SplineFitter::computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, const SplineFitConfig& config) {
 
@@ -279,7 +267,7 @@ void SplineFitter::computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, 
         anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, anchors[i].tangent);
     }
 
-    // Phase 1.1: Overshoot detection and correction
+    // Overshoot detection and correction
     // Check if PCHIP cubic overshoots the monotonic range between anchors
     // This prevents visual "bulges" and sonic artifacts in smooth regions
     const int maxOvershootIterations = 3; // Iterative refinement
@@ -314,7 +302,7 @@ void SplineFitter::computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, 
         }
     }
 
-    // Phase 1.2: Length-based tangent scaling
+    // Length-based tangent scaling
     // Very long segments (sparse anchor distribution) need gentler tangents to avoid oscillation
     // Only apply scaling to segments longer than threshold (0.3 = 15% of full range)
     const double longSegmentThreshold = 0.3;

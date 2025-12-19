@@ -4,10 +4,6 @@
 
 namespace dsp_core {
 
-//==============================================================================
-// Pimpl - Private implementation
-//==============================================================================
-
 /**
  * SeamlessTransferFunction::Impl - Private implementation with all components
  *
@@ -61,10 +57,6 @@ class SeamlessTransferFunction::Impl {
     std::function<void()> visualizerCallback;
 };
 
-//==============================================================================
-// SeamlessTransferFunction Implementation
-//==============================================================================
-
 SeamlessTransferFunction::SeamlessTransferFunction()
     : pimpl(std::make_unique<Impl>()) {
     // editingModel already initialized in Impl constructor
@@ -73,8 +65,7 @@ SeamlessTransferFunction::SeamlessTransferFunction()
 }
 
 SeamlessTransferFunction::~SeamlessTransferFunction() {
-    // CRITICAL: Stop async operations before destruction
-    // releaseResources() is async, so we need synchronous stop here
+    // Stop async operations before destruction (releaseResources() is async)
 
     // Stop poller first (no more jobs enqueued)
     if (pimpl->poller) {
@@ -113,9 +104,9 @@ void SeamlessTransferFunction::prepareToPlay(double sampleRate, int samplesPerBl
 }
 
 void SeamlessTransferFunction::releaseResources() {
-    // CRITICAL FIX: Do NOT stop seamless updates here!
+    // Do NOT stop seamless updates here!
     //
-    // WHY: DAWs call releaseResources() unpredictably (e.g., when stopping playback,
+    // DAWs call releaseResources() unpredictably (e.g., when stopping playback,
     // or even during initialization). The seamless update system should stay alive
     // for the plugin's entire lifetime because:
     //
@@ -125,7 +116,7 @@ void SeamlessTransferFunction::releaseResources() {
     //
     // The only time we should stop seamless updates is in the destructor.
     //
-    // PREVIOUS BUG: Calling stopSeamlessUpdates() here destroyed the poller,
+    // Previous bug: Calling stopSeamlessUpdates() here destroyed the poller,
     // breaking UI updates after DAW called releaseResources().
 }
 

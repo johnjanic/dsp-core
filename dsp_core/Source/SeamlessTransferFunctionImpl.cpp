@@ -417,8 +417,9 @@ void LUTRendererThread::processJobs() {
     int start1, size1, start2, size2;
     while (true) {
         jobQueue.prepareToRead(1, start1, size1, start2, size2);
-        if (size1 == 0)
+        if (size1 == 0) {
             break;
+        }
 
         latestJob = jobSlots[start1];
         jobQueue.finishedRead(1);
@@ -457,7 +458,7 @@ namespace {
             return frozenScalar;
         }
 
-        std::vector<double> coeffsVec(coefficients.begin(), coefficients.end());
+        const std::vector<double> coeffsVec(coefficients.begin(), coefficients.end());
         double maxAbsValue = 0.0;
 
         for (int i = 0; i < TABLE_SIZE; ++i) {
@@ -576,7 +577,7 @@ void TransferFunctionDirtyPoller::timerCallback() {
     const uint64_t currentVersion = ltf.getVersion();
 
     if (currentVersion != lastSeenVersion) {
-        RenderJob job = captureRenderJob();
+        const RenderJob job = captureRenderJob();
         renderer.enqueueJob(job);
         lastSeenVersion = currentVersion;
     }
@@ -585,7 +586,7 @@ void TransferFunctionDirtyPoller::timerCallback() {
 void TransferFunctionDirtyPoller::forceRender() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
-    RenderJob job = captureRenderJob();
+    const RenderJob job = captureRenderJob();
     renderer.enqueueJob(job);
     lastSeenVersion = ltf.getVersion();
 }

@@ -1,13 +1,3 @@
-/*
-  ==============================================================================
-
-    TransferFunctionEvaluator.h
-    Created: 14 May 2025 10:58:51am
-    Author:  janic
-
-  ==============================================================================
-*/
-
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
