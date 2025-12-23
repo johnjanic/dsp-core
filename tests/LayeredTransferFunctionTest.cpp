@@ -413,6 +413,41 @@ TEST_F(LayeredTransferFunctionTest, BakeHarmonics_NoOpForZeroHarmonics) {
     }
 }
 
+TEST_F(LayeredTransferFunctionTest, BakeHarmonics_ZeroWTBakesZerosToBase) {
+    // Regression test: When WT=0 and no harmonics, baking should zero the base layer
+    // (preserving the zero composite the user saw, not the old base layer values)
+
+    // Set WT=0 (base layer hidden) and populate base layer with non-zero values
+    ltf->setCoefficient(0, 0.0); // WT = 0
+    for (int i = 0; i < 256; ++i) {
+        ltf->setBaseLayerValue(i, static_cast<double>(i) / 256.0);
+    }
+
+    // Composite should be zero everywhere (WT=0, no harmonics)
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_NEAR(ltf->computeCompositeAt(i), 0.0, 1e-12);
+    }
+
+    // Bake - should transfer zeros to base layer
+    bool baked = ltf->bakeHarmonicsToBase();
+
+    // Should return true (actual baking happened because WT != 1.0)
+    EXPECT_TRUE(baked);
+
+    // WT should now be 1.0
+    EXPECT_NEAR(ltf->getCoefficient(0), 1.0, 1e-12);
+
+    // Base layer should now be zeros (preserving what user saw)
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_NEAR(ltf->getBaseLayerValue(i), 0.0, 1e-12);
+    }
+
+    // Composite should still be zero (visual identity preserved)
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_NEAR(ltf->computeCompositeAt(i), 0.0, 1e-12);
+    }
+}
+
 TEST_F(LayeredTransferFunctionTest, BakeHarmonics_TransfersCompositeToBase) {
     // Set base layer and harmonics
     ltf->setCoefficient(0, 1.0); // Full WT mix

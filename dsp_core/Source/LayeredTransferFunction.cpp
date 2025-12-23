@@ -216,9 +216,12 @@ bool LayeredTransferFunction::hasNonZeroHarmonics() const {
 }
 
 bool LayeredTransferFunction::bakeHarmonicsToBase() {
-    // Early exit if no harmonics to bake (no-op optimization)
-    if (!hasNonZeroHarmonics()) {
-        return false;
+    // Early exit only if composite equals base layer (no-op optimization)
+    // This requires: WT=1.0 AND no harmonics (then composite = 1.0 * base + 0 = base)
+    // If WT != 1.0, we must bake even with no harmonics because composite = WT * base
+    const bool wtIsOne = std::abs(coefficients[0] - 1.0) <= HARMONIC_EPSILON;
+    if (wtIsOne && !hasNonZeroHarmonics()) {
+        return false;  // Composite already equals base layer, nothing to bake
     }
 
     // Batch update guard: Defer version increment until end of function
