@@ -570,12 +570,12 @@ RenderJob LUTRenderTimer::captureRenderJob() {
     return job;
 }
 
-// VisualizerUpdateTimer Implementation (60Hz, direct model reads)
+// VisualizerUpdateTimer Implementation (120Hz, direct model reads)
 
 VisualizerUpdateTimer::VisualizerUpdateTimer(LayeredTransferFunction& model)
     : editingModel(model) {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    startTimerHz(60);  // 60Hz for smooth UI updates
+    startTimerHz(120);  // 120Hz for smooth UI updates during drag
 }
 
 VisualizerUpdateTimer::~VisualizerUpdateTimer() {
@@ -597,6 +597,15 @@ void VisualizerUpdateTimer::timerCallback() {
         lastSeenVersion = currentVersion;
 
         if (visualizerLUTPtr) {
+            // Update normalization scalar for Harmonic mode (must be computed fresh when harmonics change)
+            // Paint mode: uses frozen scalar during strokes (controller manages this)
+            // Spline mode: doesn't use normalization scalar
+            if (editingModel.getRenderingMode() == RenderingMode::Harmonic &&
+                editingModel.isNormalizationEnabled() &&
+                !editingModel.isPaintStrokeActive()) {
+                editingModel.updateNormalizationScalar();
+            }
+
             // Get normalization scalar for rendering
             const double normScalar = editingModel.getNormalizationScalar();
 
@@ -618,6 +627,13 @@ void VisualizerUpdateTimer::forceUpdate() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     if (visualizerLUTPtr) {
+        // Update normalization scalar for Harmonic mode (must be computed fresh when harmonics change)
+        if (editingModel.getRenderingMode() == RenderingMode::Harmonic &&
+            editingModel.isNormalizationEnabled() &&
+            !editingModel.isPaintStrokeActive()) {
+            editingModel.updateNormalizationScalar();
+        }
+
         // Get normalization scalar for rendering
         const double normScalar = editingModel.getNormalizationScalar();
 
