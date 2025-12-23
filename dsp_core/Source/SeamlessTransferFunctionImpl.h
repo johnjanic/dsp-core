@@ -13,7 +13,8 @@ namespace dsp_core {
 // Forward declarations
 struct RenderJob;
 class LUTRendererThread;
-class TransferFunctionDirtyPoller;
+class LUTRenderTimer;
+class VisualizerUpdateTimer;
 
 // Constants (hardcoded for performance)
 static constexpr int TABLE_SIZE = 16384;          // DSP LUT size (audio thread)
@@ -284,14 +285,14 @@ struct RenderJob {
 };
 
 /**
- * LUTRendererThread - Background worker thread that renders LUTs from RenderJobs
+ * LUTRendererThread - Background worker thread that renders DSP LUTs from RenderJobs
  *
  * Architecture:
- *   - Lock-free job queue (AbstractFifo, 4 slots - sufficient for 25Hz polling)
+ *   - Lock-free job queue (AbstractFifo, 4 slots - sufficient for 20Hz polling)
  *   - Job coalescing: drains queue, renders only latest job
  *   - Worker-owned LayeredTransferFunction for isolated rendering
  *   - Writes to lutBuffers[workerTargetIndex] (safe from audio thread)
- *   - Updates visualizer via MessageManager::callAsync
+ *   - DSP LUT ONLY (visualizer handled separately by VisualizerUpdateTimer)
  *
  * Queue Overflow:
  *   - Silently drops jobs if queue full (acceptable - next poll will retry)
@@ -301,7 +302,6 @@ struct RenderJob {
  * Thread Safety:
  *   - Worker thread: reads from job queue, writes to workerTargetIndex buffer
  *   - Audio thread: never touches workerTargetIndex buffer (safe isolation)
- *   - Message thread: receives visualizer updates via callAsync
  *
  * Self-Contained RenderJobs:
  *   - No ContentStore dependency (preserves dsp-core module boundary)
@@ -316,12 +316,10 @@ class LUTRendererThread : public juce::Thread {
      * @param audioEngine Reference to AudioEngine (to check crossfade state)
      * @param workerTargetIdx Reference to atomic index (where to write LUT)
      * @param readyFlag Reference to atomic flag (signals audio thread)
-     * @param visualizerCallback Optional callback for visualizer repaints
      */
     LUTRendererThread(AudioEngine& audioEngine,
                       std::atomic<int>& workerTargetIdx,
-                      std::atomic<bool>& readyFlag,
-                      std::function<void()> visualizerCallback = nullptr);
+                      std::atomic<bool>& readyFlag);
 
     /**
      * Worker thread main loop
@@ -342,31 +340,13 @@ class LUTRendererThread : public juce::Thread {
     void enqueueJob(const RenderJob& job);
 
     /**
-     * Set visualizer callback (message thread only)
-     *
-     * Called after LUT render completes (via MessageManager::callAsync).
-     *
-     * @param callback Callback function for visualizer repaint
-     */
-    void setVisualizerCallback(std::function<void()> callback);
-
-    /**
-     * Set visualizer LUT buffer pointer (message thread only)
-     *
-     * Worker thread will write to this buffer via MessageManager::callAsync.
-     *
-     * @param lutPtr Pointer to UI-owned visualizer LUT buffer (VISUALIZER_LUT_SIZE samples)
-     */
-    void setVisualizerLUTPointer(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr);
-
-    /**
-     * Get pointer to LUT buffers (for direct worker writes)
+     * Set LUT buffers pointer (for direct worker writes)
      *
      * Worker thread writes to lutBuffers[workerTargetIndex].
      *
-     * @return Pointer to LUT buffer array (from AudioEngine)
+     * @param buffers Pointer to LUT buffer array (from AudioEngine)
      */
-    void setLUTBuffersPointer(LUTBuffer* lutBuffers);
+    void setLUTBuffersPointer(LUTBuffer* buffers);
 
   private:
     /**
@@ -374,33 +354,13 @@ class LUTRendererThread : public juce::Thread {
      *
      * Drains entire queue, keeping only the latest job.
      * Renders that job into workerTargetIndex buffer.
-     *
-     * TWO-SPEED RENDERING STRATEGY:
-     *   1. FAST PATH: Always render visualizer LUT (2K samples, ~2ms)
-     *      - Updates UI immediately via MessageManager::callAsync
-     *   2. SLOW PATH: Conditionally render DSP LUT (16K samples, ~16ms)
-     *      - Only renders if !audioEngine.isCrossfading()
-     *      - Skips render if audio thread is busy crossfading
-     *   3. CPU savings: Skip 16K render when DSP can't accept new LUT
      */
     void processJobs();
 
     /**
-     * Render visualizer LUT from self-contained RenderJob (FAST PATH)
-     *
-     * Renders 2K samples for UI display (~2ms).
-     * ALWAYS called, regardless of crossfade state.
-     * Updates visualizer buffer via MessageManager::callAsync.
-     *
-     * @param job RenderJob containing full state snapshot
-     */
-    void renderVisualizerLUT(const RenderJob& job);
-
-    /**
-     * Render DSP LUT from self-contained RenderJob (SLOW PATH)
+     * Render DSP LUT from self-contained RenderJob
      *
      * Renders 16K samples for audio processing (~16ms).
-     * ONLY called if !audioEngine.isCrossfading().
      * Writes to lutBuffers[workerTargetIndex].
      *
      * Workflow:
@@ -419,7 +379,7 @@ class LUTRendererThread : public juce::Thread {
      */
     void renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuffer);
 
-    // Job queue (lock-free, 4 slots is sufficient given 25Hz polling + job coalescing)
+    // Job queue (lock-free, 4 slots is sufficient given 20Hz polling + job coalescing)
     juce::WaitableEvent wakeEvent;
     juce::AbstractFifo jobQueue{4};
     RenderJob jobSlots[4];
@@ -436,14 +396,13 @@ class LUTRendererThread : public juce::Thread {
 
     // LUT buffers pointer (from AudioEngine)
     LUTBuffer* lutBuffers{nullptr};
-
-    // Visualizer integration
-    std::function<void()> onVisualizerUpdate;
-    std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr{nullptr};
 };
 
 /**
- * TransferFunctionDirtyPoller - Timer-based version change detector
+ * LUTRenderTimer - Timer-based DSP LUT renderer with guaranteed delivery (20Hz)
+ *
+ * Separate from visualizer updates to optimize for crossfade timing.
+ * Uses two-version tracking to guarantee final changes are never skipped.
  *
  * THREADING CONTRACT (CRITICAL):
  *   - MUST run on message thread (JUCE Timer contract)
@@ -451,50 +410,45 @@ class LUTRendererThread : public juce::Thread {
  *   - Reads non-atomic data (coefficients vector, base layer)
  *   - Constructor asserts isThisTheMessageThread()
  *   - timerCallback() asserts message thread in debug builds
- *   - DO NOT override timer thread behavior
  *
- * Architecture:
- *   - Polls LayeredTransferFunction.getVersion() at 25Hz (40ms interval)
- *   - Detects version changes (version != lastSeenVersion)
- *   - Captures self-contained RenderJob snapshot
- *   - Enqueues job to LUTRendererThread
- *   - NO ContentStore dependency (preserves module boundaries)
+ * Two-Version Tracking (GUARANTEED DELIVERY):
+ *   - lastSeenVersion: What version we last observed
+ *   - lastRenderedVersion: What version we last sent to worker
+ *   - Invariant: Eventually lastRenderedVersion == lastSeenVersion
+ *   - Render triggered when: lastRenderedVersion != lastSeenVersion
+ *   - This ensures the FINAL change is never skipped
  *
  * Performance:
- *   - <100μs overhead per tick
- *   - Full snapshot capture: ~128KB memcpy (acceptable at 25Hz)
+ *   - 20Hz update rate (50ms, matches crossfade timing)
+ *   - ~3x fewer 16K LUT renders compared to 60Hz
+ *   - Full snapshot capture: ~128KB memcpy
  *   - CPU overhead: <0.1%
- *
- * Initial Render:
- *   - forceRender() triggers immediate render (used for initialization)
- *   - Ensures visualizer shows correct curve on startup
  */
-class TransferFunctionDirtyPoller : public juce::Timer {
+class LUTRenderTimer : public juce::Timer {
   public:
     /**
-     * Construct dirty poller (message thread only)
+     * Construct LUT render timer (message thread only)
      *
      * CRITICAL: Asserts that construction happens on message thread.
-     * This is required because we read non-atomic data from LayeredTransferFunction.
+     * Starts timer at 20Hz automatically.
      *
      * @param ltf LayeredTransferFunction to poll (editing model)
      * @param renderer LUTRendererThread to enqueue jobs to
      */
-    TransferFunctionDirtyPoller(LayeredTransferFunction& ltf, LUTRendererThread& renderer);
+    LUTRenderTimer(LayeredTransferFunction& ltf, LUTRendererThread& renderer);
 
     /**
-     * Destructor - cancels any pending async callbacks
-     *
-     * CRITICAL: Sets destructed flag to prevent use-after-free from pending callbacks.
+     * Destructor - stops timer
      */
-    ~TransferFunctionDirtyPoller();
+    ~LUTRenderTimer();
 
     /**
      * Timer callback - polls version and enqueues jobs (message thread)
      *
-     * Called at 25Hz (40ms interval).
-     * Checks if version has changed since last tick.
-     * If changed, captures RenderJob and enqueues to worker thread.
+     * Called at 20Hz (50ms interval).
+     * Uses two-version tracking for guaranteed delivery:
+     *   1. Update lastSeenVersion if version changed
+     *   2. If lastRenderedVersion != lastSeenVersion, render
      *
      * CRITICAL: Asserts message thread in debug builds.
      */
@@ -505,7 +459,7 @@ class TransferFunctionDirtyPoller : public juce::Timer {
      *
      * Used for initial setup - ensures first LUT render happens immediately.
      * Captures current state and enqueues job without waiting for next tick.
-     * Updates lastSeenVersion to prevent duplicate render on next tick.
+     * Updates both lastSeenVersion and lastRenderedVersion.
      */
     void forceRender();
 
@@ -530,6 +484,64 @@ class TransferFunctionDirtyPoller : public juce::Timer {
 
     LayeredTransferFunction& ltf;
     LUTRendererThread& renderer;
+    uint64_t lastSeenVersion{0};
+    uint64_t lastRenderedVersion{0};  // For guaranteed final delivery
+};
+
+/**
+ * VisualizerUpdateTimer - Fast timer for direct model sampling (60Hz)
+ *
+ * Separate from DSP LUT rendering to decouple visualizer responsiveness
+ * from audio update frequency. Samples the editing model directly on the
+ * message thread without using the worker thread.
+ *
+ * Threading:
+ *   - MUST run on message thread (JUCE Timer contract)
+ *   - Reads from editingModel directly (safe - message thread only)
+ *   - Writes to visualizerLUT directly (safe - message thread only)
+ *
+ * Performance:
+ *   - 60Hz update rate for smooth UI
+ *   - ~0.5ms per update (1024 points sampled)
+ *   - No worker thread overhead
+ */
+class VisualizerUpdateTimer : public juce::Timer {
+  public:
+    /**
+     * Construct visualizer timer (message thread only)
+     *
+     * @param model Reference to editing model for sampling
+     */
+    explicit VisualizerUpdateTimer(LayeredTransferFunction& model);
+
+    /**
+     * Destructor - stops timer
+     */
+    ~VisualizerUpdateTimer() override;
+
+    /**
+     * Set visualizer target buffer and callback
+     *
+     * @param lutPtr Pointer to visualizer LUT buffer
+     * @param callback Callback to invoke after update
+     */
+    void setVisualizerTarget(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr,
+                             std::function<void()> callback);
+
+    /**
+     * Timer callback - samples model and updates visualizer (60Hz)
+     */
+    void timerCallback() override;
+
+    /**
+     * Force immediate update (for initialization)
+     */
+    void forceUpdate();
+
+  private:
+    LayeredTransferFunction& editingModel;
+    std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr{nullptr};
+    std::function<void()> onVisualizerUpdate;
     uint64_t lastSeenVersion{0};
 };
 

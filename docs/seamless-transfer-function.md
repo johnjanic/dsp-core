@@ -12,34 +12,38 @@ Transfer function updates require milliseconds (spline evaluation, 40-harmonic s
 
 ## The Solution
 
-**Three-thread architecture** with lock-free communication:
+**Three-thread architecture** with lock-free communication and **two-timer design**:
 
 ```
-Message Thread              Worker Thread              Audio Thread
-(UI mutations)             (LUT rendering)            (Playback)
-     │                           │                         │
-     │  Version change           │                         │
-     ├──────────────────────────>│                         │
-     │  detected (25Hz poll)     │                         │
-     │                           │                         │
-     │                           │ Render LUT              │
-     │                           │ (5-15ms)                │
-     │                           │                         │
-     │                           │ Set newLUTReady ────────>│
-     │                           │   (atomic)              │
-     │                           │                         │
-     │                           │                         │ Check flag
-     │                           │                         │ (once per block)
-     │                           │                         │
-     │                           │                         │ Rotate buffers
-     │                           │                         │
-     │                           │                         │ Start crossfade
-     │                           │                         │ (50ms linear)
+                     SeamlessTransferFunction (self-contained)
+                    ┌─────────────────────────────────────────┐
+                    │                                         │
+VisualizerUpdateTimer (60Hz)              LUTRenderTimer (20Hz)
+    │                                          │
+    └─→ Version changed?                       ├─→ Track lastSeenVersion
+        └─→ Sample editingModel directly       ├─→ Track lastRenderedVersion
+            (1024 points, ~0.5ms)              │
+            └─→ visualizerCallback             └─→ lastRendered != lastSeen?
+                                                   └─→ Enqueue RenderJob (DSP only)
+                                                            │
+                                               LUTRendererThread (Worker)
+                                                   └─→ renderDSPLUT() only (16K)
+                                                       └─→ newLUTReady.store(true)
+                                                                │
+                                                       Audio Thread
+                                                           └─→ Check flag, rotate buffers
+                                                               └─→ 50ms crossfade
 ```
+
+**Key Design: Two-Timer Architecture**
+- **VisualizerUpdateTimer (60Hz)**: Direct model reads for responsive UI (~0.5ms per update)
+- **LUTRenderTimer (20Hz)**: DSP LUT updates with guaranteed delivery via two-version tracking
 
 **Benefits**:
 - Audio thread never blocks (wait-free reads)
-- UI stays responsive during complex renders
+- UI stays responsive (60Hz visualizer, decoupled from DSP)
+- DSP renders ~3x less often (20Hz vs 60Hz), saving CPU
+- Guaranteed final delivery via two-version tracking
 - Crossfades mask discontinuities
 - Lock-free communication via atomics
 
@@ -74,7 +78,9 @@ LUTBuffer lutBuffers[3];
 
 ### 2. LUTRendererThread (Worker Thread)
 
-**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L266-L371)
+**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L286-L399)
+
+**DSP LUT Only** - Visualizer is handled separately by VisualizerUpdateTimer.
 
 **Job Queue**:
 ```cpp
@@ -87,47 +93,79 @@ RenderJob jobSlots[4];           // Job storage (~524KB total)
 **Rendering Workflow**:
 1. Dequeue all pending jobs → keep latest
 2. Restore state into worker-owned `LayeredTransferFunction`
-3. Call `updateComposite()` (5-15ms)
-4. Copy composite to `lutBuffers[workerTargetIndex]`
+3. Render 16K samples via `evaluateForRendering()` (~5-15ms)
+4. Copy to `lutBuffers[workerTargetIndex]`
 5. Set `newLUTReady = true` (release ordering)
-6. Update visualizer LUT via `MessageManager::callAsync`
 
-### 3. TransferFunctionDirtyPoller (Message Thread)
+### 3. LUTRenderTimer (Message Thread, 20Hz)
 
-**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L404-L466)
+**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L441-L535)
 
-**⚠️ CRITICAL THREADING CONTRACT**:
+**Two-Version Tracking for Guaranteed Delivery**:
 ```cpp
-TransferFunctionDirtyPoller::TransferFunctionDirtyPoller(...) {
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    // MUST construct on message thread because we read non-atomic data!
-}
+uint64_t lastSeenVersion{0};      // What version we last observed
+uint64_t lastRenderedVersion{0};  // What version we last sent to worker
 ```
 
-**Why Message Thread Only?**
-- Reads non-atomic data (coefficients vector, base layer array)
-- LayeredTransferFunction is mutated from message thread (via controller)
-- JUCE Timer contract requires message thread execution
+**Invariant**: Eventually `lastRenderedVersion == lastSeenVersion`. This ensures the final change is never skipped.
 
-**Polling Algorithm**:
+**Timer Algorithm (20Hz)**:
 ```cpp
 void timerCallback() override {
     uint64_t currentVersion = ltf.getVersion();
 
+    // Track version changes
     if (currentVersion != lastSeenVersion) {
-        RenderJob job = captureRenderJob();  // ~128KB memcpy
-        renderer.enqueueJob(job);            // Lock-free enqueue
         lastSeenVersion = currentVersion;
+    }
+
+    // Render if we're behind - handles BOTH intermediate AND final
+    if (lastRenderedVersion != lastSeenVersion) {
+        RenderJob job = captureRenderJob();
+        renderer.enqueueJob(job);
+        lastRenderedVersion = lastSeenVersion;
     }
 }
 ```
 
-**Polling Rate**: 25Hz (40ms interval)
-- Fast enough: <40ms latency for UI-to-audio propagation
-- Slow enough: <0.1% CPU overhead
-- Job coalescing handles bursts (e.g., rapid painting)
+**Why 20Hz?** Matches crossfade timing (50ms). Renders ~3x less often than previous 60Hz approach while guaranteeing no changes are lost.
 
-### 4. Version Tracking System
+### 4. VisualizerUpdateTimer (Message Thread, 60Hz)
+
+**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L537-L592)
+
+**Direct Model Sampling** - No worker thread, no job queue. Samples the editing model directly on the message thread for responsive UI.
+
+**Timer Algorithm (60Hz)**:
+```cpp
+void timerCallback() override {
+    uint64_t currentVersion = editingModel.getVersion();
+
+    if (currentVersion != lastSeenVersion) {
+        lastSeenVersion = currentVersion;
+
+        // Get normalization scalar and sample model directly
+        const double normScalar = editingModel.getNormalizationScalar();
+
+        for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {  // 1024 points
+            const double x = MIN_VALUE + (i / 1023.0) * (MAX_VALUE - MIN_VALUE);
+            (*visualizerLUTPtr)[i] = editingModel.evaluateForRendering(x, normScalar);
+        }
+
+        if (onVisualizerUpdate) {
+            onVisualizerUpdate();  // Triggers UI repaint
+        }
+    }
+}
+```
+
+**Why 60Hz with Direct Reads?**
+- Decoupled from DSP render rate (20Hz)
+- ~0.5ms per update (1024 points vs 16K for DSP)
+- User sees their edit immediately (no worker thread latency)
+- Visual/audio discrepancy during crossfade is acceptable (audio catches up within 50ms)
+
+### 5. Version Tracking System
 
 **File**: [`modules/dsp-core/dsp_core/Source/LayeredTransferFunction.h`](../../modules/dsp-core/dsp_core/Source/LayeredTransferFunction.h)
 
@@ -147,14 +185,14 @@ public:
 
 **Version Counter Properties**:
 - NOT serialized (runtime-only dirty tracking)
-- Atomic (safe to read from poller thread while UI mutates editing model)
-- Acquire/Release ordering (ensures mutations visible to poller thread)
+- Atomic (safe to read from timer callbacks while UI mutates editing model)
+- Acquire/Release ordering (ensures mutations visible to timer callbacks)
 
 ### 5. Normalization Architecture
 
 **File**: [`modules/dsp-core/dsp_core/Source/LayeredTransferFunction.h`](../../modules/dsp-core/dsp_core/Source/LayeredTransferFunction.h)
 
-**Core Principle**: Normalization is the **renderer's responsibility**, computed at max 25Hz. UI code never recomputes normalization on-the-fly.
+**Core Principle**: Normalization is the **renderer's responsibility**, computed at max 20Hz (DSP) or 60Hz (visualizer). UI code never recomputes normalization on-the-fly.
 
 **Cached Scalar Pattern**:
 ```cpp
@@ -175,7 +213,7 @@ double computeCompositeAt(int index) const {
 **Why Explicit Caching?**
 - **Performance**: Eliminates O(n²) bug where equation mode rendered 16K points, each calling `computeCompositeAt()` which scanned 16K table = 268M iterations
 - **Simplicity**: Controller no longer needs complex defer normalization management
-- **Correctness**: Renderer recomputes normalization at 25Hz, UI uses frozen scalar during interactive edits
+- **Correctness**: Renderer recomputes normalization at 20Hz (DSP) or 60Hz (visualizer), UI uses frozen scalar during interactive edits
 
 **Paint Stroke Freezing**:
 ```cpp
@@ -188,7 +226,7 @@ void beginPaintStrokeDirect() {
 
 void endPaintStrokeDirect() {
     layeredTransferFunction.setPaintStrokeActive(false);  // Unfreeze
-    // Renderer will recompute normalization at next 25Hz poll
+    // Renderer will recompute normalization at next 20Hz DSP poll
 }
 ```
 
@@ -291,7 +329,7 @@ case RenderingMode::Spline:
 
 **Why no normalization**: Splines are already constrained to [-1, 1] by the UI. Scanning 16K spline evaluations would only find max ≈ 1.0, wasting CPU cycles for no benefit.
 
-**Performance**: Eliminates unnecessary 16K scan on every spline change (25Hz polling would trigger expensive normalization constantly).
+**Performance**: Eliminates unnecessary 16K scan on every spline change (20Hz DSP polling would trigger expensive normalization constantly).
 
 **Contract**: Mode exit MUST bake spline to base WITHOUT normalization for the next mode.
 
@@ -299,7 +337,7 @@ case RenderingMode::Spline:
 
 **Breaking these contracts causes**:
 - **Paint mode reading un-baked harmonics**: Incorrect audio output (harmonics not applied)
-- **Unnecessary normalization scans**: Performance regression (16K iterations at 25Hz = 400K ops/sec wasted)
+- **Unnecessary normalization scans**: Performance regression (16K iterations at 20Hz = 320K ops/sec wasted)
 - **Visual discontinuities**: Baking with wrong normalization scalar causes jumps in visualizer
 - **Double-fit bug**: Fitting the base layer twice causes wrong curve to be fitted (see Critical Fix #22 below)
 
@@ -413,7 +451,7 @@ struct RenderJob {
 ```cpp
 TotalHarmonicControlAudioProcessor::TotalHarmonicControlAudioProcessor() {
     transferFunction = std::make_unique<dsp_core::SeamlessTransferFunction>();
-    transferFunction->startSeamlessUpdates();  // Creates poller + worker
+    transferFunction->startSeamlessUpdates();  // Creates timers + worker
 }
 ```
 
@@ -438,7 +476,7 @@ void SeamlessTransferFunction::releaseResources() {
     // or even during initialization). The seamless update system should stay alive
     // for the plugin's entire lifetime because:
     //
-    // 1. Poller runs on message thread (UI-related, not an audio resource)
+    // 1. Timers run on message thread (UI-related, not audio resources)
     // 2. Worker thread is idle when not rendering (no CPU overhead)
     // 3. Audio engine is always needed (not just during playback)
     //
@@ -493,7 +531,7 @@ if (newLUTReady.load(std::memory_order_acquire)) {
 
 1. **Worker Target Isolation**: Audio thread NEVER reads `lutBuffers[workerTargetIndex]`
 2. **Single Writer**: Only worker thread writes to `lutBuffers[workerTargetIndex]`
-3. **Message Thread Only**: Poller ONLY runs on message thread (JUCE Timer contract)
+3. **Message Thread Only**: Timers ONLY run on message thread (JUCE Timer contract)
 4. **No Allocations in Audio Thread**: All buffers pre-allocated in `prepareToPlay()`
 5. **Atomic Crossfade State**: `crossfading`, `crossfadePosition` are audio-thread-local (mutable)
 
@@ -547,34 +585,23 @@ void MyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 }
 ```
 
-### Step 3: Connect Editor Timer (CRITICAL for DAW Support)
+### Step 3: Set Up Visualizer Callback
 
 ```cpp
-// PluginEditor.h
-class MyAudioProcessorEditor : public juce::AudioProcessorEditor,
-                               public juce::Timer {
-private:
-    uint64_t lastSeenTransferFunctionVersion{0};
-};
-
 // PluginEditor.cpp
 MyAudioProcessorEditor::MyAudioProcessorEditor(MyAudioProcessor& p)
     : AudioProcessorEditor(&p), processor(p) {
-    startTimer(40);  // 25Hz polling
-}
 
-void MyAudioProcessorEditor::timerCallback() {
-    auto& tf = processor.getTransferFunction();
-    uint64_t currentVersion = tf.getEditingModel().getVersion();
-
-    if (currentVersion != lastSeenTransferFunctionVersion) {
-        tf.notifyEditingModelChanged();
-        lastSeenTransferFunctionVersion = currentVersion;
-    }
+    // Set up visualizer callback (called at 60Hz when model changes)
+    processor.getTransferFunction().setVisualizerCallback([this]() {
+        if (visualizerComponent != nullptr) {
+            visualizerComponent->repaint();
+        }
+    });
 }
 ```
 
-**⚠️ WHY EDITOR TIMER?** DAWs don't reliably pump JUCE message queue for backend services, but they MUST pump for UI components.
+**Note**: The internal `VisualizerUpdateTimer` (60Hz) and `LUTRenderTimer` (20Hz) handle all version tracking and update scheduling automatically. No Editor polling is required.
 
 ### Step 4: Mutate Editing Model (Message Thread Only)
 
@@ -582,7 +609,9 @@ void MyAudioProcessorEditor::timerCallback() {
 void onUserPaint(double x, double y) {
     auto& editingModel = transferFunction->getEditingModel();
     editingModel.setSplineAnchor(index, {x, y});
-    // Version change detected by editor timer within 40ms
+    // Version change detected by internal timers:
+    // - Visualizer: within ~17ms (60Hz)
+    // - DSP: within ~50ms (20Hz)
 }
 ```
 
@@ -604,18 +633,20 @@ void releaseResources() {
 }
 ```
 
-### 2. Forgetting Editor Timer
+### 2. Not Setting Visualizer Callback
 
 ```cpp
-// ❌ WRONG (backend timer won't fire reliably in DAWs)
-class MyAudioProcessor : public juce::AudioProcessor, public juce::Timer {
-    void timerCallback() override { /* unreliable */ }
-};
+// ❌ WRONG (visualizer never updates)
+MyAudioProcessorEditor::MyAudioProcessorEditor(MyAudioProcessor& p) {
+    // Forgot to set callback!
+}
 
-// ✅ CORRECT (editor timer fires reliably)
-class MyAudioProcessorEditor : public juce::AudioProcessorEditor, public juce::Timer {
-    void timerCallback() override { /* reliable */ }
-};
+// ✅ CORRECT (visualizer updates at 60Hz when model changes)
+MyAudioProcessorEditor::MyAudioProcessorEditor(MyAudioProcessor& p) {
+    processor.getTransferFunction().setVisualizerCallback([this]() {
+        visualizerComponent->repaint();
+    });
+}
 ```
 
 ### 3. Mutating Editing Model from Non-Message Thread
@@ -647,7 +678,7 @@ controller.onSomeCallback = [this]() {
 // Job coalescing ensures latest state shown with ~30ms latency (imperceptible)
 ```
 
-**Why critical**: Multiple visualizer update paths compete for control, causing flicker as worker processes stale queued jobs. Trust the 25Hz polling + job coalescing architecture - it's the single source of truth.
+**Why critical**: Multiple visualizer update paths compete for control, causing flicker as worker processes stale queued jobs. Trust the two-timer architecture - the 60Hz VisualizerUpdateTimer samples the model directly for the UI, while the 20Hz LUTRenderTimer handles DSP updates with guaranteed final delivery.
 
 ---
 
@@ -663,10 +694,10 @@ controller.onSomeCallback = [this]() {
 - Worker Thread: 0% when idle
 - Audio Thread: <1% (dominated by LUT cache misses)
 
-**Latency**: UI-to-Audio <50ms
-- 25Hz poll: worst-case 40ms to detect change
-- Worker render: 5-15ms
-- Audio crossfade: 50ms
+**Latency**:
+- UI-to-Visualizer: <17ms (60Hz timer, worst-case ~17ms to detect change)
+- UI-to-Audio: <65ms (20Hz timer worst-case 50ms + worker render 5-15ms)
+- Audio crossfade: 50ms (matches DSP poll rate)
 
 ---
 

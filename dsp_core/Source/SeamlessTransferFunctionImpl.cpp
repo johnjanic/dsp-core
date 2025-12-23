@@ -368,13 +368,11 @@ double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* 
 
 LUTRendererThread::LUTRendererThread(AudioEngine& audioEngine_,
                                      std::atomic<int>& workerTargetIdx,
-                                     std::atomic<bool>& readyFlag,
-                                     std::function<void()> visualizerCallback)
+                                     std::atomic<bool>& readyFlag)
     : juce::Thread("LUTRendererThread")
     , audioEngine(audioEngine_)
     , workerTargetIndex(workerTargetIdx)
-    , newLUTReady(readyFlag)
-    , onVisualizerUpdate(std::move(visualizerCallback)) {
+    , newLUTReady(readyFlag) {
     tempLTF = std::make_unique<LayeredTransferFunction>(TABLE_SIZE, MIN_VALUE, MAX_VALUE);
 }
 
@@ -423,13 +421,8 @@ void LUTRendererThread::processJobs() {
     }
 
     if (hasJob) {
-        // Always render both visualizer LUT (2K samples) and DSP LUT (16K samples)
-        // Previously skipped DSP render during crossfade to save CPU, but this caused
-        // bug where job was consumed without rendering (visualizer updates but audio
-        // still plays old value). Fix: Always render. Audio thread defers pickup via
-        // newLUTReady flag until crossfade completes.
-        renderVisualizerLUT(latestJob);
-
+        // Render DSP LUT only (16K samples)
+        // Visualizer is handled separately by VisualizerUpdateTimer (60Hz direct model reads)
         const int targetIdx = workerTargetIndex.load(std::memory_order_relaxed);
         if (lutBuffers != nullptr) {
             renderDSPLUT(latestJob, &lutBuffers[targetIdx]);
@@ -470,44 +463,6 @@ namespace {
     }
 } // namespace
 
-void LUTRendererThread::renderVisualizerLUT(const RenderJob& job) {
-    for (int i = 0; i < TABLE_SIZE; ++i) {
-        tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
-    }
-    tempLTF->setHarmonicCoefficients(job.coefficients);
-    tempLTF->setSplineAnchors(job.splineAnchors);
-    tempLTF->setInterpolationMode(job.interpolationMode);
-    tempLTF->setExtrapolationMode(job.extrapolationMode);
-    tempLTF->setRenderingMode(job.renderingMode);
-
-    // Compute normalization scalar (used by Harmonic mode, ignored by Paint/Spline modes)
-    const double normScalar = computeNormalizationScalar(
-        job.baseLayerData,
-        job.coefficients,
-        tempLTF->getHarmonicLayer(),
-        job.normalizationEnabled,
-        job.paintStrokeActive,
-        job.frozenNormalizationScalar
-    );
-
-    std::array<double, VISUALIZER_LUT_SIZE> visualizerData;
-    for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
-        const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
-        visualizerData[i] = tempLTF->evaluateForRendering(x, normScalar);
-    }
-
-    if (visualizerLUTPtr && onVisualizerUpdate) {
-        juce::MessageManager::callAsync([this, data = visualizerData]() {
-            if (visualizerLUTPtr) {
-                *visualizerLUTPtr = data;
-                if (onVisualizerUpdate) {
-                    onVisualizerUpdate();
-                }
-            }
-        });
-    }
-}
-
 void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuffer) {
     for (int i = 0; i < TABLE_SIZE; ++i) {
         tempLTF->setBaseLayerValue(i, job.baseLayerData[i]);
@@ -540,52 +495,56 @@ void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuff
     newLUTReady.store(true, std::memory_order_release);
 }
 
-void LUTRendererThread::setVisualizerCallback(std::function<void()> callback) {
-    onVisualizerUpdate = std::move(callback);
+void LUTRendererThread::setLUTBuffersPointer(LUTBuffer* buffers) {
+    lutBuffers = buffers;
 }
 
-void LUTRendererThread::setVisualizerLUTPointer(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr) {
-    visualizerLUTPtr = lutPtr;
-}
+// LUTRenderTimer Implementation (20Hz, DSP LUT only, guaranteed delivery)
 
-void LUTRendererThread::setLUTBuffersPointer(LUTBuffer* lutBuffers_) {
-    lutBuffers = lutBuffers_;
-}
-
-// TransferFunctionDirtyPoller Implementation
-
-TransferFunctionDirtyPoller::TransferFunctionDirtyPoller(LayeredTransferFunction& ltf_,
-                                                         LUTRendererThread& renderer_)
+LUTRenderTimer::LUTRenderTimer(LayeredTransferFunction& ltf_,
+                               LUTRendererThread& renderer_)
     : ltf(ltf_)
     , renderer(renderer_) {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    startTimerHz(20);  // 50ms interval, matches crossfade timing
 }
 
-TransferFunctionDirtyPoller::~TransferFunctionDirtyPoller() {
+LUTRenderTimer::~LUTRenderTimer() {
     stopTimer();
 }
 
-void TransferFunctionDirtyPoller::timerCallback() {
+void LUTRenderTimer::timerCallback() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     const uint64_t currentVersion = ltf.getVersion();
 
+    // Track version changes
     if (currentVersion != lastSeenVersion) {
+        lastSeenVersion = currentVersion;
+    }
+
+    // Render if we're behind - handles BOTH intermediate AND final renders
+    // This two-version tracking guarantees the final change is never skipped
+    if (lastRenderedVersion != lastSeenVersion) {
         const RenderJob job = captureRenderJob();
         renderer.enqueueJob(job);
-        lastSeenVersion = currentVersion;
+        lastRenderedVersion = lastSeenVersion;
     }
 }
 
-void TransferFunctionDirtyPoller::forceRender() {
+void LUTRenderTimer::forceRender() {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
 
     const RenderJob job = captureRenderJob();
     renderer.enqueueJob(job);
-    lastSeenVersion = ltf.getVersion();
+
+    // Update both versions to prevent duplicate render on next tick
+    const uint64_t currentVersion = ltf.getVersion();
+    lastSeenVersion = currentVersion;
+    lastRenderedVersion = currentVersion;
 }
 
-RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
+RenderJob LUTRenderTimer::captureRenderJob() {
     RenderJob job;
 
     for (int i = 0; i < TABLE_SIZE; ++i) {
@@ -609,6 +568,71 @@ RenderJob TransferFunctionDirtyPoller::captureRenderJob() {
     job.version = ltf.getVersion();
 
     return job;
+}
+
+// VisualizerUpdateTimer Implementation (60Hz, direct model reads)
+
+VisualizerUpdateTimer::VisualizerUpdateTimer(LayeredTransferFunction& model)
+    : editingModel(model) {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    startTimerHz(60);  // 60Hz for smooth UI updates
+}
+
+VisualizerUpdateTimer::~VisualizerUpdateTimer() {
+    stopTimer();
+}
+
+void VisualizerUpdateTimer::setVisualizerTarget(std::array<double, VISUALIZER_LUT_SIZE>* lutPtr,
+                                                 std::function<void()> callback) {
+    visualizerLUTPtr = lutPtr;
+    onVisualizerUpdate = std::move(callback);
+}
+
+void VisualizerUpdateTimer::timerCallback() {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+    const uint64_t currentVersion = editingModel.getVersion();
+
+    if (currentVersion != lastSeenVersion) {
+        lastSeenVersion = currentVersion;
+
+        if (visualizerLUTPtr) {
+            // Get normalization scalar for rendering
+            const double normScalar = editingModel.getNormalizationScalar();
+
+            // Direct model sampling - ~0.5ms for 1024 points
+            for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
+                const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1))
+                                           * (MAX_VALUE - MIN_VALUE);
+                (*visualizerLUTPtr)[i] = editingModel.evaluateForRendering(x, normScalar);
+            }
+
+            if (onVisualizerUpdate) {
+                onVisualizerUpdate();
+            }
+        }
+    }
+}
+
+void VisualizerUpdateTimer::forceUpdate() {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+    if (visualizerLUTPtr) {
+        // Get normalization scalar for rendering
+        const double normScalar = editingModel.getNormalizationScalar();
+
+        for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
+            const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1))
+                                       * (MAX_VALUE - MIN_VALUE);
+            (*visualizerLUTPtr)[i] = editingModel.evaluateForRendering(x, normScalar);
+        }
+
+        if (onVisualizerUpdate) {
+            onVisualizerUpdate();
+        }
+    }
+
+    lastSeenVersion = editingModel.getVersion();
 }
 
 } // namespace dsp_core
