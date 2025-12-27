@@ -79,14 +79,6 @@ struct SplineFitConfig {
     double positionTolerance = 0.01;
 
     /**
-     * Derivative tolerance - unused in adaptive algorithm (legacy parameter).
-     *
-     * Originally used for RDP simplification. Now kept for backward compatibility
-     * but not actively used in current greedy fitting algorithm.
-     */
-    double derivativeTolerance = 0.02;
-
-    /**
      * Maximum anchor budget - hard limit on anchor count.
      *
      * Interacts with adaptive tolerance:
@@ -298,7 +290,6 @@ struct SplineFitConfig {
     static SplineFitConfig tight() {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.005; // Relaxed from 0.002 for backtranslation stability
-        cfg.derivativeTolerance = 0.05;
         cfg.maxAnchors =
             128; // Optimal for perfect stability (3→3, 4→4) + exceptional quality (0.01% error)
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
@@ -308,7 +299,6 @@ struct SplineFitConfig {
     static SplineFitConfig smooth() {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.01;
-        cfg.derivativeTolerance = 0.02;
         cfg.maxAnchors = 24;
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;
@@ -317,7 +307,6 @@ struct SplineFitConfig {
     static SplineFitConfig monotonePreserving() {
         SplineFitConfig cfg;
         cfg.positionTolerance = 0.001;
-        cfg.derivativeTolerance = 0.02;
         cfg.maxAnchors = 32;
         cfg.tangentAlgorithm = TangentAlgorithm::FritschCarlson;
         return cfg;

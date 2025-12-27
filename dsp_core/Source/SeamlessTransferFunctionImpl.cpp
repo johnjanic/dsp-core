@@ -72,9 +72,6 @@ void AudioEngine::processBuffer(juce::AudioBuffer<double>& buffer) const {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
-    static int debugCounter = 0;
-    const bool shouldDebug = (++debugCounter % 10000 == 0);
-
     // Crossfade position advances once per sample (not per channel)
     for (int i = 0; i < numSamples; ++i) {
         if (crossfading) {

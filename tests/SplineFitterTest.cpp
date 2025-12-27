@@ -94,8 +94,7 @@ TEST(SplineTypesTest, SplineFitResult_DefaultInitialization) {
 TEST(SplineTypesTest, SplineFitConfig_DefaultValues) {
     dsp_core::SplineFitConfig config;
     EXPECT_DOUBLE_EQ(config.positionTolerance, 0.01);
-    EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.02);
-    EXPECT_EQ(config.maxAnchors, 64);
+    EXPECT_EQ(config.maxAnchors, 128);
     EXPECT_TRUE(config.enableRefinement);
     EXPECT_TRUE(config.enforceMonotonicity);
     EXPECT_DOUBLE_EQ(config.minSlope, -8.0);
@@ -106,14 +105,12 @@ TEST(SplineTypesTest, SplineFitConfig_DefaultValues) {
 TEST(SplineTypesTest, SplineFitConfig_TightPreset) {
     auto config = dsp_core::SplineFitConfig::tight();
     EXPECT_DOUBLE_EQ(config.positionTolerance, 0.005); // Relaxed from 0.002 for backtranslation stability
-    EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.05);
     EXPECT_EQ(config.maxAnchors, 128); // Increased from 64 to allow better convergence for steep curves
 }
 
 TEST(SplineTypesTest, SplineFitConfig_SmoothPreset) {
     auto config = dsp_core::SplineFitConfig::smooth();
     EXPECT_DOUBLE_EQ(config.positionTolerance, 0.01);
-    EXPECT_DOUBLE_EQ(config.derivativeTolerance, 0.02);
     EXPECT_EQ(config.maxAnchors, 24);
 }
 
@@ -850,7 +847,6 @@ TEST_F(FeatureBasedFittingTest, Tanh_NoSpuriousExtrema_PCHIP) {
 
     dsp_core::SplineFitConfig config;
     config.positionTolerance = 0.001;
-    config.derivativeTolerance = 0.1;
     config.maxAnchors = 32;
     config.tangentAlgorithm = dsp_core::TangentAlgorithm::PCHIP;
 
@@ -885,7 +881,6 @@ TEST_F(FeatureBasedFittingTest, Tanh_Akima_MinimalExtrema) {
 
     dsp_core::SplineFitConfig config;
     config.positionTolerance = 0.001;
-    config.derivativeTolerance = 0.1;
     config.maxAnchors = 32;
     config.tangentAlgorithm = dsp_core::TangentAlgorithm::Akima;
 
@@ -974,7 +969,6 @@ TEST_F(FeatureBasedFittingTest, TangentAlgorithmComparison_TanhQualityVsSpeed) {
     for (const auto& [algo, name] : algorithms) {
         dsp_core::SplineFitConfig config;
         config.positionTolerance = 0.001;
-        config.derivativeTolerance = 0.1;
         config.maxAnchors = 32;
         config.tangentAlgorithm = algo;
 

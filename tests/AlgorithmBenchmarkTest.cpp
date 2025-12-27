@@ -46,7 +46,6 @@ class AlgorithmBenchmark : public ::testing::Test {
         // Configure fitting (use smooth preset as baseline)
         dsp_core::SplineFitConfig config;
         config.positionTolerance = 0.01;
-        config.derivativeTolerance = 0.02;
         config.maxAnchors = 64; // Generous limit for fair comparison
         config.tangentAlgorithm = algo;
 

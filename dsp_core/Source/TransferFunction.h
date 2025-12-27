@@ -25,9 +25,6 @@ class TransferFunction {
     void setTableValue(int index, double value);
     void setTableValues(const double* samples, const int numSamples);
     double getTableValue(int index) const;
-    int getTableIndex(double x) const {
-        return static_cast<int>(juce::jmap(x, minSignalValue, maxSignalValue, 0.0, static_cast<double>(tableSize - 1)));
-    }
 
     int getTableSize() const {
         return tableSize;
@@ -50,9 +47,6 @@ class TransferFunction {
     void processBlock(double* samples, int numSamples) const;
 
   private:
-    const double minExtrapolationAmmount = -10.0;
-    const double maxExtrapolationAmmount = 10.0;
-
     double getSample(int i) const;
     double applyTransferFunctionLinear(double x) const;
     double applyTransferFunctionCubic(double x) const;

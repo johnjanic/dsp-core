@@ -65,7 +65,7 @@ double TransferFunction::applyTransferFunctionLinear(double x) const {
     const int index = static_cast<int>(x_proj);
     const double t = x_proj - index;
     const double y0 = getSample(index);
-    const double y1 = getSample(index);
+    const double y1 = getSample(index + 1);
     return interpolateLinear(y0, y1, t);
 }
 
