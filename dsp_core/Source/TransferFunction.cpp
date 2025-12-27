@@ -124,43 +124,10 @@ double TransferFunction::getSample(int i) const {
     return table[clampedIdx].load();
 }
 
-void TransferFunction::writeToStream(juce::MemoryOutputStream& stream) const {
-    for (int i = 0; i < tableSize; ++i) {
-        stream.writeDouble(getTableValue(i));
-    }
-}
-
-void TransferFunction::readFromStream(juce::MemoryInputStream& stream) {
-    for (int i = 0; i < tableSize; ++i) {
-        setTableValue(i, stream.readDouble());
-    }
-}
-
-void TransferFunction::applyFunction(const std::function<double(double)>& func) {
-    for (int i = 0; i < tableSize; ++i) {
-        const double x = normalizeIndex(i);
-        const double y = juce::jlimit(minSignalValue, maxSignalValue, func(x));
-        setTableValue(i, y);
-    }
-}
-
 void TransferFunction::processBlock(double* samples, int numSamples) const {
     for (int n = 0; n < numSamples; ++n) {
         const double inputSample = samples[n];
         samples[n] = applyTransferFunction(inputSample);
-    }
-}
-
-void TransferFunction::normalizeByMaximum() {
-    double maxVal = 0.0;
-    for (const auto& v : table) {
-        const double absVal = std::abs(v.load());
-        maxVal = std::max(absVal, maxVal);
-    }
-    if (maxVal > 0.0) {
-        for (auto& v : table) {
-            v.store(v.load() / maxVal);
-        }
     }
 }
 

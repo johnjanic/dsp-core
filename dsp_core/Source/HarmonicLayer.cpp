@@ -1,15 +1,10 @@
 #include "HarmonicLayer.h"
 #include <cmath>
 #include <algorithm>
-#include <juce_data_structures/juce_data_structures.h>
 
 namespace dsp_core {
 
 HarmonicLayer::HarmonicLayer(int numHarmonics_) : numHarmonics(numHarmonics_) {}
-
-void HarmonicLayer::setAlgorithm(Algorithm algo) {
-    algorithm = algo;
-}
 
 double HarmonicLayer::evaluate(double x, const std::vector<double>& coefficients, int tableSize) const {
     // Validate coefficient array size

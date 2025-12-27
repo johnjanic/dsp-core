@@ -136,12 +136,6 @@ class CurveFeatureDetector {
     static FeatureResult detectFeatures(const LayeredTransferFunction& ltf,
                                         const FeatureDetectionConfig& config = FeatureDetectionConfig{});
 
-    /**
-     * Legacy overload for backward compatibility
-     * @deprecated Use version with FeatureDetectionConfig instead
-     */
-    static FeatureResult detectFeatures(const LayeredTransferFunction& ltf, int maxMandatoryAnchors);
-
   private:
     CurveFeatureDetector() = delete; // Pure static service
 

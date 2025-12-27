@@ -283,20 +283,6 @@ TEST_F(CurveFeatureDetectorTest, SignificanceFilter_LargeExtrema_AllPreserved) {
     EXPECT_LE(features.localExtrema.size(), 5) << "Should not detect spurious extrema";
 }
 
-/**
- * Test: Backward compatibility - legacy overload still works
- */
-TEST_F(CurveFeatureDetectorTest, LegacyOverload_WorksCorrectly) {
-    createSineCurve(1);
-
-    // Use legacy overload (maxMandatoryAnchors parameter)
-    auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, 5);
-
-    EXPECT_LE(features.mandatoryAnchors.size(), static_cast<size_t>(5))
-        << "Legacy overload should respect maxMandatoryAnchors limit";
-    EXPECT_GE(features.mandatoryAnchors.size(), 2) << "Should always have at least endpoints";
-}
-
 // ============================================================================
 // Exact Extrema Positioning Tests (TDD - Stage 1: Expose discretization issue)
 // ============================================================================

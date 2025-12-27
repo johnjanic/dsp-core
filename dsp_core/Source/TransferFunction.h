@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <atomic>
-#include <functional>
 #include <juce_core/juce_core.h>
 
 namespace dsp_core {
@@ -48,16 +47,7 @@ class TransferFunction {
         return table;
     }
 
-    // Serialization helpers
-    void writeToStream(juce::MemoryOutputStream&) const;
-    void readFromStream(juce::MemoryInputStream&);
-
-    // Apply a function to the table (for editor or processor use)
-    void applyFunction(const std::function<double(double)>& func);
     void processBlock(double* samples, int numSamples) const;
-
-    // Normalize the table so the maximum value becomes 1.0 (if max != 0)
-    void normalizeByMaximum();
 
   private:
     const double minExtrapolationAmmount = -10.0;

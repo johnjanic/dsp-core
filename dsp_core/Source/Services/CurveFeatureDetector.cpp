@@ -2,7 +2,6 @@
 #include "../LayeredTransferFunction.h"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <limits>
 
 namespace dsp_core::Services {
@@ -213,14 +212,6 @@ double CurveFeatureDetector::estimateSecondDerivative(const LayeredTransferFunct
     double y_next = ltf.getBaseLayerValue(idx + 1);
 
     return (y_next - 2.0 * y + y_prev) / (h * h);
-}
-
-// Legacy overload for backward compatibility
-CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const LayeredTransferFunction& ltf,
-                                                                         int maxMandatoryAnchors) {
-    FeatureDetectionConfig config;
-    config.maxFeatures = maxMandatoryAnchors;
-    return detectFeatures(ltf, config);
 }
 
 } // namespace dsp_core::Services

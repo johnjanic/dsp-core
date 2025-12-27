@@ -31,11 +31,6 @@ class HarmonicLayer {
         return numHarmonics;
     }
 
-    void setAlgorithm(Algorithm algo);
-    Algorithm getAlgorithm() const {
-        return algorithm;
-    }
-
     // Evaluation (thread-safe read)
 
     /**
