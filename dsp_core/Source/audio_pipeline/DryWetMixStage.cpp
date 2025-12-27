@@ -5,7 +5,6 @@ namespace dsp_core::audio_pipeline {
 
 namespace {
 constexpr int kMaxChannels = 8; // Support stereo, 5.1, 7.1
-constexpr int kDebugLogInterval = 10000; // Debug logging frequency
 } // namespace
 
 DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)

@@ -26,12 +26,12 @@ class SplineFitter {
   public:
     // Main API: Fit painted curve to spline anchors
     static SplineFitResult fitCurve(const LayeredTransferFunction& ltf,
-                                    const SplineFitConfig& config = SplineFitConfig::smooth());
+                                    const SplineFitConfig& config = SplineFitConfig::tight());
 
     // Tangent computation (exposed for manual anchor manipulation)
     // Recomputes tangents for anchors after position changes using configured algorithm
     static void computeTangents(std::vector<SplineAnchor>& anchors,
-                                const SplineFitConfig& config = SplineFitConfig::smooth());
+                                const SplineFitConfig& config = SplineFitConfig::tight());
 
     // Zero-crossing analysis (exposed for testing)
     struct ZeroCrossingInfo {

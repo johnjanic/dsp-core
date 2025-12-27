@@ -320,11 +320,8 @@ bool LayeredTransferFunction::isSplineLayerEnabled() const {
 }
 
 void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {
-    const auto oldMode = getRenderingMode();
     renderingMode.store(static_cast<int>(mode), std::memory_order_release);
     incrementVersionIfNotBatching();
-
-    // DIAGNOSTIC: Log rendering mode changes to track bug
 }
 
 RenderingMode LayeredTransferFunction::getRenderingMode() const {
