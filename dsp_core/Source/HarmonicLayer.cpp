@@ -145,7 +145,12 @@ bool HarmonicLayer::operator==(const HarmonicLayer& other) const {
 int HarmonicLayer::xToTableIndex(double x, int tableSize, double minVal, double maxVal) const {
     // Map x from [minVal, maxVal] to table index [0, tableSize-1]
     // Inverse of the jmap operation used in precomputeBasisFunctions
-    return static_cast<int>(juce::jmap(x, minVal, maxVal, 0.0, static_cast<double>(tableSize - 1)));
+    //
+    // CRITICAL: Use std::round() instead of truncation to ensure proper round-trip
+    // with normalizeIndex(). Without rounding, floating-point precision errors cause
+    // off-by-one index lookups (e.g., 948.9999... truncates to 948 instead of 949),
+    // which creates subtle differences in baked values between equivalent curves.
+    return static_cast<int>(std::round(juce::jmap(x, minVal, maxVal, 0.0, static_cast<double>(tableSize - 1))));
 }
 
 } // namespace dsp_core
