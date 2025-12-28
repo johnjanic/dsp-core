@@ -323,6 +323,23 @@ class LayeredTransferFunction {
     void bakeCompositeToBase();
 
     /**
+     * Bake spline layer into base layer and reset harmonics
+     *
+     * This evaluates the current spline curve at all table indices and writes
+     * the values to the base layer. After baking:
+     *   - Base layer contains the spline values (visually identical curve)
+     *   - All harmonic coefficients are set to zero
+     *   - WT mix coefficient is set to 1.0 (enables base layer)
+     *   - Normalization scalar will be recalculated by renderer
+     *
+     * Use this when exiting Spline mode to preserve the edited spline shape.
+     *
+     * THREAD SAFETY: Call from message thread only. Increments version counter
+     * to trigger renderer update at next 25Hz poll.
+     */
+    void bakeSplineToBase();
+
+    /**
      * Get current harmonic coefficients for undo/redo
      *
      * @return array: [wtMix, h1, h2, ..., h40] (41 values)

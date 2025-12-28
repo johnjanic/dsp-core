@@ -51,6 +51,9 @@ void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, doubl
 
             if (n == 0) {
                 basisFunctions[n][i] = 0.0; // Reserved for WT (handled in compositor)
+            } else if (n == 1) {
+                // H1: sin(asin(x)) = x exactly, avoid floating-point round-trip error
+                basisFunctions[n][i] = x;
             } else if (n % 2 == 0) {
                 // Even harmonics: cos(n * acos(x))
                 basisFunctions[n][i] = std::cos(n * std::acos(x));
@@ -73,7 +76,10 @@ double HarmonicLayer::evaluateChebyshevTrig(double x, const std::vector<double>&
 
     for (int n = 1; n < N; ++n) {
         double term = 0.0;
-        if (n % 2 == 0) {
+        if (n == 1) {
+            // H1: sin(asin(x)) = x exactly, avoid floating-point round-trip error
+            term = x;
+        } else if (n % 2 == 0) {
             // Even harmonics: cos(n * acos(x))
             term = std::cos(n * std::acos(x));
         } else {

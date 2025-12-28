@@ -1,4 +1,5 @@
 #include "LayeredTransferFunction.h"
+#include "Services/SplineEvaluator.h"
 #include <algorithm>
 #include <cmath>
 #include <juce_core/juce_core.h>
@@ -283,6 +284,46 @@ void LayeredTransferFunction::bakeCompositeToBase() {
 
     // Step 6: Version increment happens automatically when guard destructor runs
     // (16,384 base layer writes + coefficient changes → 1 version increment)
+}
+
+void LayeredTransferFunction::bakeSplineToBase() {
+    // Batch update guard: Defer version increment until end of function
+    // NOLINTNEXTLINE(misc-const-correctness) - RAII guard, destructor modifies state
+    BatchUpdateGuard guard(*this);
+
+    // Step 1: Get current spline anchors
+    const auto& anchors = splineLayer->getAnchors();
+    if (anchors.empty()) {
+        return;  // No spline to bake
+    }
+
+    // Step 2: Batch evaluate spline at all table indices
+    std::vector<double> xValues(static_cast<size_t>(tableSize));
+    std::vector<double> yValues(static_cast<size_t>(tableSize));
+
+    for (int i = 0; i < tableSize; ++i) {
+        xValues[static_cast<size_t>(i)] = normalizeIndex(i);
+    }
+
+    Services::SplineEvaluator::evaluateBatch(anchors, xValues.data(), yValues.data(), tableSize);
+
+    // Step 3: Write evaluated spline values to base layer
+    for (int i = 0; i < tableSize; ++i) {
+        setBaseLayerValue(i, yValues[static_cast<size_t>(i)]);
+    }
+
+    // Step 4: Set WT coefficient to 1.0 (enable base layer)
+    coefficients[0] = 1.0;
+
+    // Step 5: Zero out all harmonic coefficients (h1..h40)
+    for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
+        coefficients[i] = 0.0;
+    }
+
+    // Step 6: Recalculate normalization scalar for the new state
+    updateNormalizationScalar();
+
+    // Step 7: Version increment happens automatically when guard destructor runs
 }
 
 std::array<double, LayeredTransferFunction::NUM_HARMONIC_COEFFICIENTS>
