@@ -251,26 +251,6 @@ class LayeredTransferFunction {
     bool isNormalizationEnabled() const;
 
     /**
-     * Enable or disable spline layer (LEGACY API - delegates to setRenderingMode)
-     *
-     * This is a convenience wrapper for:
-     *   setSplineLayerEnabled(true)  → setRenderingMode(RenderingMode::Spline)
-     *   setSplineLayerEnabled(false) → setRenderingMode(RenderingMode::Paint)
-     *
-     * DEPRECATED: Use setRenderingMode() directly for clarity.
-     *
-     * @param enabled If true, enable spline mode; if false, use paint mode
-     */
-    void setSplineLayerEnabled(bool enabled);
-
-    /**
-     * Check if spline layer is currently enabled (LEGACY API)
-     *
-     * DEPRECATED: Use getRenderingMode() == RenderingMode::Spline instead.
-     */
-    bool isSplineLayerEnabled() const;
-
-    /**
      * Set rendering mode (determines evaluation path for LUT rendering)
      *
      * Paint    → Direct base layer (no normalization)
@@ -428,28 +408,16 @@ class LayeredTransferFunction {
      */
     void processBlock(double* samples, int numSamples) const;
 
-    // Interpolation/Extrapolation Modes (same as TransferFunction)
+    // Extrapolation Mode
 
-    enum class InterpolationMode { Linear, Cubic, CatmullRom };
     enum class ExtrapolationMode { Clamp, Linear };
 
-    void setInterpolationMode(InterpolationMode mode) {
-        interpMode = mode;
-        // Increment version to trigger LUT re-render with new interpolation mode
-        // NOTE: Interpolation mode affects LUT evaluation, not LUT contents, but
-        // we re-render anyway for simplicity
-
-        incrementVersionIfNotBatching();
-    }
     void setExtrapolationMode(ExtrapolationMode mode) {
         extrapMode = mode;
         // Increment version to trigger LUT re-render with new extrapolation mode
         incrementVersionIfNotBatching();
     }
 
-    InterpolationMode getInterpolationMode() const {
-        return interpMode;
-    }
     ExtrapolationMode getExtrapolationMode() const {
         return extrapMode;
     }
@@ -624,16 +592,12 @@ class LayeredTransferFunction {
         }
     }
 
-    InterpolationMode interpMode = InterpolationMode::CatmullRom;
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
 
-    // Interpolation helpers with dual-path optimization
-    // Each method has two code paths selected by a single branch on extrapMode:
+    // Interpolation helper (Catmull-Rom) with dual-path optimization
+    // Two code paths selected by a single branch on extrapMode:
     //   - Fast path (Clamp): Direct clamped loads, relaxed memory order (default)
     //   - Slow path (Linear): Boundary checks + slope calculations for extrapolation
-    double interpolate(double x) const;
-    double interpolateLinear(double x) const;
-    double interpolateCubic(double x) const;
     double interpolateCatmullRom(double x) const;
 
     /**

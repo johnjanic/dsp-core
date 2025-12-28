@@ -36,16 +36,16 @@ class LayeredTransferFunctionSplineTest : public ::testing::Test {
 //==============================================================================
 
 TEST_F(LayeredTransferFunctionSplineTest, SplineLayerInitiallyDisabled) {
-    EXPECT_FALSE(ltf->isSplineLayerEnabled());
+    EXPECT_NE(ltf->getRenderingMode(), RenderingMode::Spline);
 }
 
 TEST_F(LayeredTransferFunctionSplineTest, SplineLayerCanBeEnabled) {
-    ltf->setSplineLayerEnabled(true);
-    EXPECT_TRUE(ltf->isSplineLayerEnabled());
+    ltf->setRenderingMode(RenderingMode::Spline);
+    EXPECT_EQ(ltf->getRenderingMode(), RenderingMode::Spline);
 }
 
 TEST_F(LayeredTransferFunctionSplineTest, EnablingSplineLayerLocksNormalization) {
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
     EXPECT_NEAR(ltf->getNormalizationScalar(), 1.0, 1e-9);
 }
 
@@ -56,7 +56,7 @@ TEST_F(LayeredTransferFunctionSplineTest, EnablingSplineLayerLocksNormalization)
 TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
     // Set up spline layer
     ltf->getSplineLayer().setAnchors(threePtAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Evaluate (should use direct path since cache invalid)
     double result = ltf->applyTransferFunction(0.0);
@@ -65,7 +65,7 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
 
 TEST_F(LayeredTransferFunctionSplineTest, DirectPathAtAnchorPoints) {
     ltf->getSplineLayer().setAnchors(threePtAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     EXPECT_NEAR(ltf->applyTransferFunction(-1.0), -1.0, kTolerance);
     EXPECT_NEAR(ltf->applyTransferFunction(0.0), 0.5, kTolerance);
@@ -81,7 +81,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
     ltf->setCoefficient(1, 0.5); // Harmonic 1 amplitude
 
     // Enable spline layer
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Audio thread should use spline, ignoring harmonics
     ltf->getSplineLayer().setAnchors(linearAnchors);
@@ -94,12 +94,12 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
 TEST_F(LayeredTransferFunctionSplineTest, DisablingSplineLayerRestoresHarmonicMode) {
     // Enable spline mode
     ltf->getSplineLayer().setAnchors(linearAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     const double splineResult = ltf->applyTransferFunction(0.5);
 
     // Disable spline mode
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     const double harmonicResult = ltf->applyTransferFunction(0.5);
 
@@ -118,7 +118,7 @@ TEST_F(LayeredTransferFunctionSplineTest, DisablingSplineLayerRestoresHarmonicMo
 
 TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
     ltf->getSplineLayer().setAnchors(threePtAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify on-demand computation matches direct evaluation
     // Note: In spline mode, computeCompositeAt() returns base+harmonics (not spline)
@@ -133,7 +133,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
 
 TEST_F(LayeredTransferFunctionSplineTest, SplineEvaluationPreservesShape) {
     ltf->getSplineLayer().setAnchors(threePtAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Check anchor points via audio evaluation path
     int midIdx = ltf->getTableSize() / 2;
@@ -155,7 +155,7 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
     SplineFitter::computeTangents(largeAnchors, SplineFitConfig::tight());
 
     ltf->getSplineLayer().setAnchors(largeAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // In spline mode, normalization is locked to 1.0
     // So values should not be scaled down

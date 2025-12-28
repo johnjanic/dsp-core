@@ -26,8 +26,6 @@ static constexpr double MAX_VALUE = 1.0;
 struct LUTBuffer {
     std::array<double, TABLE_SIZE> data;
     uint64_t version{0};
-    LayeredTransferFunction::InterpolationMode interpolationMode{
-        LayeredTransferFunction::InterpolationMode::CatmullRom};
     LayeredTransferFunction::ExtrapolationMode extrapolationMode{
         LayeredTransferFunction::ExtrapolationMode::Clamp};
 };
@@ -150,28 +148,13 @@ class AudioEngine {
     void checkForNewLUT() const;
 
     /**
-     * Evaluate LUT with interpolation/extrapolation
+     * Evaluate LUT with Catmull-Rom interpolation
      *
      * @param lut LUT buffer to evaluate
      * @param x Input value
      * @return Interpolated output value
      */
     double evaluateLUT(const LUTBuffer* lut, double x) const;
-
-    /**
-     * Linear interpolation helper (fast path for most common case)
-     */
-    double evaluateLinear(const LUTBuffer* lut, double x) const;
-
-    /**
-     * Cubic interpolation helper
-     */
-    double evaluateCubic(const LUTBuffer* lut, double x) const;
-
-    /**
-     * Catmull-Rom interpolation helper
-     */
-    double evaluateCatmullRom(const LUTBuffer* lut, double x) const;
 
     /**
      * Evaluate crossfade between two LUTs (OPTIMIZED)
@@ -184,7 +167,7 @@ class AudioEngine {
      * 1. Map x to fractional index once (j + delta)
      * 2. Fetch 4 samples from each LUT at same positions
      * 3. Mix corresponding samples: mixed[i] = gainOld * old[i] + gainNew * new[i]
-     * 4. Do ONE interpolation on mixed samples
+     * 4. Do ONE Catmull-Rom interpolation on mixed samples
      *
      * Saves one complex polynomial evaluation per sample during crossfade.
      *
@@ -199,12 +182,8 @@ class AudioEngine {
                             double x, double gainOld, double gainNew) const;
 
     /**
-     * Perform interpolation on 4 pre-fetched samples
+     * Catmull-Rom interpolation on 4 pre-fetched samples
      *
-     * Used by evaluateCrossfade to interpolate mixed samples.
-     * Dispatches to correct interpolation mode.
-     *
-     * @param mode Interpolation mode
      * @param y0 Sample at index-1
      * @param y1 Sample at index
      * @param y2 Sample at index+1
@@ -212,8 +191,7 @@ class AudioEngine {
      * @param t Fractional position [0, 1]
      * @return Interpolated value
      */
-    double interpolate4Samples(LayeredTransferFunction::InterpolationMode mode,
-                              double y0, double y1, double y2, double y3, double t) const;
+    static double interpolateCatmullRom(double y0, double y1, double y2, double y3, double t);
 
     // TRIPLE BUFFERING (prevents data race during crossfade):
     // - lutBuffers[0,1]: Used for crossfading (audio thread reads)
@@ -271,9 +249,7 @@ struct RenderJob {
     // Frozen normalization scalar (used when paintStrokeActive = true)
     double frozenNormalizationScalar{1.0};
 
-    // Interpolation/extrapolation modes
-    LayeredTransferFunction::InterpolationMode interpolationMode{
-        LayeredTransferFunction::InterpolationMode::CatmullRom};
+    // Extrapolation mode
     LayeredTransferFunction::ExtrapolationMode extrapolationMode{
         LayeredTransferFunction::ExtrapolationMode::Clamp};
 

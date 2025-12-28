@@ -244,41 +244,7 @@ TEST_F(AudioEngineTest, Crossfade_NewLUTDefersUntilComplete) {
 // ============================================================================
 
 /**
- * Test: Linear interpolation matches expected behavior
- * Expected: Smooth interpolation between table points
- */
-TEST_F(AudioEngineTest, Interpolation_LinearIsAccurate) {
-    engine->prepareToPlay(44100.0, 512);
-
-    // Set up a simple linear ramp in worker buffer
-    dsp_core::LUTBuffer* buffers = engine->getLUTBuffers();
-    for (int i = 0; i < dsp_core::TABLE_SIZE; ++i) {
-        const double x = dsp_core::MIN_VALUE + (i / static_cast<double>(dsp_core::TABLE_SIZE - 1)) *
-                                                    (dsp_core::MAX_VALUE - dsp_core::MIN_VALUE);
-        buffers[2].data[i] = 2.0 * x; // y = 2x
-    }
-    buffers[2].version = 1;
-    buffers[2].interpolationMode = dsp_core::LayeredTransferFunction::InterpolationMode::Linear;
-
-    // Swap to new LUT
-    engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
-
-    // Skip crossfade
-    const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
-    juce::AudioBuffer<double> skipBuffer(1, crossfadeSamples);
-    skipBuffer.clear();
-    engine->processBuffer(skipBuffer);
-
-    // Test interpolation at various points
-    const std::vector<double> testInputs = {-0.75, -0.25, 0.0, 0.33, 0.99};
-    for (double x : testInputs) {
-        double output = engine->applyTransferFunction(x);
-        EXPECT_NEAR(output, 2.0 * x, 1e-4) << "Linear interpolation should match y = 2x for input " << x;
-    }
-}
-
-/**
- * Test: Catmull-Rom interpolation works
+ * Test: Catmull-Rom interpolation works (hardcoded, no mode selection)
  * Expected: Smooth cubic interpolation
  */
 TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
@@ -292,7 +258,7 @@ TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
         buffers[2].data[i] = x * x; // y = x^2
     }
     buffers[2].version = 1;
-    buffers[2].interpolationMode = dsp_core::LayeredTransferFunction::InterpolationMode::CatmullRom;
+    // Note: No interpolationMode - Catmull-Rom is now hardcoded
 
     // Swap to new LUT
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
@@ -303,7 +269,7 @@ TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
     skipBuffer.clear();
     engine->processBuffer(skipBuffer);
 
-    // Test interpolation (should be more accurate than linear for curves)
+    // Test interpolation (should be accurate for curves)
     const std::vector<double> testInputs = {-0.5, 0.0, 0.5};
     for (double x : testInputs) {
         double output = engine->applyTransferFunction(x);

@@ -194,7 +194,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_SplineFitting) {
     auto t0 = std::chrono::high_resolution_clock::now();
 
     // Enable spline layer (triggers SplineFitter)
-    editingModel.setSplineLayerEnabled(true);
+    editingModel.setRenderingMode(dsp_core::RenderingMode::Spline);
 
     // Wait for spline fitting and LUT render
     std::this_thread::sleep_for(std::chrono::milliseconds(600));

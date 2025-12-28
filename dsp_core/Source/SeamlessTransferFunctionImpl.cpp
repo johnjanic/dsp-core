@@ -36,7 +36,6 @@ AudioEngine::AudioEngine() {
             lutBuffers[bufIdx].data[i] = x;
         }
         lutBuffers[bufIdx].version = 0;
-        lutBuffers[bufIdx].interpolationMode = LayeredTransferFunction::InterpolationMode::CatmullRom;
         lutBuffers[bufIdx].extrapolationMode = LayeredTransferFunction::ExtrapolationMode::Clamp;
     }
 }
@@ -126,106 +125,6 @@ void AudioEngine::checkForNewLUT() const {
 }
 
 double AudioEngine::evaluateLUT(const LUTBuffer* lut, double x) const {
-    switch (lut->interpolationMode) {
-    case LayeredTransferFunction::InterpolationMode::Linear:
-        return evaluateLinear(lut, x);
-    case LayeredTransferFunction::InterpolationMode::Cubic:
-        return evaluateCubic(lut, x);
-    case LayeredTransferFunction::InterpolationMode::CatmullRom:
-        return evaluateCatmullRom(lut, x);
-    default:
-        return evaluateLinear(lut, x);
-    }
-}
-
-double AudioEngine::evaluateLinear(const LUTBuffer* lut, double x) const {
-    const double x_proj = (x - MIN_VALUE) / (MAX_VALUE - MIN_VALUE) * (TABLE_SIZE - 1);
-    const int index = static_cast<int>(x_proj);
-    const double t = x_proj - index;
-
-    if (lut->extrapolationMode == LayeredTransferFunction::ExtrapolationMode::Clamp) {
-        const int idx0 = std::clamp(index, 0, TABLE_SIZE - 1);
-        const int idx1 = std::clamp(index + 1, 0, TABLE_SIZE - 1);
-
-        const double y0 = lut->data[idx0];
-        const double y1 = lut->data[idx1];
-
-        return y0 + t * (y1 - y0);
-    }
-
-    double y0, y1;
-    if (index < 0) {
-        const double slope = lut->data[1] - lut->data[0];
-        y0 = lut->data[0] + slope * index;
-    } else if (index >= TABLE_SIZE) {
-        const double slope = lut->data[TABLE_SIZE - 1] - lut->data[TABLE_SIZE - 2];
-        y0 = lut->data[TABLE_SIZE - 1] + slope * (index - TABLE_SIZE + 1);
-    } else {
-        y0 = lut->data[index];
-    }
-
-    const int index1 = index + 1;
-    if (index1 < 0) {
-        const double slope = lut->data[1] - lut->data[0];
-        y1 = lut->data[0] + slope * index1;
-    } else if (index1 >= TABLE_SIZE) {
-        const double slope = lut->data[TABLE_SIZE - 1] - lut->data[TABLE_SIZE - 2];
-        y1 = lut->data[TABLE_SIZE - 1] + slope * (index1 - TABLE_SIZE + 1);
-    } else {
-        y1 = lut->data[index1];
-    }
-
-    return y0 + t * (y1 - y0);
-}
-
-double AudioEngine::evaluateCubic(const LUTBuffer* lut, double x) const {
-    const double x_proj = (x - MIN_VALUE) / (MAX_VALUE - MIN_VALUE) * (TABLE_SIZE - 1);
-    const int index = static_cast<int>(x_proj);
-    const double t = x_proj - index;
-
-    if (lut->extrapolationMode == LayeredTransferFunction::ExtrapolationMode::Clamp) {
-        const int idx0 = std::clamp(index - 1, 0, TABLE_SIZE - 1);
-        const int idx1 = std::clamp(index, 0, TABLE_SIZE - 1);
-        const int idx2 = std::clamp(index + 1, 0, TABLE_SIZE - 1);
-        const int idx3 = std::clamp(index + 2, 0, TABLE_SIZE - 1);
-
-        const double y0 = lut->data[idx0];
-        const double y1 = lut->data[idx1];
-        const double y2 = lut->data[idx2];
-        const double y3 = lut->data[idx3];
-
-        const double a0 = y3 - y2 - y0 + y1;
-        const double a1 = y0 - y1 - a0;
-        const double a2 = y2 - y0;
-        const double a3 = y1;
-        return a0 * t * t * t + a1 * t * t + a2 * t + a3;
-    }
-
-    auto getSample = [lut](int i) -> double {
-        if (i < 0) {
-            const double slope = lut->data[1] - lut->data[0];
-            return lut->data[0] + slope * i;
-        }
-        if (i >= TABLE_SIZE) {
-            const double slope = lut->data[TABLE_SIZE - 1] - lut->data[TABLE_SIZE - 2];
-            return lut->data[TABLE_SIZE - 1] + slope * (i - TABLE_SIZE + 1);
-        }
-        return lut->data[i];
-    };
-
-    const double y0 = getSample(index - 1);
-    const double y1 = getSample(index);
-    const double y2 = getSample(index + 1);
-    const double y3 = getSample(index + 2);
-
-    const double a0 = y3 - y2 - y0 + y1;
-    const double a1 = y0 - y1 - a0;
-    const double a2 = y2 - y0;
-    const double a3 = y1;
-    return a0 * t * t * t + a1 * t * t + a2 * t + a3;
-}
-
-double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
     const double x_proj = (x - MIN_VALUE) / (MAX_VALUE - MIN_VALUE) * (TABLE_SIZE - 1);
     const int index = static_cast<int>(x_proj);
     const double t = x_proj - index;
@@ -272,29 +171,11 @@ double AudioEngine::evaluateCatmullRom(const LUTBuffer* lut, double x) const {
     // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 }
 
-double AudioEngine::interpolate4Samples(LayeredTransferFunction::InterpolationMode mode,
-                                       double y0, double y1, double y2, double y3, double t) const {
-    switch (mode) {
-    case LayeredTransferFunction::InterpolationMode::Linear:
-        return y1 + t * (y2 - y1);
-
-    case LayeredTransferFunction::InterpolationMode::Cubic: {
-        const double a0 = y3 - y2 - y0 + y1;
-        const double a1 = y0 - y1 - a0;
-        const double a2 = y2 - y0;
-        const double a3 = y1;
-        return a0 * t * t * t + a1 * t * t + a2 * t + a3;
-    }
-
-    case LayeredTransferFunction::InterpolationMode::CatmullRom:
-        // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
-        return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
-                      (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
-        // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
-
-    default:
-        return y1 + t * (y2 - y1);
-    }
+double AudioEngine::interpolateCatmullRom(double y0, double y1, double y2, double y3, double t) {
+    // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
+    return 0.5 * ((2.0 * y1) + (-y0 + y2) * t + (2.0 * y0 - 5.0 * y1 + 4.0 * y2 - y3) * t * t +
+                  (-y0 + 3.0 * y1 - 3.0 * y2 + y3) * t * t * t);
+    // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 }
 
 double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* newLUT,
@@ -304,7 +185,6 @@ double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* 
     const int index = static_cast<int>(x_proj);
     const double t = x_proj - index;
 
-    const auto interpMode = newLUT->interpolationMode;
     const auto extrapMode = newLUT->extrapolationMode;
 
     if (extrapMode == LayeredTransferFunction::ExtrapolationMode::Clamp) {
@@ -328,7 +208,7 @@ double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* 
         const double mixed_y2 = gainOld * old_y2 + gainNew * new_y2;
         const double mixed_y3 = gainOld * old_y3 + gainNew * new_y3;
 
-        return interpolate4Samples(interpMode, mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
+        return interpolateCatmullRom(mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
     }
 
     auto getSample = [](const LUTBuffer* lut, int i) -> double {
@@ -358,7 +238,7 @@ double AudioEngine::evaluateCrossfade(const LUTBuffer* oldLUT, const LUTBuffer* 
     const double mixed_y2 = gainOld * old_y2 + gainNew * new_y2;
     const double mixed_y3 = gainOld * old_y3 + gainNew * new_y3;
 
-    return interpolate4Samples(interpMode, mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
+    return interpolateCatmullRom(mixed_y0, mixed_y1, mixed_y2, mixed_y3, t);
 }
 
 // LUTRendererThread Implementation
@@ -466,7 +346,6 @@ void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuff
     }
     tempLTF->setHarmonicCoefficients(job.coefficients);
     tempLTF->setSplineAnchors(job.splineAnchors);
-    tempLTF->setInterpolationMode(job.interpolationMode);
     tempLTF->setExtrapolationMode(job.extrapolationMode);
     tempLTF->setRenderingMode(job.renderingMode);
 
@@ -486,7 +365,6 @@ void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuff
     }
 
     outputBuffer->version = job.version;
-    outputBuffer->interpolationMode = job.interpolationMode;
     outputBuffer->extrapolationMode = job.extrapolationMode;
 
     newLUTReady.store(true, std::memory_order_release);
@@ -560,7 +438,6 @@ RenderJob LUTRenderTimer::captureRenderJob() {
         job.frozenNormalizationScalar = 1.0;
     }
 
-    job.interpolationMode = ltf.getInterpolationMode();
     job.extrapolationMode = ltf.getExtrapolationMode();
     job.version = ltf.getVersion();
 

@@ -8,8 +8,6 @@ namespace dsp_core {
 
 class TransferFunction {
   public:
-    enum class InterpolationMode { Linear, Cubic, CatmullRom };
-
     enum class ExtrapolationMode { Clamp, Linear };
 
     TransferFunction(int tableSize, double minSignalValue = -1.0, double maxSignalValue = 1.0);
@@ -19,7 +17,6 @@ class TransferFunction {
 
     double applyTransferFunction(double x) const;
 
-    void setInterpolationMode(InterpolationMode mode);
     void setExtrapolationMode(ExtrapolationMode mode);
 
     void setTableValue(int index, double value);
@@ -48,17 +45,11 @@ class TransferFunction {
 
   private:
     double getSample(int i) const;
-    double applyTransferFunctionLinear(double x) const;
-    double applyTransferFunctionCubic(double x) const;
-    double applyTransferFunctionCatmullRom(double x) const;
-    static double interpolateLinear(double y0, double y1, double t);
-    static double interpolateCubic(double y0, double y1, double y2, double y3, double t);
     static double interpolateCatmullRom(double y0, double y1, double y2, double y3, double t);
 
     int tableSize;
     double minSignalValue, maxSignalValue;
     std::vector<std::atomic<double>> table;
-    InterpolationMode interpolationMode = InterpolationMode::Cubic;
     ExtrapolationMode extrapolationMode = ExtrapolationMode::Clamp;
 };
 

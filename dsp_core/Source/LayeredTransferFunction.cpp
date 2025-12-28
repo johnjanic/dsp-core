@@ -198,13 +198,6 @@ bool LayeredTransferFunction::isNormalizationEnabled() const {
     return normalizationEnabled;
 }
 
-void LayeredTransferFunction::setSplineLayerEnabled(bool enabled) {
-    // LEGACY API - Simply delegates to RenderingMode (single source of truth)
-    // When enabled: use Spline rendering mode
-    // When disabled: use Paint rendering mode (harmonics should be baked by mode-exit contract)
-    setRenderingMode(enabled ? RenderingMode::Spline : RenderingMode::Paint);
-}
-
 bool LayeredTransferFunction::hasNonZeroHarmonics() const {
     // Check harmonics only (coefficients[1..40]), not WT mix at [0]
     for (int i = 1; i < static_cast<int>(coefficients.size()); ++i) {
@@ -314,11 +307,6 @@ void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, N
     incrementVersionIfNotBatching();
 }
 
-bool LayeredTransferFunction::isSplineLayerEnabled() const {
-    // Legacy API - delegates to RenderingMode (source of truth)
-    return getRenderingMode() == RenderingMode::Spline;
-}
-
 void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {
     renderingMode.store(static_cast<int>(mode), std::memory_order_release);
     incrementVersionIfNotBatching();
@@ -336,125 +324,13 @@ double LayeredTransferFunction::normalizeIndex(int index) const {
 }
 
 double LayeredTransferFunction::applyTransferFunction(double x) const {
-    return interpolate(x);
+    return interpolateCatmullRom(x);
 }
 
 void LayeredTransferFunction::processBlock(double* samples, int numSamples) const {
     for (int i = 0; i < numSamples; ++i) {
         samples[i] = applyTransferFunction(samples[i]);
     }
-}
-
-double LayeredTransferFunction::interpolate(double x) const {
-    switch (interpMode) {
-    case InterpolationMode::Linear:
-        return interpolateLinear(x);
-    case InterpolationMode::Cubic:
-        return interpolateCubic(x);
-    case InterpolationMode::CatmullRom:
-        return interpolateCatmullRom(x);
-    default:
-        return interpolateLinear(x);
-    }
-}
-
-double LayeredTransferFunction::interpolateLinear(double x) const {
-    // Map x from signal range to table index
-    const double x_proj = (x - minValue) / (maxValue - minValue) * (tableSize - 1);
-    const int index = static_cast<int>(x_proj);
-    const double t = x_proj - index;
-
-    // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
-    // Computes on-demand from base layer + harmonics (no cached composite table)
-    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
-        const int idx0 = juce::jlimit(0, tableSize - 1, index);
-        const int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
-
-        const double y0 = computeCompositeAt(idx0);
-        const double y1 = computeCompositeAt(idx1);
-
-        return y0 + t * (y1 - y0);
-    }
-
-    // Linear extrapolation path (requires boundary checks and slope calculations)
-    double y0;
-    double y1;
-
-    // Handle index
-    if (index < 0) {
-        const double slope = computeCompositeAt(1) - computeCompositeAt(0);
-        y0 = computeCompositeAt(0) + slope * index;
-    } else if (index >= tableSize) {
-        const double slope = computeCompositeAt(tableSize - 1) - computeCompositeAt(tableSize - 2);
-        y0 = computeCompositeAt(tableSize - 1) + slope * (index - tableSize + 1);
-    } else {
-        y0 = computeCompositeAt(index);
-    }
-
-    // Handle index + 1
-    const int index1 = index + 1;
-    if (index1 < 0) {
-        const double slope = computeCompositeAt(1) - computeCompositeAt(0);
-        y1 = computeCompositeAt(0) + slope * index1;
-    } else if (index1 >= tableSize) {
-        const double slope = computeCompositeAt(tableSize - 1) - computeCompositeAt(tableSize - 2);
-        y1 = computeCompositeAt(tableSize - 1) + slope * (index1 - tableSize + 1);
-    } else {
-        y1 = computeCompositeAt(index1);
-    }
-
-    return y0 + t * (y1 - y0);
-}
-
-double LayeredTransferFunction::interpolateCubic(double x) const {
-    // Map x from signal range to table index
-    const double x_proj = (x - minValue) / (maxValue - minValue) * (tableSize - 1);
-    const int index = static_cast<int>(x_proj);
-    const double t = x_proj - index;
-
-    // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
-    // Computes on-demand from base layer + harmonics (no cached composite table)
-    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
-        const int idx0 = juce::jlimit(0, tableSize - 1, index - 1);
-        const int idx1 = juce::jlimit(0, tableSize - 1, index);
-        const int idx2 = juce::jlimit(0, tableSize - 1, index + 1);
-        const int idx3 = juce::jlimit(0, tableSize - 1, index + 2);
-
-        const double y0 = computeCompositeAt(idx0);
-        const double y1 = computeCompositeAt(idx1);
-        const double y2 = computeCompositeAt(idx2);
-        const double y3 = computeCompositeAt(idx3);
-
-        const double a0 = y3 - y2 - y0 + y1;
-        const double a1 = y0 - y1 - a0;
-        const double a2 = y2 - y0;
-        const double a3 = y1;
-        return a0 * t * t * t + a1 * t * t + a2 * t + a3;
-    }
-
-    // Linear extrapolation path (helper lambda for readability)
-    auto getSample = [this](int i) -> double {
-        if (i < 0) {
-            const double slope = computeCompositeAt(1) - computeCompositeAt(0);
-            return computeCompositeAt(0) + slope * i;
-        }
-        if (i >= tableSize) {
-            const double slope = computeCompositeAt(tableSize - 1) - computeCompositeAt(tableSize - 2);
-            return computeCompositeAt(tableSize - 1) + slope * (i - tableSize + 1);
-        }
-        return computeCompositeAt(i);
-    };
-
-    const double y0 = getSample(index - 1);
-    const double y1 = getSample(index);
-    const double y2 = getSample(index + 1);
-    const double y3 = getSample(index + 2);
-
-    const double a0 = y3 - y2 - y0 + y1;
-    const double a1 = y0 - y1 - a0;
-    const double a2 = y2 - y0;
-    const double a3 = y1;
-    return a0 * t * t * t + a1 * t * t + a2 * t + a3;
 }
 
 double LayeredTransferFunction::interpolateCatmullRom(double x) const {
@@ -765,7 +641,6 @@ juce::ValueTree LayeredTransferFunction::toValueTree() const {
     vt.setProperty("normalizationEnabled", normalizationEnabled, nullptr);
 
     // Serialize settings
-    vt.setProperty("interpolationMode", static_cast<int>(interpMode), nullptr);
     vt.setProperty("extrapolationMode", static_cast<int>(extrapMode), nullptr);
 
     return vt;
@@ -829,9 +704,7 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     }
 
     // Load settings
-    if (vt.hasProperty("interpolationMode")) {
-        interpMode = static_cast<InterpolationMode>(static_cast<int>(vt.getProperty("interpolationMode")));
-    }
+    // Note: interpolationMode is ignored for backward compatibility (Catmull-Rom is now hardcoded)
     if (vt.hasProperty("extrapolationMode")) {
         extrapMode = static_cast<ExtrapolationMode>(static_cast<int>(vt.getProperty("extrapolationMode")));
     }

@@ -146,11 +146,11 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     SplineFitter::computeTangents(userAnchors, config);
 
     ltf->getSplineLayer().setAnchors(userAnchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // STEP c: Bake to 16k samples
     bakeSplineToBase();
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     // Capture baked state
     auto bakedState = captureBaseLayer();
@@ -166,7 +166,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
 
     // Verify shape preservation
     ltf->getSplineLayer().setAnchors(refitResult.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     auto refittedState = captureBaseLayer();
     double maxError = computeMaxError(bakedState, refittedState);
@@ -183,7 +183,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
             ltf->setBaseLayerValue(i, ltf->getBaseLayerValue(i) + bump);
         }
     }
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     // STEP g: Bake to 16k samples (already in base layer)
     auto scribbledState = captureBaseLayer();
@@ -198,7 +198,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
 
     // Verify shape still preserved
     ltf->getSplineLayer().setAnchors(finalResult.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
     double finalError = computeMaxError(scribbledState, finalState);
@@ -245,7 +245,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     EXPECT_TRUE(harmonicFitResult.success) << "Harmonic fit should succeed";
     ltf->getSplineLayer().setAnchors(harmonicFitResult.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // STEP d: Verify shape preserved (max error <5%)
     std::vector<double> splineState;
@@ -272,7 +272,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     // STEP g: Bake and refit
     bakeSplineToBase();
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     auto modifiedState = captureBaseLayer();
 
@@ -290,7 +290,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     // Verify shape preservation after refit
     ltf->getSplineLayer().setAnchors(refitResult.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
     double refitError = computeMaxError(modifiedState, finalState);
@@ -339,7 +339,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
 
         // Apply fitted spline
         ltf->getSplineLayer().setAnchors(fitResult.anchors);
-        ltf->setSplineLayerEnabled(true);
+        ltf->setRenderingMode(RenderingMode::Spline);
 
         // Measure error
         auto fittedState = captureBaseLayer();
@@ -348,7 +348,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
 
         // Bake back for next cycle
         bakeSplineToBase();
-        ltf->setSplineLayerEnabled(false);
+        ltf->setRenderingMode(RenderingMode::Paint);
     }
 
     // Verify convergence: last 2 cycles should have similar anchor counts
@@ -415,7 +415,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Apply first fit
     ltf->getSplineLayer().setAnchors(fitResult1.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify first fit quality
     std::vector<double> firstFit;
@@ -429,7 +429,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Backtranslate: bake spline → refit
     bakeSplineToBase();
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     bakeCompositeToBase();
     auto fitResult2 = SplineFitter::fitCurve(*ltf, config);
@@ -443,7 +443,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Apply second fit
     ltf->getSplineLayer().setAnchors(fitResult2.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify shape preservation
     std::vector<double> secondFit;
@@ -639,10 +639,10 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_Backtranslation_StableWithCorre
 
         // Apply fit and bake for next iteration
         ltf->getSplineLayer().setAnchors(fitResult.anchors);
-        ltf->setSplineLayerEnabled(true);
+        ltf->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
-        ltf->setSplineLayerEnabled(false);
+        ltf->setRenderingMode(RenderingMode::Paint);
     }
 
     // Verify zero-crossing preserved in all iterations
@@ -803,13 +803,13 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
 
         // Apply fit and measure error
         ltf->getSplineLayer().setAnchors(fitResult.anchors);
-        ltf->setSplineLayerEnabled(true);
+        ltf->setRenderingMode(RenderingMode::Spline);
 
         auto originalState = captureBaseLayer();
 
         // Bake for next iteration
         bakeSplineToBase();
-        ltf->setSplineLayerEnabled(false);
+        ltf->setRenderingMode(RenderingMode::Paint);
 
         auto bakedState = captureBaseLayer();
         double iterError = computeMaxError(originalState, bakedState);
@@ -883,7 +883,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
 
     // Verify shape preservation
     ltf->getSplineLayer().setAnchors(result.anchors);
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
 
     auto fittedState = captureBaseLayer();
     double maxError = computeMaxError(originalState, fittedState);
@@ -957,10 +957,10 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
 
         // Apply fit and bake for next cycle
         ltf->getSplineLayer().setAnchors(fitResult.anchors);
-        ltf->setSplineLayerEnabled(true);
+        ltf->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
-        ltf->setSplineLayerEnabled(false);
+        ltf->setRenderingMode(RenderingMode::Paint);
     }
 
     // Verify visual symmetry preserved across cycles
@@ -1026,10 +1026,10 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
         anchorHistoryAuto.push_back(fitResult.anchors.size());
 
         ltfAuto->getSplineLayer().setAnchors(fitResult.anchors);
-        ltfAuto->setSplineLayerEnabled(true);
+        ltfAuto->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
-        ltfAuto->setSplineLayerEnabled(false);
+        ltfAuto->setRenderingMode(RenderingMode::Paint);
     }
 
     // Config B: Never mode (original greedy)
@@ -1052,10 +1052,10 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
         anchorHistoryNever.push_back(fitResult.anchors.size());
 
         ltfNever->getSplineLayer().setAnchors(fitResult.anchors);
-        ltfNever->setSplineLayerEnabled(true);
+        ltfNever->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
-        ltfNever->setSplineLayerEnabled(false);
+        ltfNever->setRenderingMode(RenderingMode::Paint);
     }
 
     // Verify Auto mode stability
@@ -1118,7 +1118,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
 
     // Step B: Enter spline mode → fit endpoints
     std::cout << "Step B: Enter spline mode → fit endpoints\n";
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
     auto fitResult1 = SplineFitter::fitCurve(*ltf, config);
     ASSERT_TRUE(fitResult1.success) << "Initial fit should succeed";
     EXPECT_EQ(fitResult1.anchors.size(), 2) << "Identity should fit to 2 endpoints";
@@ -1139,7 +1139,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     // Step D: Exit spline mode → bake to base layer
     std::cout << "Step D: Exit spline mode → bake spline to base layer\n";
     bakeSplineToBase();
-    ltf->setSplineLayerEnabled(false);
+    ltf->setRenderingMode(RenderingMode::Paint);
 
     // Verify base layer has the baked asymmetric curve
     double bakedYAtOriginIdx = ltf->getBaseLayerValue(ltf->getTableSize() / 2);
@@ -1152,7 +1152,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
 
     // Step E: Re-enter spline mode → CRITICAL TEST
     std::cout << "Step E: Re-enter spline mode → fit should match baked curve\n";
-    ltf->setSplineLayerEnabled(true);
+    ltf->setRenderingMode(RenderingMode::Spline);
     auto fitResult2 = SplineFitter::fitCurve(*ltf, config);
     ASSERT_TRUE(fitResult2.success) << "Refit should succeed";
 
