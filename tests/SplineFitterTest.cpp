@@ -376,8 +376,10 @@ TEST(SplineEvaluatorTest, Evaluate_MonotonicSpline) {
                                                    {1.0, 0.9, false, 0.5}};
 
     // Sample and verify monotonicity
+    // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
     double prevY = -1.0;
-    for (double x = -1.0; x <= 1.0; x += 0.1) {
+    for (int i = 0; i <= 20; ++i) {
+        const double x = -1.0 + i * 0.1;
         double y = dsp_core::Services::SplineEvaluator::evaluate(anchors, x);
         EXPECT_GE(y, prevY) << "Non-monotonic at x=" << x;
         prevY = y;
@@ -404,7 +406,9 @@ TEST(SplineEvaluatorTest, FindSegment_BinarySearch) {
                                                    {1.0, 0.0, false, 0.0}};
 
     // Test that evaluator can handle many segments efficiently
-    for (double x = -1.0; x <= 1.0; x += 0.05) {
+    // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
+    for (int i = 0; i <= 40; ++i) {
+        const double x = -1.0 + i * 0.05;
         // Should not crash or hang
         dsp_core::Services::SplineEvaluator::evaluate(anchors, x);
     }

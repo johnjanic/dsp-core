@@ -218,7 +218,9 @@ TEST_F(SplineEvaluatorTest, AnalyticalDerivativeMatchesNumerical) {
     // Verify analytical derivative matches numerical approximation
     constexpr double h = 1e-6;
 
-    for (double x = -0.9; x <= 0.9; x += 0.2) {
+    // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
+    for (int i = 0; i <= 9; ++i) {
+        const double x = -0.9 + i * 0.2;
         double f_plus = SplineEvaluator::evaluate(monotonicAnchors, x + h);
         double f_minus = SplineEvaluator::evaluate(monotonicAnchors, x - h);
         double numerical_deriv = (f_plus - f_minus) / (2.0 * h);
@@ -245,7 +247,9 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
     };
 
     // Sample and verify approximation quality
-    for (double x = -1.0; x <= 1.0; x += 0.1) {
+    // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
+    for (int i = 0; i <= 20; ++i) {
+        const double x = -1.0 + i * 0.1;
         double expected = x * x;
         double actual = SplineEvaluator::evaluate(quadratic, x);
 
