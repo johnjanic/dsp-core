@@ -44,8 +44,6 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/SymmetryAnalyzer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/TransferFunctionOperations.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/TransferFunctionOperations.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/ZeroCrossingSolver.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/ZeroCrossingSolver.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioProcessingStage.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioPipeline.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/audio_pipeline/AudioPipeline.cpp"

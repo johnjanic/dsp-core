@@ -14,7 +14,6 @@
   - CoordinateMapper - Screen ↔ transfer function coordinate conversions
   - BaseLayerSolver - Harmonic coefficient solver from target curve
   - CurveFeatureDetector - Extrema and inflection point detection
-  - ZeroCrossingSolver - Root finding for adaptive sampling
 
 ## Documentation
 

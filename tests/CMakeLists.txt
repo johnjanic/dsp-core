@@ -138,31 +138,6 @@ endif()
 
 add_test(NAME DCBlockingFilterTests COMMAND dc_blocking_filter_tests)
 
-# ZeroCrossingSolver tests
-add_executable(zero_crossing_solver_tests
-    ZeroCrossingSolverTests.cpp
-)
-
-target_include_directories(zero_crossing_solver_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(zero_crossing_solver_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(zero_crossing_solver_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(zero_crossing_solver_tests)
-endif()
-
-add_test(NAME ZeroCrossingSolverTests COMMAND zero_crossing_solver_tests)
-
 # CurveFeatureDetector tests
 add_executable(curve_feature_detector_tests
     CurveFeatureDetectorTest.cpp
