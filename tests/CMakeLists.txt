@@ -564,3 +564,28 @@ endif()
 
 add_test(NAME SeamlessTransferFunctionPerformanceTests COMMAND seamless_transfer_function_performance_tests)
 
+# SymmetryDetectionComparison tests (experimental symmetry feature evaluation)
+add_executable(symmetry_detection_comparison_tests
+    SymmetryDetectionComparisonTest.cpp
+)
+
+target_include_directories(symmetry_detection_comparison_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(symmetry_detection_comparison_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(symmetry_detection_comparison_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(symmetry_detection_comparison_tests)
+endif()
+
+add_test(NAME SymmetryDetectionComparisonTests COMMAND symmetry_detection_comparison_tests)
+

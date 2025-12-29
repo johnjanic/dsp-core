@@ -30,10 +30,6 @@ CurveFeatureDetector::FeatureResult CurveFeatureDetector::detectFeatures(const L
     std::vector<Feature> features;
     detectLocalExtrema(ltf, config, amplitudeThreshold, verticalCenter, result, features);
 
-    if (config.enableInflectionDetection) {
-        detectInflections(ltf, config, result, features);
-    }
-
     // Build mandatory anchors list
     prioritizeFeatures(config, tableSize, result, features);
 
@@ -86,38 +82,13 @@ void CurveFeatureDetector::detectLocalExtrema(const LayeredTransferFunction& ltf
 
             if (prominence >= amplitudeThreshold) {
                 result.localExtrema.push_back(i);
-                features.push_back({i, prominence, true});
+                features.push_back({i, prominence});
             }
         } else {
             // Accept all extrema with valid derivative sign changes
             result.localExtrema.push_back(i);
             const double significance = std::abs(y - verticalCenter);
-            features.push_back({i, significance, true});
-        }
-    }
-}
-
-void CurveFeatureDetector::detectInflections(const LayeredTransferFunction& ltf, const FeatureDetectionConfig& config,
-                                             FeatureResult& result, std::vector<Feature>& features) {
-    const int tableSize = ltf.getTableSize();
-
-    for (int i = 2; i < tableSize - 2; ++i) {
-        const double d2y_prev = estimateSecondDerivative(ltf, i - 1);
-        const double d2y = estimateSecondDerivative(ltf, i);
-
-        // Adaptive threshold: stricter near boundaries
-        const double x = ltf.normalizeIndex(i);
-        const double distanceFromBoundary = std::min(std::abs(x - (-1.0)), std::abs(x - 1.0));
-        const double boundaryMultiplier = (distanceFromBoundary < 0.1) ? 5.0 : 1.0;
-        const double threshold = config.secondDerivativeThreshold * boundaryMultiplier;
-
-        // Detect sign changes with significant curvature
-        const bool bothSignificant = (std::abs(d2y_prev) > threshold && std::abs(d2y) > threshold);
-        const bool hasSignChange = (d2y_prev * d2y < 0.0);
-
-        if (bothSignificant && hasSignChange) {
-            result.inflectionPoints.push_back(i);
-            features.push_back({i, std::abs(d2y), false});
+            features.push_back({i, significance});
         }
     }
 }
@@ -132,43 +103,23 @@ void CurveFeatureDetector::prioritizeFeatures(const FeatureDetectionConfig& conf
         (config.maxFeatures > 0 && static_cast<int>(features.size()) + 2 > config.maxFeatures);
 
     if (!needsPrioritization) {
-        // Add all features
+        // Add all extrema features
         result.mandatoryAnchors.insert(result.mandatoryAnchors.end(), result.localExtrema.begin(),
                                        result.localExtrema.end());
-        result.mandatoryAnchors.insert(result.mandatoryAnchors.end(), result.inflectionPoints.begin(),
-                                       result.inflectionPoints.end());
         return;
     }
 
     // Too many features - prioritize by significance
-    const int maxExtrema = static_cast<int>((config.maxFeatures - 2) * config.extremaInflectionRatio);
-    const int maxInflections = (config.maxFeatures - 2) - maxExtrema;
-
-    // Separate extrema and inflections
-    std::vector<Feature> extrema;
-    std::vector<Feature> inflections;
-    for (const auto& f : features) {
-        if (f.isExtremum) {
-            extrema.push_back(f);
-        } else {
-            inflections.push_back(f);
-        }
-    }
+    const int maxExtrema = config.maxFeatures - 2;
 
     // Sort by significance (descending)
     auto bySignificance = [](const Feature& a, const Feature& b) { return a.significance > b.significance; };
-    std::sort(extrema.begin(), extrema.end(), bySignificance);
-    std::sort(inflections.begin(), inflections.end(), bySignificance);
+    std::sort(features.begin(), features.end(), bySignificance);
 
     // Keep top N most significant
-    const int extremaCount = std::min(maxExtrema, static_cast<int>(extrema.size()));
+    const int extremaCount = std::min(maxExtrema, static_cast<int>(features.size()));
     for (int i = 0; i < extremaCount; ++i) {
-        result.mandatoryAnchors.push_back(extrema[i].index);
-    }
-
-    const int inflectionCount = std::min(maxInflections, static_cast<int>(inflections.size()));
-    for (int i = 0; i < inflectionCount; ++i) {
-        result.mandatoryAnchors.push_back(inflections[i].index);
+        result.mandatoryAnchors.push_back(features[i].index);
     }
 }
 
@@ -200,18 +151,6 @@ double CurveFeatureDetector::estimateDerivative(const LayeredTransferFunction& l
     double y1 = ltf.getBaseLayerValue(idx + 1);
 
     return (y1 - y0) / (x1 - x0);
-}
-
-double CurveFeatureDetector::estimateSecondDerivative(const LayeredTransferFunction& ltf, int idx) {
-    if (idx < 1 || idx >= ltf.getTableSize() - 1)
-        return 0.0;
-
-    double h = ltf.normalizeIndex(1) - ltf.normalizeIndex(0);
-    double y_prev = ltf.getBaseLayerValue(idx - 1);
-    double y = ltf.getBaseLayerValue(idx);
-    double y_next = ltf.getBaseLayerValue(idx + 1);
-
-    return (y_next - 2.0 * y + y_prev) / (h * h);
 }
 
 } // namespace dsp_core::Services

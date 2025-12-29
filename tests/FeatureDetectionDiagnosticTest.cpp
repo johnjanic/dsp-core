@@ -6,7 +6,7 @@
 namespace dsp_core_test {
 
 /**
- * Diagnostic test to understand 4→6 backtranslation regression
+ * Diagnostic test for feature detection
  *
  * This test reproduces the ArbitraryPositions scenario and reports
  * exactly what features are detected and where anchors are placed.
@@ -48,8 +48,6 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         dsp_core::FeatureDetectionConfig featureConfig;
         featureConfig.significanceThreshold = 0.0; // Detect ALL features
         featureConfig.derivativeThreshold = 1e-6;
-        featureConfig.secondDerivativeThreshold = 1e-4;
-        featureConfig.extremaInflectionRatio = 0.8;
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
 
@@ -57,15 +55,6 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         std::cout << "  Local extrema: " << features.localExtrema.size() << std::endl;
         for (size_t i = 0; i < features.localExtrema.size(); ++i) {
             int idx = features.localExtrema[i];
-            double x = ltf->normalizeIndex(idx);
-            double y = ltf->evaluateBaseAndHarmonics(x);
-            std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x << ", y=" << y
-                      << std::endl;
-        }
-
-        std::cout << "  Inflection points: " << features.inflectionPoints.size() << std::endl;
-        for (size_t i = 0; i < features.inflectionPoints.size(); ++i) {
-            int idx = features.inflectionPoints[i];
             double x = ltf->normalizeIndex(idx);
             double y = ltf->evaluateBaseAndHarmonics(x);
             std::cout << "    [" << i << "] idx=" << idx << ", x=" << std::setprecision(6) << x << ", y=" << y
@@ -80,14 +69,11 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         dsp_core::FeatureDetectionConfig featureConfig;
         featureConfig.significanceThreshold = 0.001;
         featureConfig.derivativeThreshold = 1e-6;
-        featureConfig.secondDerivativeThreshold = 1e-4;
-        featureConfig.extremaInflectionRatio = 0.8;
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
 
         std::cout << "\nConfig: significanceThreshold=0.001 (production)" << std::endl;
         std::cout << "  Local extrema: " << features.localExtrema.size() << std::endl;
-        std::cout << "  Inflection points: " << features.inflectionPoints.size() << std::endl;
         std::cout << "  Total mandatory anchors: " << features.mandatoryAnchors.size() << std::endl;
     }
 
@@ -95,31 +81,12 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
     {
         dsp_core::FeatureDetectionConfig featureConfig;
         featureConfig.significanceThreshold = 0.001;
-        featureConfig.derivativeThreshold = 1e-5;       // 10x higher
-        featureConfig.secondDerivativeThreshold = 1e-3; // 10x higher
-        featureConfig.extremaInflectionRatio = 0.8;
+        featureConfig.derivativeThreshold = 1e-5; // 10x higher
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
 
-        std::cout << "\nConfig: Higher derivative thresholds (1e-5, 1e-3)" << std::endl;
+        std::cout << "\nConfig: Higher derivative threshold (1e-5)" << std::endl;
         std::cout << "  Local extrema: " << features.localExtrema.size() << std::endl;
-        std::cout << "  Inflection points: " << features.inflectionPoints.size() << std::endl;
-        std::cout << "  Total mandatory anchors: " << features.mandatoryAnchors.size() << std::endl;
-    }
-
-    // Test D: Extrema only (no inflections)
-    {
-        dsp_core::FeatureDetectionConfig featureConfig;
-        featureConfig.significanceThreshold = 0.001;
-        featureConfig.derivativeThreshold = 1e-6;
-        featureConfig.secondDerivativeThreshold = 1e-3; // Very high → ignore inflections
-        featureConfig.extremaInflectionRatio = 1.0;     // 100% extrema, 0% inflections
-
-        auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, featureConfig);
-
-        std::cout << "\nConfig: Extrema only (extremaInflectionRatio=1.0)" << std::endl;
-        std::cout << "  Local extrema: " << features.localExtrema.size() << std::endl;
-        std::cout << "  Inflection points: " << features.inflectionPoints.size() << std::endl;
         std::cout << "  Total mandatory anchors: " << features.mandatoryAnchors.size() << std::endl;
     }
 
@@ -131,29 +98,10 @@ TEST(FeatureDetectionDiagnostic, ArbitraryPositions_FeatureAnalysis) {
         fitConfig.enableFeatureDetection = true;
         fitConfig.featureConfig.significanceThreshold = 0.001;
         fitConfig.featureConfig.derivativeThreshold = 1e-6;
-        fitConfig.featureConfig.secondDerivativeThreshold = 1e-4;
 
         auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, fitConfig);
 
         std::cout << "\nRefit with feature detection: " << result.anchors.size() << " anchors" << std::endl;
-        for (size_t i = 0; i < result.anchors.size(); ++i) {
-            std::cout << "  [" << i << "] x=" << std::setw(8) << std::fixed << std::setprecision(4)
-                      << result.anchors[i].x << ", y=" << std::setw(8) << result.anchors[i].y << std::endl;
-        }
-    }
-
-    // Step 5: Refit with extrema-only feature detection
-    {
-        auto fitConfig = dsp_core::SplineFitConfig::tight();
-        fitConfig.enableFeatureDetection = true;
-        fitConfig.featureConfig.significanceThreshold = 0.001;
-        fitConfig.featureConfig.derivativeThreshold = 1e-6;
-        fitConfig.featureConfig.secondDerivativeThreshold = 1e-3; // Ignore inflections
-        fitConfig.featureConfig.extremaInflectionRatio = 1.0;
-
-        auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, fitConfig);
-
-        std::cout << "\nRefit with EXTREMA ONLY: " << result.anchors.size() << " anchors" << std::endl;
         for (size_t i = 0; i < result.anchors.size(); ++i) {
             std::cout << "  [" << i << "] x=" << std::setw(8) << std::fixed << std::setprecision(4)
                       << result.anchors[i].x << ", y=" << std::setw(8) << result.anchors[i].y << std::endl;

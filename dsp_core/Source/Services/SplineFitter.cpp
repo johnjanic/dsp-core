@@ -554,11 +554,9 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample
     adaptiveConfig.relativeErrorTarget = 0.01; // 1% of vertical range (balanced default)
     // anchorDensityMultiplier = 10.0 (default from AdaptiveToleranceCalculator::Config)
 
-    // Analyze symmetry if needed (controlled by config.symmetryMode)
+    // Analyze symmetry if needed (controlled by config.symmetryDetection)
     bool useSymmetricMode = false;
-    if (config.symmetryMode == SymmetryMode::Always) {
-        useSymmetricMode = true;
-    } else if (config.symmetryMode == SymmetryMode::Auto && ltf != nullptr) {
+    if (config.symmetryDetection == SymmetryDetection::Auto && ltf != nullptr) {
         auto symmetryResult = SymmetryAnalyzer::analyzeOddSymmetry(*ltf);
         useSymmetricMode = (symmetryResult.score >= config.symmetryThreshold);
     }
@@ -589,116 +587,10 @@ std::vector<SplineAnchor> SplineFitter::greedySplineFit(const std::vector<Sample
         }
     }
 
-    // Zero-crossing drift verification (defensive DC blocking)
-    // Controlled by config.enableZeroCrossingCheck (default: false)
-    if (config.enableZeroCrossingCheck && ltf != nullptr) {
-        auto zcInfo = analyzeZeroCrossing(*ltf, anchors, config);
-
-        // Only intervene if:
-        // 1. Base curve has zero-crossing
-        // 2. Fitted spline introduced significant drift
-        // 3. No anchor already exists at x≈0
-        // 4. Anchor budget allows
-        if (zcInfo.baseCurveHasZeroCrossing && zcInfo.drift > config.zeroCrossingTolerance &&
-            anchors.size() < static_cast<size_t>(config.maxAnchors)) {
-
-            // Check if anchor already exists at x≈0
-            bool hasAnchorAtZero = std::any_of(anchors.begin(), anchors.end(), [](const SplineAnchor& a) {
-                return std::abs(a.x) < 1e-6; // Within 1e-6 of origin
-            });
-
-            if (!hasAnchorAtZero) {
-                // Add corrective anchor at exactly x=0 with base curve's y value
-                // (Anchors have continuous freedom - can be placed at exact 0.0)
-                auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), 0.0,
-                                                  [](const SplineAnchor& a, double x) { return a.x < x; });
-                anchors.insert(insertPos, {0.0, zcInfo.baseYAtZero, false, 0.0});
-
-                // Recompute tangents with new anchor
-                computeTangents(anchors, config);
-            }
-        }
-    }
-
-    // Optional: Prune redundant anchors after fitting
-    if (config.enableAnchorPruning && anchors.size() > 2) {
-        // Use the final adaptive tolerance with multiplier for pruning
-        double finalAdaptiveTolerance = AdaptiveToleranceCalculator::computeTolerance(
-            verticalRange, static_cast<int>(anchors.size()), config.maxAnchors, adaptiveConfig);
-        finalAdaptiveTolerance = std::max(finalAdaptiveTolerance, config.positionTolerance);
-        double pruningTolerance = finalAdaptiveTolerance * config.pruningToleranceMultiplier;
-
-        pruneRedundantAnchors(anchors, samples, pruningTolerance, config);
-    }
-
     // Final tangent computation using configured algorithm
     computeTangents(anchors, config);
 
     return anchors;
-}
-
-// Anchor Pruning (Optional Post-Processing)
-
-void SplineFitter::pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
-                                         double pruningTolerance, const SplineFitConfig& config) {
-
-    if (anchors.size() <= 2) {
-        return; // Cannot prune endpoints
-    }
-
-    // Iteratively test removing each non-endpoint anchor
-    // If removal doesn't increase error beyond tolerance, keep it removed
-    for (int i = 1; i < static_cast<int>(anchors.size()) - 1;) {
-        // 1. Temporarily remove anchor
-        auto removed = anchors[i];
-        anchors.erase(anchors.begin() + i);
-
-        // 2. Recompute tangents with reduced anchor set
-        computeTangents(anchors, config);
-
-        // 3. Measure max error across ALL samples
-        // (We need to check all samples because tangent changes can affect the entire curve)
-        double maxError = 0.0;
-        for (const auto& sample : samples) {
-            double splineY = SplineEvaluator::evaluate(anchors, sample.x);
-            double error = std::abs(sample.y - splineY);
-            maxError = std::max(maxError, error);
-        }
-
-        // 4. If error exceeds tolerance, restore anchor
-        if (maxError > pruningTolerance) {
-            anchors.insert(anchors.begin() + i, removed);
-            ++i; // Move to next anchor
-        }
-        // else: anchor was successfully removed, check same index again (array shifted)
-    }
-}
-
-// Zero-Crossing Analysis (Defensive DC Drift Detection)
-
-SplineFitter::ZeroCrossingInfo SplineFitter::analyzeZeroCrossing(const LayeredTransferFunction& ltf,
-                                                                 const std::vector<SplineAnchor>& anchors,
-                                                                 const SplineFitConfig& config) {
-
-    ZeroCrossingInfo info;
-
-    // Evaluate normalized composite at exactly x=0 (matches what we're fitting)
-    // normalizationScalar is preserved when entering spline mode, so this returns
-    // the normalized value that SplineFitter is actually fitting
-    info.baseYAtZero = ltf.evaluateBaseAndHarmonics(0.0);
-
-    // Check if base curve crosses zero (within tolerance)
-    if (std::abs(info.baseYAtZero) < config.zeroCrossingTolerance) {
-        info.baseCurveHasZeroCrossing = true;
-
-        // Evaluate fitted spline at exactly x=0
-        info.fittedYAtZero = SplineEvaluator::evaluate(anchors, 0.0);
-
-        // Compute drift
-        info.drift = std::abs(info.fittedYAtZero - info.baseYAtZero);
-    }
-
-    return info;
 }
 
 // Helper Methods for Greedy Spline Fitting

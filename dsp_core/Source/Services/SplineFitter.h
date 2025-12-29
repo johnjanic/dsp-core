@@ -33,18 +33,6 @@ class SplineFitter {
     static void computeTangents(std::vector<SplineAnchor>& anchors,
                                 const SplineFitConfig& config = SplineFitConfig::tight());
 
-    // Zero-crossing analysis (exposed for testing)
-    struct ZeroCrossingInfo {
-        bool baseCurveHasZeroCrossing = false;
-        double baseYAtZero = 0.0;
-        double fittedYAtZero = 0.0;
-        double drift = 0.0;
-    };
-
-    static ZeroCrossingInfo analyzeZeroCrossing(const LayeredTransferFunction& ltf,
-                                                const std::vector<SplineAnchor>& anchors,
-                                                const SplineFitConfig& config);
-
   private:
     // Step 1: Sample & sanitize
     struct Sample {
@@ -84,10 +72,6 @@ class SplineFitter {
 
     static WorstFitResult findWorstFitSample(const std::vector<Sample>& samples,
                                              const std::vector<SplineAnchor>& anchors);
-
-    // Anchor pruning (optional post-processing)
-    static void pruneRedundantAnchors(std::vector<SplineAnchor>& anchors, const std::vector<Sample>& samples,
-                                      double pruningTolerance, const SplineFitConfig& config);
 
     // Helper methods for greedySplineFit to reduce cognitive complexity
     static std::vector<SplineAnchor> initializeAnchorsFromIndices(const std::vector<Sample>& samples,

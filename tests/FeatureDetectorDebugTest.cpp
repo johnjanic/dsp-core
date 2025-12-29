@@ -54,12 +54,10 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
     {
         dsp_core::FeatureDetectionConfig config;
         std::cout << "Config: derivativeThreshold=" << config.derivativeThreshold
-                  << ", secondDerivativeThreshold=" << config.secondDerivativeThreshold
                   << ", significanceThreshold=" << config.significanceThreshold << std::endl;
 
         auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf, config);
-        std::cout << "Result: " << features.localExtrema.size() << " extrema, " << features.inflectionPoints.size()
-                  << " inflections" << std::endl;
+        std::cout << "Result: " << features.localExtrema.size() << " extrema" << std::endl;
     }
 
     // Try with NO thresholds
@@ -67,7 +65,6 @@ TEST(FeatureDetectorDebug, WhyNoExtremaForH3) {
     {
         dsp_core::FeatureDetectionConfig config;
         config.derivativeThreshold = 0.0;
-        config.secondDerivativeThreshold = 0.0;
         config.significanceThreshold = 0.0;
 
         std::cout << "Config: All thresholds = 0.0" << std::endl;

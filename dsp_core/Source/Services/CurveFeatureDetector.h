@@ -36,22 +36,6 @@ struct FeatureDetectionConfig {
     double derivativeThreshold;
 
     /**
-     * Second derivative noise floor - ignore inflections with |d²y/dx²| < threshold
-     * Lower = more sensitive (detects subtle curvature changes)
-     * Higher = more conservative (ignores numerical noise)
-     * Range: 1e-5 to 1e-3, Default: 1e-4
-     */
-    double secondDerivativeThreshold;
-
-    /**
-     * Budget ratio for extrema vs inflection points
-     * When maxFeatures limit is hit, prioritize extrema over inflections
-     * Value = fraction of budget for extrema (remainder goes to inflections)
-     * Range: 0.5 (equal priority) to 1.0 (extrema only), Default: 0.8
-     */
-    double extremaInflectionRatio;
-
-    /**
      * Enable significance filtering based on local prominence
      * When enabled, filters extrema with prominence < significanceThreshold
      * When disabled, accepts all extrema with valid derivative sign changes
@@ -63,33 +47,13 @@ struct FeatureDetectionConfig {
     bool enableSignificanceFiltering;
 
     /**
-     * Enable inflection point detection
-     * When enabled, detects curvature changes (d²y/dx² sign changes) as features
-     * When disabled, only detects extrema (peaks/valleys) - saves CPU
-     * Default: false (disabled) - extrema-only detection
-     *
-     * Rationale: testing showed that with secondDerivativeThreshold=0.002
-     * (optimized to filter artifact inflections), effectively ZERO inflection points
-     * are detected anyway. Disabling saves ~30-40% of feature detection CPU time
-     * with no impact on anchor count or quality.
-     *
-     * When to enable: Only if you need genuine inflection points (e.g., S-curves with
-     * sharp curvature changes). For typical harmonic waveshaping, extrema-only is sufficient.
-     */
-    bool enableInflectionDetection;
-
-    /**
      * Default constructor - uses sensible defaults
      * Note: Very low significance threshold (0.1%) to preserve all real features
      * Increase threshold (e.g., 2-5%) for noise filtering
      */
     FeatureDetectionConfig()
         : significanceThreshold(0.001), maxFeatures(100), derivativeThreshold(1e-06),
-          secondDerivativeThreshold(0.002) // Filters artifact inflections (20× higher than 0.0001 default)
-          ,
-          extremaInflectionRatio(0.8), enableSignificanceFiltering(false),
-          enableInflectionDetection(false) // Disabled by default - saves CPU with no quality impact
-    {}
+          enableSignificanceFiltering(false) {}
 
     bool operator==(const FeatureDetectionConfig&) const = default;
 };
@@ -147,28 +111,16 @@ class CurveFeatureDetector {
      */
     static double estimateDerivative(const LayeredTransferFunction& ltf, int idx);
 
-    /**
-     * Estimate second derivative at index using finite difference
-     * @param ltf Input transfer function
-     * @param idx Table index
-     * @return Estimated d²y/dx²
-     */
-    static double estimateSecondDerivative(const LayeredTransferFunction& ltf, int idx);
-
     // Internal feature representation for prioritization
     struct Feature {
         int index;
         double significance;
-        bool isExtremum;
     };
 
     // Helper methods to reduce cognitive complexity
     static void detectLocalExtrema(const LayeredTransferFunction& ltf, const FeatureDetectionConfig& config,
                                    double amplitudeThreshold, double verticalCenter, FeatureResult& result,
                                    std::vector<Feature>& features);
-
-    static void detectInflections(const LayeredTransferFunction& ltf, const FeatureDetectionConfig& config,
-                                  FeatureResult& result, std::vector<Feature>& features);
 
     static void prioritizeFeatures(const FeatureDetectionConfig& config, int tableSize, FeatureResult& result,
                                    std::vector<Feature>& features);

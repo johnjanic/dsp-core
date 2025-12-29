@@ -187,7 +187,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
         {1.0, 1.0, false, 0.0}    // Right endpoint
     };
 
-    auto config = SplineFitConfig::smooth();
+    auto config = SplineFitConfig::tight();
     SplineFitter::computeTangents(userAnchors, config);
 
     ltf->getSplineLayer().setAnchors(userAnchors);
@@ -363,7 +363,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
         ltf->setBaseLayerValue(i, y);
     }
 
-    auto config = SplineFitConfig::smooth();
+    auto config = SplineFitConfig::tight();
     std::vector<size_t> anchorHistory;
     std::vector<double> errorHistory;
 
@@ -502,268 +502,6 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 }
 
 //==============================================================================
-// Phase 1: Zero-Crossing Integration Tests - DC Drift Prevention
-//==============================================================================
-
-/**
- * Test 1: ZeroCrossing_TanhSparseFit_DriftCorrected
- *
- * Setup:
- *   - Create LayeredTransferFunction with tanh base
- *   - Verify interpolated y(x=0) ≈ 0
- *   - Use sparse config (maxAnchors = 6) to force drift
- *
- * Execute:
- *   - Fit with SplineFitter (enableZeroCrossingCheck = true)
- *
- * Verify:
- *   - Fit succeeds
- *   - Corrective anchor added at x = 0.0 (exactly)
- *   - That anchor has |y| < zeroCrossingTolerance
- *   - SplineEvaluator::evaluate(anchors, 0.0) ≈ 0 (drift corrected)
- *   - Max error across full curve still acceptable
- */
-TEST_F(SplineFitterIntegrationTest, ZeroCrossing_TanhSparseFit_DriftCorrected) {
-    // Create tanh curve (zero-crossing at x=0)
-    for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
-    }
-
-    // Verify base curve has zero-crossing (using interpolation)
-    int centerIdx = ltf->getTableSize() / 2;
-    double xRight = ltf->normalizeIndex(centerIdx);
-    double xLeft = ltf->normalizeIndex(centerIdx - 1);
-    double yLeft = ltf->getBaseLayerValue(centerIdx - 1);
-    double yRight = ltf->getBaseLayerValue(centerIdx);
-    double t = (0.0 - xLeft) / (xRight - xLeft);
-    double baseYAtZero = yLeft + t * (yRight - yLeft);
-
-    EXPECT_LT(std::abs(baseYAtZero), 0.01) << "Base curve should cross zero at x=0";
-
-    // Use sparse config to force potential drift
-    auto config = SplineFitConfig::smooth();
-    config.maxAnchors = 6;
-    config.enableZeroCrossingCheck = true;
-    config.zeroCrossingTolerance = 0.01;
-
-    auto result = SplineFitter::fitCurve(*ltf, config);
-
-    ASSERT_TRUE(result.success) << "Tanh sparse fit should succeed";
-
-    // Check if corrective anchor was added at x = 0.0
-    bool hasAnchorAtZero = false;
-    double anchorYAtZero = 0.0;
-
-    for (const auto& anchor : result.anchors) {
-        if (std::abs(anchor.x) < 1e-6) {
-            hasAnchorAtZero = true;
-            anchorYAtZero = anchor.y;
-            break;
-        }
-    }
-
-    if (hasAnchorAtZero) {
-        EXPECT_LT(std::abs(anchorYAtZero), config.zeroCrossingTolerance)
-            << "Corrective anchor should have |y| < zeroCrossingTolerance";
-    }
-
-    // Verify drift corrected
-    double fittedYAtZero = SplineEvaluator::evaluate(result.anchors, 0.0);
-    EXPECT_LT(std::abs(fittedYAtZero), config.zeroCrossingTolerance)
-        << "DC drift should be corrected: |y(0)| < tolerance";
-
-    // Verify overall fit quality still acceptable
-    EXPECT_LT(result.maxError, 0.10) << "Max error should still be acceptable";
-
-    std::cout << "\nTanh sparse fit with zero-crossing check:\n"
-              << "  Anchors: " << result.anchors.size() << "\n"
-              << "  Anchor at x=0: " << (hasAnchorAtZero ? "YES" : "NO") << "\n"
-              << "  y(0): " << std::fixed << std::setprecision(6) << fittedYAtZero << "\n"
-              << "  Max error: " << result.maxError << "\n";
-}
-
-/**
- * Test 2: ZeroCrossing_SymmetricFit_NoIntervention
- *
- * Setup:
- *   - Create curve y = x³ (zero-crossing at origin)
- *   - Fit with symmetric anchors that naturally pass through (0,0)
- *
- * Execute: Fit with default config
- *
- * Verify:
- *   - No corrective anchor needed (greedy fit already correct!)
- *   - Drift at x=0 is minimal (< tolerance)
- *   - Defensive check passed without intervention
- */
-TEST_F(SplineFitterIntegrationTest, ZeroCrossing_SymmetricFit_NoIntervention) {
-    // Create cubic curve (naturally symmetric with zero-crossing at x=0)
-    for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, x * x * x);
-    }
-
-    auto config = SplineFitConfig::smooth();
-    config.enableZeroCrossingCheck = true;
-    config.zeroCrossingTolerance = 0.01;
-
-    auto result = SplineFitter::fitCurve(*ltf, config);
-
-    ASSERT_TRUE(result.success) << "Cubic fit should succeed";
-
-    // Verify drift is minimal (no intervention needed)
-    double fittedYAtZero = SplineEvaluator::evaluate(result.anchors, 0.0);
-    EXPECT_LT(std::abs(fittedYAtZero), config.zeroCrossingTolerance)
-        << "Drift at x=0 should be minimal (defensive check passed without intervention)";
-
-    std::cout << "\nCubic symmetric fit (zero-crossing check):\n"
-              << "  Anchors: " << result.anchors.size() << "\n"
-              << "  y(0): " << std::fixed << std::setprecision(6) << fittedYAtZero << "\n"
-              << "  Max error: " << result.maxError << "\n";
-}
-
-/**
- * Test 3: ZeroCrossing_Backtranslation_StableWithCorrection
- *
- * Setup: Tanh curve
- *
- * Execute:
- *   - Fit to spline (iteration 1)
- *   - Check if corrective anchor was added
- *   - Bake to 16k samples
- *   - Refit to spline (iteration 2)
- *   - Bake to 16k samples
- *   - Refit to spline (iteration 3)
- *
- * Verify:
- *   - Zero-crossing preserved in all iterations
- *   - Anchor count stable (no creeping)
- *   - Corrective anchor only added when needed (may not be needed after iteration 1)
- *   - Demonstrates defensive behavior doesn't cause anchor inflation
- */
-TEST_F(SplineFitterIntegrationTest, ZeroCrossing_Backtranslation_StableWithCorrection) {
-    // Create tanh curve
-    for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
-    }
-
-    auto config = SplineFitConfig::smooth();
-    config.maxAnchors = 8; // Moderate budget
-    config.enableZeroCrossingCheck = true;
-    config.zeroCrossingTolerance = 0.01;
-
-    std::vector<size_t> anchorHistory;
-    std::vector<double> driftHistory;
-    std::vector<bool> hadZeroCrossingAnchor;
-
-    const int numIterations = 3;
-
-    for (int iter = 0; iter < numIterations; ++iter) {
-        // Fit
-        auto fitResult = SplineFitter::fitCurve(*ltf, config);
-        ASSERT_TRUE(fitResult.success) << "Iteration " << iter << " fit should succeed";
-
-        anchorHistory.push_back(fitResult.anchors.size());
-
-        // Check if anchor at x=0 was added
-        bool hasZeroCrossingAnchor = std::any_of(fitResult.anchors.begin(), fitResult.anchors.end(),
-                                                 [](const SplineAnchor& a) { return std::abs(a.x) < 1e-6; });
-        hadZeroCrossingAnchor.push_back(hasZeroCrossingAnchor);
-
-        // Measure drift at x=0
-        double driftAtZero = std::abs(SplineEvaluator::evaluate(fitResult.anchors, 0.0));
-        driftHistory.push_back(driftAtZero);
-
-        // Apply fit and bake for next iteration
-        ltf->getSplineLayer().setAnchors(fitResult.anchors);
-        ltf->setRenderingMode(RenderingMode::Spline);
-
-        bakeSplineToBase();
-        ltf->setRenderingMode(RenderingMode::Paint);
-    }
-
-    // Verify zero-crossing preserved in all iterations
-    for (size_t i = 0; i < driftHistory.size(); ++i) {
-        EXPECT_LT(driftHistory[i], config.zeroCrossingTolerance)
-            << "Iteration " << i << " should preserve zero-crossing";
-    }
-
-    // Verify anchor count stability (no creeping)
-    size_t maxAnchors = *std::max_element(anchorHistory.begin(), anchorHistory.end());
-    size_t minAnchors = *std::min_element(anchorHistory.begin(), anchorHistory.end());
-    EXPECT_LE(maxAnchors - minAnchors, 3) << "Anchor count should be stable across iterations";
-
-    // Print diagnostics
-    std::cout << "\nZero-crossing backtranslation stability:\n";
-    for (int i = 0; i < numIterations; ++i) {
-        std::cout << "  Iteration " << i << ": " << anchorHistory[i] << " anchors, "
-                  << "drift = " << std::fixed << std::setprecision(6) << driftHistory[i]
-                  << ", anchor@x=0: " << (hadZeroCrossingAnchor[i] ? "YES" : "NO") << "\n";
-    }
-}
-
-/**
- * Test 4: ZeroCrossing_CompareEnabled_vs_Disabled
- *
- * Setup: Tanh curve with sparse config
- *
- * Execute twice:
- *   - Config A: enableZeroCrossingCheck = true
- *   - Config B: enableZeroCrossingCheck = false
- *
- * Verify:
- *   - Config A: Drift at x=0 corrected (|y(0)| < tolerance)
- *   - Config B: May have drift (no intervention)
- *   - Config A may have 1 more anchor than Config B
- *   - Demonstrates value of defensive check
- */
-TEST_F(SplineFitterIntegrationTest, ZeroCrossing_CompareEnabled_vs_Disabled) {
-    // Create tanh curve
-    for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-        ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
-    }
-
-    // Config A: Zero-crossing check ENABLED
-    auto configEnabled = SplineFitConfig::smooth();
-    configEnabled.maxAnchors = 6;
-    configEnabled.enableZeroCrossingCheck = true;
-    configEnabled.zeroCrossingTolerance = 0.01;
-
-    auto resultEnabled = SplineFitter::fitCurve(*ltf, configEnabled);
-    ASSERT_TRUE(resultEnabled.success) << "Fit with check enabled should succeed";
-
-    double driftEnabled = std::abs(SplineEvaluator::evaluate(resultEnabled.anchors, 0.0));
-
-    // Config B: Zero-crossing check DISABLED
-    auto configDisabled = SplineFitConfig::smooth();
-    configDisabled.maxAnchors = 6;
-    configDisabled.enableZeroCrossingCheck = false;
-    configDisabled.zeroCrossingTolerance = 0.01;
-
-    auto resultDisabled = SplineFitter::fitCurve(*ltf, configDisabled);
-    ASSERT_TRUE(resultDisabled.success) << "Fit with check disabled should succeed";
-
-    double driftDisabled = std::abs(SplineEvaluator::evaluate(resultDisabled.anchors, 0.0));
-
-    // Verify Config A corrected drift
-    EXPECT_LT(driftEnabled, configEnabled.zeroCrossingTolerance) << "Config A (enabled) should correct drift";
-
-    // Config B may have drift (no guarantee)
-    // Just verify it ran successfully
-
-    // Print comparison
-    std::cout << "\nZero-crossing check comparison:\n"
-              << "  Enabled:  " << resultEnabled.anchors.size() << " anchors, "
-              << "drift = " << std::fixed << std::setprecision(6) << driftEnabled << "\n"
-              << "  Disabled: " << resultDisabled.anchors.size() << " anchors, "
-              << "drift = " << driftDisabled << "\n"
-              << "  Value of check: " << (driftEnabled < driftDisabled ? "IMPROVED drift" : "similar drift") << "\n";
-}
-
-//==============================================================================
 // Phase 3: Symmetric Fitting Integration Tests
 //==============================================================================
 
@@ -772,7 +510,7 @@ TEST_F(SplineFitterIntegrationTest, ZeroCrossing_CompareEnabled_vs_Disabled) {
  *
  * Setup:
  *   - Create tanh curve (odd symmetric, f(-x) = -f(x))
- *   - Fit with symmetryMode = Always
+ *   - Fit with symmetryDetection = Always
  *
  * Execute:
  *   - Fit to spline (iteration 1)
@@ -795,8 +533,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
         ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
     }
 
-    auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Always; // Force symmetric fitting
+    auto config = SplineFitConfig::tight();
+    config.symmetryDetection = SymmetryDetection::Auto; // Force symmetric fitting
     config.maxAnchors = 16;                     // Moderate budget
 
     std::vector<size_t> anchorHistory;
@@ -885,7 +623,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
  *
  * Setup:
  *   - Create Harmonic 3 curve (odd symmetric)
- *   - Use SymmetryMode::Never (original greedy algorithm)
+ *   - Use SymmetryDetection::Never (original greedy algorithm)
  *
  * Execute:
  *   - Fit to spline
@@ -907,8 +645,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
     // Capture original shape
     auto originalState = captureBaseLayer();
 
-    auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Never; // Original greedy algorithm
+    auto config = SplineFitConfig::tight();
+    config.symmetryDetection = SymmetryDetection::Never; // Original greedy algorithm
 
     auto result = SplineFitter::fitCurve(*ltf, config);
 
@@ -958,8 +696,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
         ltf->setBaseLayerValue(i, x * x * x);
     }
 
-    auto config = SplineFitConfig::smooth();
-    config.symmetryMode = SymmetryMode::Auto; // Should auto-detect
+    auto config = SplineFitConfig::tight();
+    config.symmetryDetection = SymmetryDetection::Auto; // Should auto-detect
     config.symmetryThreshold = 0.90;
     config.maxAnchors = 12;
 
@@ -1044,8 +782,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
     auto originalState = captureBaseLayer();
 
     // Config A: Auto mode (should detect symmetry)
-    auto configAuto = SplineFitConfig::smooth();
-    configAuto.symmetryMode = SymmetryMode::Auto;
+    auto configAuto = SplineFitConfig::tight();
+    configAuto.symmetryDetection = SymmetryDetection::Auto;
     configAuto.symmetryThreshold = 0.90;
     configAuto.maxAnchors = 16;
 
@@ -1072,8 +810,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
     }
 
     // Config B: Never mode (original greedy)
-    auto configNever = SplineFitConfig::smooth();
-    configNever.symmetryMode = SymmetryMode::Never;
+    auto configNever = SplineFitConfig::tight();
+    configNever.symmetryDetection = SymmetryDetection::Never;
     configNever.maxAnchors = 16;
 
     std::vector<size_t> anchorHistoryNever;
@@ -1145,7 +883,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
  *   3. Curve shape preserved (drooping asymmetric, NOT straight line)
  */
 TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrectCurve) {
-    auto config = SplineFitConfig::smooth();
+    auto config = SplineFitConfig::tight();
     config.maxAnchors = 24;
     config.positionTolerance = 0.01;
 
@@ -1248,7 +986,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
      *   3. Fit the baked curve
      */
 
-    auto config = SplineFitConfig::smooth();
+    auto config = SplineFitConfig::tight();
 
     std::cout << "\n=== BUG INVESTIGATION: WT+H3 vs H1+H3 (PRODUCTION FLOW) ===\n";
 
