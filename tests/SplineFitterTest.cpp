@@ -530,7 +530,9 @@ TEST_F(SplineFitterTest, TrigHarmonics_AllBasisFunctions) {
         }
 
         // Use balanced config (good quality, reasonable anchor count)
+        // Use Never mode to test original greedy algorithm behavior
         auto config = dsp_core::SplineFitConfig::tight();
+        config.symmetryDetection = dsp_core::SymmetryDetection::Never;
         auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
         EXPECT_TRUE(result.success) << "Harmonic " << n << " fit failed";
@@ -650,6 +652,7 @@ TEST_F(SplineFitterTest, EdgeCase_ExtremelySteepTanh) {
     }
 
     auto config = dsp_core::SplineFitConfig::tight();
+    config.symmetryDetection = dsp_core::SymmetryDetection::Never; // Test original greedy behavior
     config.maxAnchors = 64; // May need many anchors for near-discontinuity
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);

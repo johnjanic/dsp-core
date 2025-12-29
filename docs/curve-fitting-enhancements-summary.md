@@ -80,7 +80,7 @@ This document summarizes the curve fitting algorithm enhancements implemented ac
 **Objective**: Modify greedy fitting algorithm to add anchors in complementary pairs for symmetric curves.
 
 **Implementation**:
-- SymmetryDetection enum: Auto (detect), Always (force), Never (original)
+- SymmetryDetection enum: Auto (detect, default), Never (original greedy)
 - Auto mode: Detects symmetry, enables paired anchors if score ≥ threshold
 - Paired anchor placement: (x, y) and (-x, -y) added together
 - Symmetric y-value: `ySymmetric = (yLeft - yRight) / 2.0`
@@ -226,11 +226,6 @@ auto config = dsp_core::SplineFitConfig::smooth();
 **Tighter DC Blocking (Mastering)**:
 ```cpp
 config.zeroCrossingTolerance = 0.001;  // 0.1% drift allowed
-```
-
-**Force Symmetric Mode (Known Symmetric Curves)**:
-```cpp
-config.symmetryDetection = SymmetryDetection::Always;  // Always paired
 ```
 
 **Disable Symmetric Mode (Asymmetric Curves)**:
