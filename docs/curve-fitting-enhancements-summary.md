@@ -80,7 +80,7 @@ This document summarizes the curve fitting algorithm enhancements implemented ac
 **Objective**: Modify greedy fitting algorithm to add anchors in complementary pairs for symmetric curves.
 
 **Implementation**:
-- SymmetryMode enum: Auto (detect), Always (force), Never (original)
+- SymmetryDetection enum: Auto (detect), Always (force), Never (original)
 - Auto mode: Detects symmetry, enables paired anchors if score ≥ threshold
 - Paired anchor placement: (x, y) and (-x, -y) added together
 - Symmetric y-value: `ySymmetric = (yLeft - yRight) / 2.0`
@@ -94,7 +94,7 @@ This document summarizes the curve fitting algorithm enhancements implemented ac
 
 **Key Files**:
 - `SplineFitter.cpp`: Symmetric fitting logic
-- `SplineTypes.h`: SymmetryMode enum and config fields
+- `SplineTypes.h`: SymmetryDetection enum and config fields
 - `SplineFitterTest.cpp`: Unit tests
 - `SplineFitterIntegrationTest.cpp`: Integration tests
 
@@ -217,7 +217,7 @@ auto config = dsp_core::SplineFitConfig::smooth();
 // tangentAlgorithm = FritschCarlson
 // enableZeroCrossingCheck = true      // NEW: DC blocking
 // zeroCrossingTolerance = 0.01         // NEW: 1% drift allowed
-// symmetryMode = SymmetryMode::Auto    // NEW: Auto-detect symmetry
+// symmetryDetection = SymmetryDetection::Auto    // NEW: Auto-detect symmetry
 // symmetryThreshold = 0.90             // NEW: 90% correlation threshold
 ```
 
@@ -230,12 +230,12 @@ config.zeroCrossingTolerance = 0.001;  // 0.1% drift allowed
 
 **Force Symmetric Mode (Known Symmetric Curves)**:
 ```cpp
-config.symmetryMode = SymmetryMode::Always;  // Always paired
+config.symmetryDetection = SymmetryDetection::Always;  // Always paired
 ```
 
 **Disable Symmetric Mode (Asymmetric Curves)**:
 ```cpp
-config.symmetryMode = SymmetryMode::Never;  // Original greedy
+config.symmetryDetection = SymmetryDetection::Never;  // Original greedy
 ```
 
 **Lower Symmetry Threshold (More Lenient)**:
