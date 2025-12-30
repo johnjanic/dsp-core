@@ -107,10 +107,10 @@ void TransferFunctionPanel::setupSplineModeSettingsPanel()
 
     // Wire up callback
     algorithmComboPtr->onChange = [this](int selectedId) {
-        // Update mode state
-        if (auto* mode = getModeCoordinator()->getSplineMode()) {
-            mode->setAlgorithm(selectedId);
-        }
+        // Update mode state via controller
+        // Note: Direct mode access (getSplineMode) was removed.
+        // Use controller methods for mode-specific operations.
+        controller->setSplineAlgorithm(selectedId);
     };
 
     // Add to panel
@@ -133,17 +133,16 @@ void TransferFunctionPanel::updateModeComponentsVisibility()
         {
             splineModeSettingsPanel->setVisible(true);
 
-            // Sync controls with mode state
-            if (auto* mode = getModeCoordinator()->getSplineMode())
-            {
-                auto value = mode->getCurrentValue();
+            // Sync controls with mode state via controller
+            // Note: Direct mode access (getSplineMode) was removed.
+            // Query state through controller or model instead.
+            auto value = controller->getSplineAlgorithm();
 
-                // Temporarily disable callback to avoid recursive updates
-                auto originalCallback = algorithmComboPtr->onChange;
-                algorithmComboPtr->onChange = nullptr;
-                algorithmComboPtr->setSelectedId(value);
-                algorithmComboPtr->onChange = originalCallback;
-            }
+            // Temporarily disable callback to avoid recursive updates
+            auto originalCallback = algorithmComboPtr->onChange;
+            algorithmComboPtr->onChange = nullptr;
+            algorithmComboPtr->setSelectedId(value);
+            algorithmComboPtr->onChange = originalCallback;
         }
     }
     else
