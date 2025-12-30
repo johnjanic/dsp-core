@@ -149,6 +149,31 @@ def estimateSecondDerivative(ltf: LayeredTransferFunction, idx: int) -> float:
 
 ---
 
+## Unified Sampling Path
+
+**CRITICAL DESIGN PRINCIPLE**: All curve evaluation (fitting, rendering, visualization) uses the same code path: `LayeredTransferFunction::evaluateForRendering(x, normScalar)`.
+
+This unified path ensures:
+- Fitting samples what user sees (avoids base-layer-only bugs)
+- Audio processing renders exactly what fitting was based on
+- Visualizer displays accurate curve preview
+
+**Single Source of Truth**:
+```cpp
+// Mode-specific rendering via single entry point
+double LayeredTransferFunction::evaluateForRendering(double x, double normScalar) const {
+    // Routes through RenderingMode (Paint/Harmonic/Spline)
+    // Each mode reads base + harmonics + normalization consistently
+}
+```
+
+**Three Callers, One Path**:
+- Spline fitting: `SplineFitter::sampleAndSanitize()` → `ltf.getCompositeValue(i)` → `evaluateForRendering()`
+- DSP rendering: `LUTRendererThread::renderDSPLUT()` → `evaluateForRendering()`
+- Visualizer: `VisualizerUpdateTimer::timerCallback()` → `evaluateForRendering()`
+
+---
+
 ## Stage 2: Sampling & Densification
 
 **Purpose:** Convert rasterized lookup table into a densified polyline suitable for spline fitting.
@@ -168,12 +193,12 @@ def sampleAndSanitize(ltf: LayeredTransferFunction, config: SplineFitConfig) -> 
     tableSize = ltf.getTableSize()
     samples = []
 
-    # 1. Sample entire composite curve
-    # CRITICAL: Read from getCompositeValue(), not base layer
+    # 1. Sample entire composite curve via unified evaluation path
+    # CRITICAL: Read from evaluateForRendering(), not base layer
     # This includes base + harmonics + normalization = what user sees
     for i in range(tableSize):
         x = ltf.normalizeIndex(i)  # Maps table index to [-1, 1]
-        y = ltf.getCompositeValue(i)  # Composite output
+        y = ltf.evaluateForRendering(x, normScalar)  # Unified rendering path
         samples.append(Sample{x, y})
 
     # 2. Densify: Add midpoint samples from actual curve

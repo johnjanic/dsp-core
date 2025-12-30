@@ -16,11 +16,24 @@ class LUTRendererThread;
 class LUTRenderTimer;
 class VisualizerUpdateTimer;
 
-// Constants (hardcoded for performance)
-static constexpr int TABLE_SIZE = 16384;          // DSP LUT size (audio thread)
-static constexpr int VISUALIZER_LUT_SIZE = 1024;  // Visualizer LUT size (UI thread)
-static constexpr double MIN_VALUE = -1.0;
-static constexpr double MAX_VALUE = 1.0;
+/**
+ * SeamlessConfig - Configuration constants for seamless transfer function updates
+ */
+struct SeamlessConfig {
+    static constexpr int DSP_LUT_SIZE = 16384;
+    static constexpr int VISUALIZER_LUT_SIZE = 1024;
+    static constexpr double MIN_VALUE = -1.0;
+    static constexpr double MAX_VALUE = 1.0;
+    static constexpr double CROSSFADE_DURATION_MS = 50.0;
+    static constexpr int DSP_TIMER_HZ = 20;
+    static constexpr int VISUALIZER_TIMER_HZ = 120;
+};
+
+// Legacy aliases for backward compatibility
+static constexpr int TABLE_SIZE = SeamlessConfig::DSP_LUT_SIZE;
+static constexpr int VISUALIZER_LUT_SIZE = SeamlessConfig::VISUALIZER_LUT_SIZE;
+static constexpr double MIN_VALUE = SeamlessConfig::MIN_VALUE;
+static constexpr double MAX_VALUE = SeamlessConfig::MAX_VALUE;
 
 // Buffer roles for triple-buffered LUT system
 enum class BufferRole {

@@ -43,9 +43,8 @@ AudioEngine::AudioEngine() {
 void AudioEngine::prepareToPlay(double sampleRate, int samplesPerBlock) {
     this->sampleRate = sampleRate;
     // 50ms crossfade = 1.5× DC blocking time constant (balances smoothness vs latency)
-    constexpr double crossfadeDurationMs = 50.0;
     constexpr double msToSeconds = 1000.0;
-    crossfadeSamples = static_cast<int>(sampleRate * crossfadeDurationMs / msToSeconds);
+    crossfadeSamples = static_cast<int>(sampleRate * SeamlessConfig::CROSSFADE_DURATION_MS / msToSeconds);
 
     if (crossfading && crossfadePosition >= crossfadeSamples) {
         crossfading = false;
@@ -381,7 +380,7 @@ LUTRenderTimer::LUTRenderTimer(LayeredTransferFunction& ltf_,
     : ltf(ltf_)
     , renderer(renderer_) {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    startTimerHz(20);  // 50ms interval, matches crossfade timing
+    startTimerHz(SeamlessConfig::DSP_TIMER_HZ);  // 50ms interval, matches crossfade timing
 }
 
 LUTRenderTimer::~LUTRenderTimer() {
@@ -449,7 +448,7 @@ RenderJob LUTRenderTimer::captureRenderJob() {
 VisualizerUpdateTimer::VisualizerUpdateTimer(LayeredTransferFunction& model)
     : editingModel(model) {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    startTimerHz(120);  // 120Hz for smooth UI updates during drag
+    startTimerHz(SeamlessConfig::VISUALIZER_TIMER_HZ);  // 120Hz for smooth UI updates during drag
 }
 
 VisualizerUpdateTimer::~VisualizerUpdateTimer() {

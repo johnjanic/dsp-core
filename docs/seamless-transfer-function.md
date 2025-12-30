@@ -36,16 +36,43 @@ VisualizerUpdateTimer (60Hz)              LUTRenderTimer (20Hz)
 ```
 
 **Key Design: Two-Timer Architecture**
-- **VisualizerUpdateTimer (60Hz)**: Direct model reads for responsive UI (~0.5ms per update)
+- **VisualizerUpdateTimer (120Hz)**: Direct model reads for responsive UI (~0.5ms per update)
 - **LUTRenderTimer (20Hz)**: DSP LUT updates with guaranteed delivery via two-version tracking
 
 **Benefits**:
 - Audio thread never blocks (wait-free reads)
-- UI stays responsive (60Hz visualizer, decoupled from DSP)
-- DSP renders ~3x less often (20Hz vs 60Hz), saving CPU
+- UI stays responsive (120Hz visualizer, decoupled from DSP)
+- DSP renders ~6x less often (20Hz vs 120Hz), saving CPU
 - Guaranteed final delivery via two-version tracking
 - Crossfades mask discontinuities
 - Lock-free communication via atomics
+
+### Timer Configuration Constants (SeamlessConfig)
+
+**File**: [`modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h`](../../modules/dsp-core/dsp_core/Source/SeamlessTransferFunctionImpl.h#L19-L30)
+
+All timing configuration is centralized in `SeamlessConfig` struct:
+
+```cpp
+struct SeamlessConfig {
+    static constexpr int DSP_LUT_SIZE = 16384;           // 16K samples for audio processing
+    static constexpr int VISUALIZER_LUT_SIZE = 1024;     // 1K samples for UI rendering
+    static constexpr double MIN_VALUE = -1.0;
+    static constexpr double MAX_VALUE = 1.0;
+    static constexpr double CROSSFADE_DURATION_MS = 50.0; // 50ms S-curve crossfade
+    static constexpr int DSP_TIMER_HZ = 20;              // DSP LUT updates at 20Hz
+    static constexpr int VISUALIZER_TIMER_HZ = 120;      // Visualizer updates at 120Hz
+};
+```
+
+**Why Separate Timer Rates?**
+
+| Timer | Rate | Workload | Rationale |
+|-------|------|----------|-----------|
+| **LUTRenderTimer (DSP)** | 20 Hz (50ms) | Render 16K-sample LUT via worker thread | Expensive (~5-15ms), matches crossfade timing, coalesces rapid edits |
+| **VisualizerUpdateTimer** | 120 Hz (~8.3ms) | Direct model reads, ~1K samples | Cheap (~0.5ms), responsive to user drags, independent from DSP rate |
+
+**CPU Efficiency**: 20Hz DSP rate saves ~85% CPU vs 120Hz (workers renders only 1/6 as often), while visualizer stays responsive at 120Hz direct reads.
 
 ---
 
