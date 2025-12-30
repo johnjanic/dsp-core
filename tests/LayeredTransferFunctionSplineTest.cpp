@@ -55,7 +55,7 @@ TEST_F(LayeredTransferFunctionSplineTest, EnablingSplineLayerLocksNormalization)
 
 TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
     // Set up spline layer
-    ltf->getSplineLayer().setAnchors(threePtAnchors);
+    ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Evaluate (should use direct path since cache invalid)
@@ -64,7 +64,7 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
 }
 
 TEST_F(LayeredTransferFunctionSplineTest, DirectPathAtAnchorPoints) {
-    ltf->getSplineLayer().setAnchors(threePtAnchors);
+    ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     EXPECT_NEAR(ltf->applyTransferFunction(-1.0), -1.0, kTolerance);
@@ -84,7 +84,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Audio thread should use spline, ignoring harmonics
-    ltf->getSplineLayer().setAnchors(linearAnchors);
+    ltf->setSplineAnchors(linearAnchors);
 
     double result = ltf->applyTransferFunction(0.0);
     // Result should come from spline (y=x at x=0), not harmonics
@@ -93,7 +93,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
 
 TEST_F(LayeredTransferFunctionSplineTest, DisablingSplineLayerRestoresHarmonicMode) {
     // Enable spline mode
-    ltf->getSplineLayer().setAnchors(linearAnchors);
+    ltf->setSplineAnchors(linearAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     const double splineResult = ltf->applyTransferFunction(0.5);
@@ -117,7 +117,7 @@ TEST_F(LayeredTransferFunctionSplineTest, DisablingSplineLayerRestoresHarmonicMo
 //==============================================================================
 
 TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
-    ltf->getSplineLayer().setAnchors(threePtAnchors);
+    ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify on-demand computation matches direct evaluation
@@ -132,7 +132,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
 }
 
 TEST_F(LayeredTransferFunctionSplineTest, SplineEvaluationPreservesShape) {
-    ltf->getSplineLayer().setAnchors(threePtAnchors);
+    ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Check anchor points via audio evaluation path
@@ -154,7 +154,7 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
     std::vector<SplineAnchor> largeAnchors = {{-1.0, -2.0, false, 0.0}, {1.0, 2.0, false, 0.0}};
     SplineFitter::computeTangents(largeAnchors, SplineFitConfig::tight());
 
-    ltf->getSplineLayer().setAnchors(largeAnchors);
+    ltf->setSplineAnchors(largeAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // In spline mode, normalization is locked to 1.0

@@ -791,4 +791,92 @@ TEST_F(LayeredTransferFunctionTest, BatchUpdate_NestedGuardsNotSupported) {
     EXPECT_EQ(versionAfterSecond, versionAfterFirst); // No change
 }
 
+// ============================================================================
+// Version Increment Tests for All Mutation Methods
+// ============================================================================
+
+TEST_F(LayeredTransferFunctionTest, SetSplineAnchors_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+
+    std::vector<dsp_core::SplineAnchor> anchors = {
+        {-1.0, -1.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
+    ltf->setSplineAnchors(anchors);
+
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, ClearSplineAnchors_IncrementsVersion) {
+    // First set some anchors
+    std::vector<dsp_core::SplineAnchor> anchors = {
+        {-1.0, -1.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
+    ltf->setSplineAnchors(anchors);
+
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->clearSplineAnchors();
+
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetRenderingMode_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setRenderingMode(dsp_core::RenderingMode::Spline);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+
+    versionBefore = ltf->getVersion();
+    ltf->setRenderingMode(dsp_core::RenderingMode::Harmonic);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+
+    versionBefore = ltf->getVersion();
+    ltf->setRenderingMode(dsp_core::RenderingMode::Paint);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetNormalizationEnabled_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setNormalizationEnabled(false);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+
+    versionBefore = ltf->getVersion();
+    ltf->setNormalizationEnabled(true);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetExtrapolationMode_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setExtrapolationMode(dsp_core::LayeredTransferFunction::ExtrapolationMode::Linear);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+
+    versionBefore = ltf->getVersion();
+    ltf->setExtrapolationMode(dsp_core::LayeredTransferFunction::ExtrapolationMode::Clamp);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetBaseLayerValue_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setBaseLayerValue(100, 0.5);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, ClearBaseLayer_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->clearBaseLayer();
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetCoefficient_IncrementsVersion) {
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setCoefficient(1, 0.5);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
+TEST_F(LayeredTransferFunctionTest, SetHarmonicCoefficients_IncrementsVersion) {
+    std::array<double, 41> coeffs{};
+    coeffs[0] = 1.0;
+    coeffs[3] = 0.5;
+
+    uint64_t versionBefore = ltf->getVersion();
+    ltf->setHarmonicCoefficients(coeffs);
+    EXPECT_EQ(ltf->getVersion(), versionBefore + 1);
+}
+
 } // namespace dsp_core_test

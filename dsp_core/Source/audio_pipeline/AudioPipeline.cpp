@@ -76,4 +76,12 @@ AudioProcessingStage* AudioPipeline::getStage(const std::string& tag) {
     return stages_[index].get();
 }
 
+void AudioPipeline::addStage(std::unique_ptr<AudioProcessingStage> stage, StageTag tag) {
+    addStage(std::move(stage), stageTagToString(tag));
+}
+
+AudioProcessingStage* AudioPipeline::getStage(StageTag tag) {
+    return getStage(stageTagToString(tag));
+}
+
 } // namespace dsp_core::audio_pipeline

@@ -311,7 +311,7 @@ namespace {
     double computeNormalizationScalar(
         const std::array<double, TABLE_SIZE>& baseLayer,
         const std::array<double, 41>& coefficients,
-        HarmonicLayer& harmonicLayer,
+        const HarmonicLayer& harmonicLayer, // Changed to const reference
         bool normalizationEnabled,
         bool paintStrokeActive,
         double frozenScalar
@@ -353,7 +353,7 @@ void LUTRendererThread::renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuff
     const double normScalar = computeNormalizationScalar(
         job.baseLayerData,
         job.coefficients,
-        tempLTF->getHarmonicLayer(),
+        static_cast<const HarmonicLayer&>(tempLTF->getHarmonicLayer()), // Cast to const
         job.normalizationEnabled,
         job.paintStrokeActive,
         job.frozenNormalizationScalar

@@ -75,16 +75,8 @@ void LayeredTransferFunction::clearBaseLayer() {
     incrementVersionIfNotBatching();
 }
 
-HarmonicLayer& LayeredTransferFunction::getHarmonicLayer() {
-    return *harmonicLayer;
-}
-
 const HarmonicLayer& LayeredTransferFunction::getHarmonicLayer() const {
     return *harmonicLayer;
-}
-
-SplineLayer& LayeredTransferFunction::getSplineLayer() {
-    return *splineLayer;
 }
 
 const SplineLayer& LayeredTransferFunction::getSplineLayer() const {

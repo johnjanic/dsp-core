@@ -9,18 +9,61 @@
 namespace dsp_core::audio_pipeline {
 
 /**
+ * StageTag - Type-safe identifiers for pipeline stage retrieval
+ *
+ * Use these tags when adding stages that need later retrieval for parameter updates.
+ * Stages without tags can still be added (auto-generated internal tag).
+ */
+enum class StageTag {
+    InputGain,
+    Waveshaper,
+    Oversampling,
+    DCBlock,
+    OutputGain,
+    DryWetMix,
+};
+
+/**
+ * Convert StageTag to string for internal storage
+ */
+inline std::string stageTagToString(StageTag tag) {
+    switch (tag) {
+        case StageTag::InputGain:
+            return "inputGain";
+        case StageTag::Waveshaper:
+            return "waveshaper";
+        case StageTag::Oversampling:
+            return "oversampling";
+        case StageTag::DCBlock:
+            return "dcBlock";
+        case StageTag::OutputGain:
+            return "outputGain";
+        case StageTag::DryWetMix:
+            return "dryWetMix";
+    }
+    return "unknown";
+}
+
+/**
  * Serial pipeline of audio processing stages.
  *
  * Stages are executed in the order they were added.
  * Example:
- *   pipeline.addStage(makeGainStage());
- *   pipeline.addStage(makeWaveshaperStage());
- *   pipeline.addStage(makeHighpassStage());
+ *   pipeline.addStage(makeGainStage(), StageTag::InputGain);
+ *   pipeline.addStage(makeWaveshaperStage(), StageTag::Waveshaper);
+ *   pipeline.addStage(makeHighpassStage(), StageTag::DCBlock);
  *   pipeline.process(buffer);  // Gain → Waveshaper → Highpass
  *
- * Thread safety:
- * - addStage() must be called before prepareToPlay() (setup phase only)
- * - process() is thread-safe after setup
+ * THREADING CONTRACT
+ * ==================
+ * - Setup Phase: addStage(), clear() - MUST complete before prepareToPlay()
+ * - Audio Thread: process(), getLatencySamples() - lock-free reads
+ * - Parameter Thread: getStage() for stage pointer access - safe after setup
+ *
+ * LIFETIME
+ * ========
+ * - Stages owned by pipeline (unique_ptr)
+ * - Stage pointers from getStage() valid until clear() or destruction
  */
 class AudioPipeline : public AudioProcessingStage {
   public:
@@ -94,6 +137,35 @@ class AudioPipeline : public AudioProcessingStage {
     template <typename StageType> StageType* getStage(const std::string& tag) {
         auto* stage = getStage(tag);
         return dynamic_cast<StageType*>(stage);
+    }
+
+    // ========================================================================
+    // Type-safe StageTag overloads (preferred API)
+    // ========================================================================
+
+    /**
+     * Add stage to end of pipeline with type-safe tag.
+     * MUST be called before prepareToPlay().
+     * @param stage Stage to add
+     * @param tag StageTag enum for retrieval
+     */
+    void addStage(std::unique_ptr<AudioProcessingStage> stage, StageTag tag);
+
+    /**
+     * Get stage by type-safe tag (type-erased).
+     * @param tag StageTag enum used when adding the stage
+     * @return Non-owning pointer to stage, or nullptr if not found
+     */
+    AudioProcessingStage* getStage(StageTag tag);
+
+    /**
+     * Get stage by type-safe tag (typed).
+     * @tparam StageType Expected stage type
+     * @param tag StageTag enum used when adding the stage
+     * @return Non-owning pointer to stage, or nullptr if not found or type mismatch
+     */
+    template <typename StageType> StageType* getStage(StageTag tag) {
+        return getStage<StageType>(stageTagToString(tag));
     }
 
   private:

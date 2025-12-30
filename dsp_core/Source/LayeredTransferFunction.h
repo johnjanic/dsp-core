@@ -43,10 +43,23 @@ enum class RenderingMode {
  * Critical: Layers (baseTable, harmonic evaluations) are NEVER modified by normalization.
  * This allows seamless coefficient mixing in TransferFunctionController.
  *
- * Thread safety:
- *   - Base layer uses atomics for lock-free reads
- *   - All mutations should be from message thread only
- *   - Version counter tracks changes for renderer polling
+ * THREADING CONTRACT
+ * ==================
+ * - Message Thread: All mutations (setters, baking, mode changes)
+ * - Worker Thread:  Read-only via const methods, getVersion() polling
+ * - Audio Thread:   Read-only via evaluateForRendering(), applyTransferFunction()
+ *
+ * VERSION TRACKING INVARIANT
+ * ==========================
+ * Every mutation MUST increment the version counter via incrementVersionIfNotBatching().
+ * Use public setters (setBaseLayerValue, setCoefficient, setSplineAnchors, etc.) or
+ * BatchUpdateGuard for multiple mutations. Direct layer mutation is PROHIBITED
+ * (const references only via getHarmonicLayer()/getSplineLayer()).
+ *
+ * MEMORY ORDERING
+ * ===============
+ * - Reads:  memory_order_acquire (visibility of prior writes)
+ * - Writes: memory_order_release (visibility to readers)
  */
 class LayeredTransferFunction {
   public:
@@ -59,12 +72,10 @@ class LayeredTransferFunction {
     void setBaseLayerValue(int index, double value);
     void clearBaseLayer(); // Set all base values to 0.0
 
-    // Harmonic layer (for algorithm settings only)
-    HarmonicLayer& getHarmonicLayer();
+    // Harmonic layer (read-only access - use setCoefficient/setHarmonicCoefficients to mutate)
     const HarmonicLayer& getHarmonicLayer() const;
 
-    // Spline layer (NEW: for spline mode)
-    SplineLayer& getSplineLayer();
+    // Spline layer (read-only access - use setSplineAnchors/clearSplineAnchors to mutate)
     const SplineLayer& getSplineLayer() const;
 
     // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)

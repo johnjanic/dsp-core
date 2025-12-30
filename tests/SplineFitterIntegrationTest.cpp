@@ -190,7 +190,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     auto config = SplineFitConfig::tight();
     SplineFitter::computeTangents(userAnchors, config);
 
-    ltf->getSplineLayer().setAnchors(userAnchors);
+    ltf->setSplineAnchors(userAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // STEP c: Bake to 16k samples
@@ -210,7 +210,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     EXPECT_LE(refitResult.anchors.size(), 5) << "Should not explode anchor count (3 ±2)";
 
     // Verify shape preservation
-    ltf->getSplineLayer().setAnchors(refitResult.anchors);
+    ltf->setSplineAnchors(refitResult.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto refittedState = captureBaseLayer();
@@ -242,7 +242,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     EXPECT_LT(finalResult.anchors.size(), 20) << "Scribbled curve should not explode anchor count";
 
     // Verify shape still preserved
-    ltf->getSplineLayer().setAnchors(finalResult.anchors);
+    ltf->setSplineAnchors(finalResult.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
@@ -290,7 +290,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     auto harmonicFitResult = SplineFitter::fitCurve(*ltf, config);
 
     EXPECT_TRUE(harmonicFitResult.success) << "Harmonic fit should succeed";
-    ltf->getSplineLayer().setAnchors(harmonicFitResult.anchors);
+    ltf->setSplineAnchors(harmonicFitResult.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // STEP d: Verify shape preserved (use mode-aware capture)
@@ -311,7 +311,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     modifiedAnchors[midIdx].y += 0.2; // Drag up by 0.2
 
     SplineFitter::computeTangents(modifiedAnchors, config);
-    ltf->getSplineLayer().setAnchors(modifiedAnchors);
+    ltf->setSplineAnchors(modifiedAnchors);
 
     // STEP g: Bake and refit
     bakeSplineToBase();
@@ -332,7 +332,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     EXPECT_LT(anchorRatio, 1.5) << "Anchor count should not explode";
 
     // Verify shape preservation after refit
-    ltf->getSplineLayer().setAnchors(refitResult.anchors);
+    ltf->setSplineAnchors(refitResult.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
@@ -381,7 +381,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
         anchorHistory.push_back(fitResult.anchors.size());
 
         // Apply fitted spline
-        ltf->getSplineLayer().setAnchors(fitResult.anchors);
+        ltf->setSplineAnchors(fitResult.anchors);
         ltf->setRenderingMode(RenderingMode::Spline);
 
         // Measure error
@@ -460,7 +460,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     EXPECT_LE(fitResult1.anchors.size(), 100) << "H15 should not require excessive anchors";
 
     // Apply first fit
-    ltf->getSplineLayer().setAnchors(fitResult1.anchors);
+    ltf->setSplineAnchors(fitResult1.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify first fit quality (use mode-aware capture to get spline values)
@@ -484,7 +484,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     EXPECT_LT(ratio, 1.3) << "Anchor count should not explode on backtranslation";
 
     // Apply second fit
-    ltf->getSplineLayer().setAnchors(fitResult2.anchors);
+    ltf->setSplineAnchors(fitResult2.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify shape preservation (use mode-aware capture to get spline values)
@@ -579,7 +579,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
         pairedHistory.push_back(mostlyPaired);
 
         // Apply fit and measure error
-        ltf->getSplineLayer().setAnchors(fitResult.anchors);
+        ltf->setSplineAnchors(fitResult.anchors);
         ltf->setRenderingMode(RenderingMode::Spline);
 
         auto originalState = captureBaseLayer();
@@ -659,7 +659,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
     EXPECT_LE(result.anchors.size(), 24) << "Should not exceed smooth() config maxAnchors";
 
     // Verify shape preservation
-    ltf->getSplineLayer().setAnchors(result.anchors);
+    ltf->setSplineAnchors(result.anchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto fittedState = captureBaseLayer();
@@ -733,7 +733,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
         symmetryScores.push_back(visualSymmetryScore);
 
         // Apply fit and bake for next cycle
-        ltf->getSplineLayer().setAnchors(fitResult.anchors);
+        ltf->setSplineAnchors(fitResult.anchors);
         ltf->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
@@ -802,7 +802,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
 
         anchorHistoryAuto.push_back(fitResult.anchors.size());
 
-        ltfAuto->getSplineLayer().setAnchors(fitResult.anchors);
+        ltfAuto->setSplineAnchors(fitResult.anchors);
         ltfAuto->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
@@ -828,7 +828,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
 
         anchorHistoryNever.push_back(fitResult.anchors.size());
 
-        ltfNever->getSplineLayer().setAnchors(fitResult.anchors);
+        ltfNever->setSplineAnchors(fitResult.anchors);
         ltfNever->setRenderingMode(RenderingMode::Spline);
 
         bakeSplineToBase();
@@ -906,7 +906,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
                                                    {0.1, -0.5, false, 0.0}, // Asymmetric anchor (drooping downward)
                                                    {1.0, 1.0, false, 0.0}};
     SplineFitter::computeTangents(userEditedAnchors, config);
-    ltf->getSplineLayer().setAnchors(userEditedAnchors);
+    ltf->setSplineAnchors(userEditedAnchors);
 
     // Verify the spline layer has the user's curve
     double yAtOrigin = ltf->getSplineLayer().evaluate(0.0);
