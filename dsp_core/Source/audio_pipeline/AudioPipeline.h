@@ -103,8 +103,10 @@ class AudioPipeline : public AudioProcessingStage {
     int getLatencySamples() const override;
 
     /**
-     * Get total latency of all stages combined (legacy name).
+     * Get total latency of all stages combined.
+     * @deprecated Use getLatencySamples() instead.
      */
+    [[deprecated("Use getLatencySamples() instead")]]
     int getTotalLatencySamples() const {
         return getLatencySamples();
     }

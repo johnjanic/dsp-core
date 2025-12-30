@@ -22,6 +22,13 @@ static constexpr int VISUALIZER_LUT_SIZE = 1024;  // Visualizer LUT size (UI thr
 static constexpr double MIN_VALUE = -1.0;
 static constexpr double MAX_VALUE = 1.0;
 
+// Buffer roles for triple-buffered LUT system
+enum class BufferRole {
+    Primary = 0,      // Active LUT for playback (audio thread reads)
+    Secondary = 1,    // Previous LUT used during crossfade (audio thread reads)
+    WorkerTarget = 2  // Worker thread writes here (isolated from audio)
+};
+
 // LUTBuffer - Triple-buffered lookup table
 struct LUTBuffer {
     std::array<double, TABLE_SIZE> data;
@@ -199,9 +206,9 @@ class AudioEngine {
     LUTBuffer lutBuffers[3];
 
     // Atomics are mutable because they're modified in const methods (thread-safe state)
-    mutable std::atomic<int> primaryIndex{0};      // Active LUT for playback
-    mutable std::atomic<int> secondaryIndex{1};    // Previous LUT (used during crossfade)
-    mutable std::atomic<int> workerTargetIndex{2}; // Worker writes here
+    mutable std::atomic<int> primaryIndex{static_cast<int>(BufferRole::Primary)};      // Active LUT for playback
+    mutable std::atomic<int> secondaryIndex{static_cast<int>(BufferRole::Secondary)};    // Previous LUT (used during crossfade)
+    mutable std::atomic<int> workerTargetIndex{static_cast<int>(BufferRole::WorkerTarget)}; // Worker writes here
     mutable std::atomic<bool> newLUTReady{false};
 
     // Crossfade state (audio thread local - mutable for const methods)

@@ -11,7 +11,7 @@ namespace dsp_core::audio_pipeline {
  * Features:
  * - Automatic channel count detection
  * - 10ms smoothing time for parameter changes
- * - Supports both dB and linear gain setting
+ * - dB-based gain control
  */
 class GainStage : public AudioProcessingStage {
   public:
@@ -29,16 +29,6 @@ class GainStage : public AudioProcessingStage {
      * Smoothed over ~10ms to prevent clicks.
      */
     void setGainDB(double gainDB);
-
-    /**
-     * Set gain as linear multiplier.
-     */
-    void setGainLinear(double gainLinear);
-
-    /**
-     * Get current target gain (linear).
-     */
-    double getTargetGainLinear() const;
 
   private:
     juce::dsp::Gain<double> gainProcessor_;

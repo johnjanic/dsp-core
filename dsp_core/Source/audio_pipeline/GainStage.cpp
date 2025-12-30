@@ -54,12 +54,4 @@ void GainStage::setGainDB(double gainDB) {
     smoothedGain_.setTargetValue(linear);
 }
 
-void GainStage::setGainLinear(double gainLinear) {
-    smoothedGain_.setTargetValue(gainLinear);
-}
-
-double GainStage::getTargetGainLinear() const {
-    return smoothedGain_.getTargetValue();
-}
-
 } // namespace dsp_core::audio_pipeline
