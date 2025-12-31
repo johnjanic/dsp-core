@@ -16,6 +16,7 @@ namespace dsp_core::audio_pipeline {
  */
 enum class StageTag {
     InputGain,
+    AudioInputWriter,
     Waveshaper,
     Oversampling,
     DCBlock,
@@ -30,6 +31,8 @@ inline std::string stageTagToString(StageTag tag) {
     switch (tag) {
         case StageTag::InputGain:
             return "inputGain";
+        case StageTag::AudioInputWriter:
+            return "audioInputWriter";
         case StageTag::Waveshaper:
             return "waveshaper";
         case StageTag::Oversampling:
@@ -101,15 +104,6 @@ class AudioPipeline : public AudioProcessingStage {
      * Get total latency of all stages combined.
      */
     int getLatencySamples() const override;
-
-    /**
-     * Get total latency of all stages combined.
-     * @deprecated Use getLatencySamples() instead.
-     */
-    [[deprecated("Use getLatencySamples() instead")]]
-    int getTotalLatencySamples() const {
-        return getLatencySamples();
-    }
 
     /**
      * Get number of stages in pipeline.

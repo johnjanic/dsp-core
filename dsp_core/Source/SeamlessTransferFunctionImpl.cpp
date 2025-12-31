@@ -466,6 +466,7 @@ void VisualizerUpdateTimer::timerCallback() {
 
     const uint64_t currentVersion = editingModel.getVersion();
 
+    // Path 1: Conditionally update transfer function curve (only when version changes)
     if (currentVersion != lastSeenVersion) {
         lastSeenVersion = currentVersion;
 
@@ -488,11 +489,13 @@ void VisualizerUpdateTimer::timerCallback() {
                                            * (MAX_VALUE - MIN_VALUE);
                 (*visualizerLUTPtr)[i] = editingModel.evaluateForRendering(x, normScalar);
             }
-
-            if (onVisualizerUpdate) {
-                onVisualizerUpdate();
-            }
         }
+    }
+
+    // Path 2: Unconditionally invoke callback (for amplitude trace updates)
+    // The callback handles both curve updates (when LUT changed) and amplitude trace (every frame)
+    if (onVisualizerUpdate) {
+        onVisualizerUpdate();
     }
 }
 

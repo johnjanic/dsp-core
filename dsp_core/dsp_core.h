@@ -51,3 +51,7 @@
 #include "Source/audio_pipeline/WaveshapingStage.h"
 #include "Source/audio_pipeline/OversamplingWrapper.h"
 #include "Source/audio_pipeline/DCBlockingFilter.h"
+#include "Source/audio_pipeline/AudioInputBuffer.h"
+#include "Source/audio_pipeline/AudioInputWriter.h"
+#include "Source/audio_pipeline/StageHandles.h"
+#include "Source/audio_pipeline/AudioPipelineBuilder.h"
