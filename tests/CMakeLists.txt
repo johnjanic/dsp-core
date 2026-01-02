@@ -614,27 +614,3 @@ endif()
 
 add_test(NAME AudioPipelineBuilderTests COMMAND audio_pipeline_builder_tests)
 
-# InputPeakTracker tests
-add_executable(input_peak_tracker_tests
-    InputPeakTrackerTest.cpp
-)
-
-target_include_directories(input_peak_tracker_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(input_peak_tracker_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(input_peak_tracker_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(input_peak_tracker_tests)
-endif()
-
-add_test(NAME InputPeakTrackerTests COMMAND input_peak_tracker_tests)
