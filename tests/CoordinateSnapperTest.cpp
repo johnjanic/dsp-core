@@ -179,7 +179,7 @@ TEST(CoordinateSnapperTest, NearestGridLine_FractionalGridStep) {
 
 TEST(CoordinateSnapperTest, Symmetry_PositiveAndNegative) {
     // Verify symmetric behavior for positive and negative values
-    double gridStep = 0.1;
+    double const gridStep = 0.1;
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.47, gridStep), -CoordinateSnapper::snapValue(-0.47, gridStep));
     EXPECT_DOUBLE_EQ(CoordinateSnapper::snapValue(0.23, gridStep), -CoordinateSnapper::snapValue(-0.23, gridStep));
 }

@@ -27,7 +27,7 @@ TEST_F(TransferFunctionOperationsTest, Invert_FlipsAllValues) {
     // Set up a simple linear ramp
     const int tableSize = ltf->getTableSize();
     for (int i = 0; i < tableSize; ++i) {
-        double x = -1.0 + (2.0 * i / (tableSize - 1));
+        double const x = -1.0 + (2.0 * i / (tableSize - 1));
         ltf->setBaseLayerValue(i, x); // Linear ramp from -1 to 1
     }
 
@@ -36,7 +36,7 @@ TEST_F(TransferFunctionOperationsTest, Invert_FlipsAllValues) {
 
     // Verify all values are negated
     for (int i = 0; i < tableSize; ++i) {
-        double expected = -(-1.0 + (2.0 * i / (tableSize - 1)));
+        double const expected = -(-1.0 + (2.0 * i / (tableSize - 1)));
         EXPECT_NEAR(ltf->getBaseLayerValue(i), expected, 1e-10) << "Value at index " << i << " not correctly inverted";
     }
 }
@@ -46,7 +46,7 @@ TEST_F(TransferFunctionOperationsTest, Invert_DoubleInvertRestoresOriginal) {
     const int tableSize = ltf->getTableSize();
     std::vector<double> original(tableSize);
     for (int i = 0; i < tableSize; ++i) {
-        double val = std::sin(2.0 * M_PI * i / tableSize);
+        double const val = std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
@@ -83,7 +83,7 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCInstantaneous_CentersAtOrigin) {
     const int tableSize = ltf->getTableSize();
     const double dcOffset = 0.5;
     for (int i = 0; i < tableSize; ++i) {
-        double x = -1.0 + (2.0 * i / (tableSize - 1));
+        double const x = -1.0 + (2.0 * i / (tableSize - 1));
         ltf->setBaseLayerValue(i, x + dcOffset); // Ramp with DC offset
     }
 
@@ -120,7 +120,7 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_RemovesAverageOffset)
     const int tableSize = ltf->getTableSize();
     for (int i = 0; i < tableSize; ++i) {
         // Positive-biased sine: average is approximately 0.5
-        double val = 0.5 + 0.5 * std::sin(2.0 * M_PI * i / tableSize);
+        double const val = 0.5 + 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
 
@@ -131,7 +131,7 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_RemovesAverageOffset)
     for (int i = 0; i < tableSize; ++i) {
         sum += ltf->getBaseLayerValue(i);
     }
-    double average = sum / tableSize;
+    double const average = sum / tableSize;
     EXPECT_NEAR(average, 0.0, 1e-10);
 }
 
@@ -140,16 +140,17 @@ TEST_F(TransferFunctionOperationsTest, RemoveDCSteadyState_PreservesShape) {
     const int tableSize = ltf->getTableSize();
     std::vector<double> original(tableSize);
     for (int i = 0; i < tableSize; ++i) {
-        double val = std::sin(2.0 * M_PI * i / tableSize);
+        double const val = std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
 
     // Calculate original average
     double origSum = 0.0;
-    for (double v : original)
+    for (double const v : original) {
         origSum += v;
-    double origAvg = origSum / tableSize;
+}
+    double const origAvg = origSum / tableSize;
 
     TransferFunctionOperations::removeDCSteadyState(*ltf);
 
@@ -167,7 +168,7 @@ TEST_F(TransferFunctionOperationsTest, Normalize_ScalesToUnitRange) {
     // Set up a function with max value of 0.5
     const int tableSize = ltf->getTableSize();
     for (int i = 0; i < tableSize; ++i) {
-        double val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
+        double const val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
 
@@ -186,20 +187,21 @@ TEST_F(TransferFunctionOperationsTest, Normalize_PreservesRelativeShape) {
     const int tableSize = ltf->getTableSize();
     std::vector<double> original(tableSize);
     for (int i = 0; i < tableSize; ++i) {
-        double val = 0.25 * std::sin(2.0 * M_PI * i / tableSize);
+        double const val = 0.25 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
         original[i] = val;
     }
 
     // Find original max for expected scale factor
     double origMax = 0.0;
-    for (double v : original)
+    for (double const v : original) {
         origMax = std::max(origMax, std::abs(v));
+}
 
     TransferFunctionOperations::normalize(*ltf);
 
     // Verify relative proportions are maintained
-    double scaleFactor = 1.0 / origMax;
+    double const scaleFactor = 1.0 / origMax;
     for (int i = 0; i < tableSize; ++i) {
         EXPECT_NEAR(ltf->getBaseLayerValue(i), original[i] * scaleFactor, 1e-10);
     }
@@ -209,7 +211,7 @@ TEST_F(TransferFunctionOperationsTest, Normalize_AlreadyNormalized_NoChange) {
     // Set up a function already at full scale
     const int tableSize = ltf->getTableSize();
     for (int i = 0; i < tableSize; ++i) {
-        double val = std::sin(2.0 * M_PI * i / tableSize); // Already peaks at ±1
+        double const val = std::sin(2.0 * M_PI * i / tableSize); // Already peaks at ±1
         ltf->setBaseLayerValue(i, val);
     }
 
@@ -265,7 +267,7 @@ TEST_F(TransferFunctionOperationsTest, ChainedOperations_InvertThenNormalize) {
     // Set up a function
     const int tableSize = ltf->getTableSize();
     for (int i = 0; i < tableSize; ++i) {
-        double val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
+        double const val = 0.5 * std::sin(2.0 * M_PI * i / tableSize);
         ltf->setBaseLayerValue(i, val);
     }
 

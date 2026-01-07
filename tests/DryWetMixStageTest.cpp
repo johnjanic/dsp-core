@@ -68,7 +68,7 @@ TEST_F(DryWetMixStageTest, FullyWet_OutputEqualsProcessed) {
     // Verify output equals input (100% wet with 1x gain)
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            double expected = static_cast<double>(i) / 64.0;
+            double const expected = static_cast<double>(i) / 64.0;
             EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -90,8 +90,8 @@ TEST_F(DryWetMixStageTest, FiftyFiftyMix_CorrectBlend) {
     // Verify output equals 0.5 * input + 0.5 * input = input (with 1x gain)
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            double input = static_cast<double>(i) / 64.0;
-            double expected = input; // 0.5 * input + 0.5 * input
+            double const input = static_cast<double>(i) / 64.0;
+            double const expected = input; // 0.5 * input + 0.5 * input
             EXPECT_NEAR(buffer.getSample(ch, i), expected, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -144,8 +144,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_Unaligned63Samples) {
     // Verify correctness for unaligned buffer
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 63; ++i) {
-            double input = static_cast<double>(i) / 63.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = static_cast<double>(i) / 63.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -167,8 +167,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_Aligned64Samples) {
     // Verify correctness for aligned buffer
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            double input = static_cast<double>(i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = static_cast<double>(i) / 64.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -190,8 +190,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_LargeBuffer512Samples) {
     // Verify correctness for large buffer
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
-            double input = static_cast<double>(i) / 512.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = static_cast<double>(i) / 512.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -213,8 +213,8 @@ TEST_F(DryWetMixStageTest, EdgeCase_513Samples) {
     // Verify correctness for 512+1 samples
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 513; ++i) {
-            double input = static_cast<double>(i) / 513.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = static_cast<double>(i) / 513.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -235,8 +235,8 @@ TEST_F(DryWetMixStageTest, NegativeValues_HandledCorrectly) {
     // Verify negative values processed correctly
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            double input = -static_cast<double>(i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = -static_cast<double>(i) / 64.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -257,8 +257,8 @@ TEST_F(DryWetMixStageTest, MultiChannel_8Channels) {
     // Verify all channels processed correctly
     for (int ch = 0; ch < 8; ++ch) {
         for (int i = 0; i < 64; ++i) {
-            double input = static_cast<double>(ch + i) / 64.0;
-            double expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
+            double const input = static_cast<double>(ch + i) / 64.0;
+            double const expectedValue = 0.5 * input + 0.5 * input; // Gain=1.0
             EXPECT_NEAR(buffer.getSample(ch, i), expectedValue, 1e-10) << "Channel " << ch << ", sample " << i;
         }
     }
@@ -453,7 +453,7 @@ TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
     juce::AudioBuffer<double> expected(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
-            double input = static_cast<double>(i) / 512.0;
+            double const input = static_cast<double>(i) / 512.0;
             expected.setSample(ch, i, 0.5 * input + 0.5 * input); // 50/50 mix
         }
     }

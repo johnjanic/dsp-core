@@ -31,7 +31,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
     // Helper: Set base layer to identity curve (y = x)
     void setIdentityCurve() {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, x);
         }
     }
@@ -54,7 +54,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
 
         // Copy composite to base (compute on-demand)
         for (int i = 0; i < tableSize; ++i) {
-            double compositeValue = ltf->computeCompositeAt(i);
+            double const compositeValue = ltf->computeCompositeAt(i);
             ltf->setBaseLayerValue(i, compositeValue);
         }
 
@@ -100,7 +100,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
     static double computeMaxError(const std::vector<double>& original, const std::vector<double>& fitted) {
         double maxError = 0.0;
         for (size_t i = 0; i < original.size(); ++i) {
-            double error = std::abs(original[i] - fitted[i]);
+            double const error = std::abs(original[i] - fitted[i]);
             maxError = std::max(maxError, error);
         }
         return maxError;
@@ -109,7 +109,7 @@ class SplineFitterIntegrationTest : public ::testing::Test {
     /**
      * Helper: Capture current base layer state
      */
-    std::vector<double> captureBaseLayer() const {
+    [[nodiscard]] std::vector<double> captureBaseLayer() const {
         std::vector<double> base;
         base.reserve(static_cast<size_t>(ltf->getTableSize()));
         for (int i = 0; i < ltf->getTableSize(); ++i) {
@@ -128,14 +128,14 @@ class SplineFitterIntegrationTest : public ::testing::Test {
      *
      * This matches production behavior (evaluateForRendering).
      */
-    std::vector<double> captureCurrentCurve() const {
+    [[nodiscard]] std::vector<double> captureCurrentCurve() const {
         std::vector<double> curve;
         curve.reserve(static_cast<size_t>(ltf->getTableSize()));
 
         const RenderingMode mode = ltf->getRenderingMode();
 
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             double y;
 
             switch (mode) {
@@ -214,17 +214,17 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto refittedState = captureBaseLayer();
-    double maxError = computeMaxError(bakedState, refittedState);
+    double const maxError = computeMaxError(bakedState, refittedState);
 
     EXPECT_LT(maxError, 0.05) << "Refitted curve should preserve shape (max error <5%)";
 
     // STEP f: User paints scribble in region (simulate by adding local variation)
     // Add small sine wave bump around x=0.5
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         if (x >= 0.3 && x <= 0.7) {
-            double localX = (x - 0.5) * 10.0; // Scale to [-2, 2]
-            double bump = 0.1 * std::sin(localX * M_PI);
+            double const localX = (x - 0.5) * 10.0; // Scale to [-2, 2]
+            double const bump = 0.1 * std::sin(localX * M_PI);
             ltf->setBaseLayerValue(i, ltf->getBaseLayerValue(i) + bump);
         }
     }
@@ -246,7 +246,7 @@ TEST_F(SplineFitterIntegrationTest, UserWorkflow_AnchorManipulation_NoAnchorCree
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
-    double finalError = computeMaxError(scribbledState, finalState);
+    double const finalError = computeMaxError(scribbledState, finalState);
 
     EXPECT_LT(finalError, 0.05) << "Final refit should preserve scribbled shape";
 }
@@ -294,9 +294,9 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // STEP d: Verify shape preserved (use mode-aware capture)
-    std::vector<double> splineState = captureCurrentCurve();
+    std::vector<double> const splineState = captureCurrentCurve();
 
-    double fitError = computeMaxError(originalState, splineState);
+    double const fitError = computeMaxError(originalState, splineState);
     // Catmull-Rom splines have inherent interpolation error on complex curves
     EXPECT_LT(fitError, 0.15) << "Spline fit should preserve harmonic shape (error <15%)";
 
@@ -307,7 +307,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
 
     // STEP f: User drags anchor (modify middle anchor)
     auto modifiedAnchors = harmonicFitResult.anchors;
-    size_t midIdx = modifiedAnchors.size() / 2;
+    size_t const midIdx = modifiedAnchors.size() / 2;
     modifiedAnchors[midIdx].y += 0.2; // Drag up by 0.2
 
     SplineFitter::computeTangents(modifiedAnchors, config);
@@ -325,7 +325,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     // STEP h: Verify no anchor explosion
     // After one drag and refit, anchor count should be similar (±50%)
     EXPECT_TRUE(refitResult.success) << "Refit should succeed";
-    double anchorRatio =
+    double const anchorRatio =
         static_cast<double>(refitResult.anchors.size()) / static_cast<double>(harmonicFitResult.anchors.size());
 
     EXPECT_GT(anchorRatio, 0.5) << "Anchor count should not collapse";
@@ -336,7 +336,7 @@ TEST_F(SplineFitterIntegrationTest, HarmonicWorkflow_MixBakeRefit_NoAnchorExplos
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto finalState = captureBaseLayer();
-    double refitError = computeMaxError(modifiedState, finalState);
+    double const refitError = computeMaxError(modifiedState, finalState);
 
     EXPECT_LT(refitError, 0.05) << "Refit should preserve modified shape";
 }
@@ -357,9 +357,9 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
 
     // Start with a moderately complex curve (3 extrema)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         // Cubic with 2 extrema: y = x^3 - 0.5x
-        double y = x * x * x - 0.5 * x;
+        double const y = x * x * x - 0.5 * x;
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -386,7 +386,7 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
 
         // Measure error
         auto fittedState = captureBaseLayer();
-        double cycleError = computeMaxError(originalState, fittedState);
+        double const cycleError = computeMaxError(originalState, fittedState);
         errorHistory.push_back(cycleError);
 
         // Bake back for next cycle
@@ -395,10 +395,10 @@ TEST_F(SplineFitterIntegrationTest, MultiCycle_Backtranslation_ConvergesToStable
     }
 
     // Verify convergence: last 2 cycles should have similar anchor counts
-    size_t lastCount = anchorHistory.back();
-    size_t secondLastCount = anchorHistory[anchorHistory.size() - 2];
+    size_t const lastCount = anchorHistory.back();
+    size_t const secondLastCount = anchorHistory[anchorHistory.size() - 2];
 
-    double countChange = std::abs(static_cast<int>(lastCount) - static_cast<int>(secondLastCount));
+    double const countChange = std::abs(static_cast<int>(lastCount) - static_cast<int>(secondLastCount));
 
     EXPECT_LE(countChange, 5) << "Anchor count should stabilize (change ≤5 in final cycles)";
 
@@ -464,9 +464,9 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify first fit quality (use mode-aware capture to get spline values)
-    std::vector<double> firstFit = captureCurrentCurve();
+    std::vector<double> const firstFit = captureCurrentCurve();
 
-    double firstError = computeMaxError(originalShape, firstFit);
+    double const firstError = computeMaxError(originalShape, firstFit);
     EXPECT_LT(firstError, 0.10) << "First fit should be reasonably accurate (<10%)";
 
     // Backtranslate: bake spline → refit
@@ -478,7 +478,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 
     // Verify anchor count stability (±30%)
     EXPECT_TRUE(fitResult2.success) << "Second H15 fit should succeed";
-    double ratio = static_cast<double>(fitResult2.anchors.size()) / static_cast<double>(fitResult1.anchors.size());
+    double const ratio = static_cast<double>(fitResult2.anchors.size()) / static_cast<double>(fitResult1.anchors.size());
 
     EXPECT_GT(ratio, 0.7) << "Anchor count should not collapse on backtranslation";
     EXPECT_LT(ratio, 1.3) << "Anchor count should not explode on backtranslation";
@@ -488,9 +488,9 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Verify shape preservation (use mode-aware capture to get spline values)
-    std::vector<double> secondFit = captureCurrentCurve();
+    std::vector<double> const secondFit = captureCurrentCurve();
 
-    double secondError = computeMaxError(originalShape, secondFit);
+    double const secondError = computeMaxError(originalShape, secondFit);
     EXPECT_LT(secondError, 0.15) << "Backtranslated fit should preserve shape (<15%)";
 
     // Print diagnostics
@@ -529,7 +529,7 @@ TEST_F(SplineFitterIntegrationTest, ComplexHarmonic_Backtranslation_PreservesSha
 TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCreeping) {
     // Create tanh curve (odd symmetric)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
     }
 
@@ -575,7 +575,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
 
         // Compute pair ratio (expect ≥50% paired)
         // Note: Feature detection may add unpaired anchors, reducing pairing ratio
-        bool mostlyPaired = (totalNonCenter == 0) || (static_cast<double>(pairedCount) / totalNonCenter >= 0.5);
+        bool const mostlyPaired = (totalNonCenter == 0) || (static_cast<double>(pairedCount) / totalNonCenter >= 0.5);
         pairedHistory.push_back(mostlyPaired);
 
         // Apply fit and measure error
@@ -589,13 +589,13 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
         ltf->setRenderingMode(RenderingMode::Paint);
 
         auto bakedState = captureBaseLayer();
-        double iterError = computeMaxError(originalState, bakedState);
+        double const iterError = computeMaxError(originalState, bakedState);
         errorHistory.push_back(iterError);
     }
 
     // Verify anchor count stability (no creeping)
-    size_t maxAnchors = *std::max_element(anchorHistory.begin(), anchorHistory.end());
-    size_t minAnchors = *std::min_element(anchorHistory.begin(), anchorHistory.end());
+    size_t const maxAnchors = *std::max_element(anchorHistory.begin(), anchorHistory.end());
+    size_t const minAnchors = *std::min_element(anchorHistory.begin(), anchorHistory.end());
     EXPECT_LE(maxAnchors - minAnchors, 4) << "Symmetric mode should prevent anchor creeping";
 
     // Verify first iteration has good pairing
@@ -637,8 +637,8 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_Backtranslation_NoAnchorCre
 TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePreservesOriginal) {
     // Create Harmonic 3 (odd symmetric via Chebyshev T₃)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = 4.0 * x * x * x - 3.0 * x; // Chebyshev T₃
+        double const x = ltf->normalizeIndex(i);
+        double const y = 4.0 * x * x * x - 3.0 * x; // Chebyshev T₃
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -663,7 +663,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
     ltf->setRenderingMode(RenderingMode::Spline);
 
     auto fittedState = captureBaseLayer();
-    double maxError = computeMaxError(originalState, fittedState);
+    double const maxError = computeMaxError(originalState, fittedState);
 
     EXPECT_LT(maxError, 0.10) << "Never mode should preserve shape";
 
@@ -692,7 +692,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_RegressionTest_NeverModePre
 TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcrossCycles) {
     // Create cubic curve (perfect odd symmetry)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x * x * x);
     }
 
@@ -715,8 +715,9 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
         int totalNonCenter = 0;
 
         for (const auto& anchor : fitResult.anchors) {
-            if (std::abs(anchor.x) < 1e-4)
+            if (std::abs(anchor.x) < 1e-4) {
                 continue; // Skip near-center
+}
 
             totalNonCenter++;
 
@@ -729,7 +730,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
             }
         }
 
-        double visualSymmetryScore = totalNonCenter > 0 ? static_cast<double>(pairedCount) / totalNonCenter : 1.0;
+        double const visualSymmetryScore = totalNonCenter > 0 ? static_cast<double>(pairedCount) / totalNonCenter : 1.0;
         symmetryScores.push_back(visualSymmetryScore);
 
         // Apply fit and bake for next cycle
@@ -775,7 +776,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_VisualSymmetry_PreservedAcr
 TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_DemonstrateBenefit) {
     // Create tanh curve (odd symmetric)
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, std::tanh(5.0 * x));
     }
 
@@ -837,7 +838,7 @@ TEST_F(SplineFitterIntegrationTest, SymmetricFitting_CompareAutoVsNever_Demonstr
 
     // Verify Auto mode stability
     if (anchorHistoryAuto.size() >= 2) {
-        size_t autoChange = std::abs(static_cast<int>(anchorHistoryAuto[1]) - static_cast<int>(anchorHistoryAuto[0]));
+        size_t const autoChange = std::abs(static_cast<int>(anchorHistoryAuto[1]) - static_cast<int>(anchorHistoryAuto[0]));
         EXPECT_LE(autoChange, 4) << "Auto mode should have stable anchor count across cycles";
     }
 
@@ -909,7 +910,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     ltf->setSplineAnchors(userEditedAnchors);
 
     // Verify the spline layer has the user's curve
-    double yAtOrigin = ltf->getSplineLayer().evaluate(0.0);
+    double const yAtOrigin = ltf->getSplineLayer().evaluate(0.0);
     std::cout << "  Spline y(0.0) = " << yAtOrigin << " (should be negative)\n";
     EXPECT_LT(yAtOrigin, 0.0) << "Asymmetric curve should droop below zero at x=0";
 
@@ -919,11 +920,11 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
     ltf->setRenderingMode(RenderingMode::Paint);
 
     // Verify base layer has the baked asymmetric curve
-    double bakedYAtOriginIdx = ltf->getBaseLayerValue(ltf->getTableSize() / 2);
+    double const bakedYAtOriginIdx = ltf->getBaseLayerValue(ltf->getTableSize() / 2);
     std::cout << "  Base layer y(centerIdx) = " << bakedYAtOriginIdx << " (should match spline)\n";
 
     // Also verify via evaluateBaseAndHarmonics (what SplineFitter will use)
-    double bakedYViaEval = ltf->evaluateBaseAndHarmonics(0.0);
+    double const bakedYViaEval = ltf->evaluateBaseAndHarmonics(0.0);
     std::cout << "  evaluateBaseAndHarmonics(0.0) = " << bakedYViaEval << "\n";
     EXPECT_NEAR(bakedYViaEval, yAtOrigin, 0.05) << "Base layer should preserve asymmetric curve shape";
 
@@ -957,7 +958,7 @@ TEST_F(SplineFitterIntegrationTest, RegressionTest_ReenterSplineMode_FitsCorrect
 
     // Verify fitted spline preserves asymmetric shape
     SplineFitter::computeTangents(fitResult2.anchors, config);
-    double refittedYAtOrigin = SplineEvaluator::evaluate(fitResult2.anchors, 0.0);
+    double const refittedYAtOrigin = SplineEvaluator::evaluate(fitResult2.anchors, 0.0);
     std::cout << "  Refitted spline y(0.0) = " << refittedYAtOrigin << "\n";
 
     EXPECT_NEAR(refittedYAtOrigin, yAtOrigin, 0.1)
@@ -993,7 +994,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     // ==================== CASE A: WT=1.0, H3=1.0 ====================
     // Reset to fresh state - base layer = identity y=x
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x);
     }
     // Set coefficients
@@ -1014,8 +1015,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     for (int i = 0; i <= 4; ++i) {
         int idx = i * (ltf->getTableSize() / 4);
         if (idx >= ltf->getTableSize()) idx = ltf->getTableSize() - 1;
-        double x = ltf->normalizeIndex(idx);
-        double y = ltf->evaluateBaseAndHarmonics(x);
+        double const x = ltf->normalizeIndex(idx);
+        double const y = ltf->evaluateBaseAndHarmonics(x);
         std::cout << "    x=" << std::fixed << std::setprecision(4) << x << " y=" << y << "\n";
     }
 
@@ -1031,8 +1032,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     for (int i = 0; i <= 4; ++i) {
         int idx = i * (ltf->getTableSize() / 4);
         if (idx >= ltf->getTableSize()) idx = ltf->getTableSize() - 1;
-        double x = ltf->normalizeIndex(idx);
-        double y = ltf->evaluateBaseAndHarmonics(x);
+        double const x = ltf->normalizeIndex(idx);
+        double const y = ltf->evaluateBaseAndHarmonics(x);
         std::cout << "    x=" << std::fixed << std::setprecision(4) << x << " y=" << y << "\n";
     }
 
@@ -1046,7 +1047,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     // ==================== CASE B: H1=1.0, H3=1.0 ====================
     // Reset to fresh state - base layer = identity y=x
     for (int i = 0; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x);
     }
     // Set coefficients
@@ -1068,8 +1069,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     for (int i = 0; i <= 4; ++i) {
         int idx = i * (ltf->getTableSize() / 4);
         if (idx >= ltf->getTableSize()) idx = ltf->getTableSize() - 1;
-        double x = ltf->normalizeIndex(idx);
-        double y = ltf->evaluateBaseAndHarmonics(x);
+        double const x = ltf->normalizeIndex(idx);
+        double const y = ltf->evaluateBaseAndHarmonics(x);
         std::cout << "    x=" << std::fixed << std::setprecision(4) << x << " y=" << y << "\n";
     }
 
@@ -1085,8 +1086,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
     for (int i = 0; i <= 4; ++i) {
         int idx = i * (ltf->getTableSize() / 4);
         if (idx >= ltf->getTableSize()) idx = ltf->getTableSize() - 1;
-        double x = ltf->normalizeIndex(idx);
-        double y = ltf->evaluateBaseAndHarmonics(x);
+        double const x = ltf->normalizeIndex(idx);
+        double const y = ltf->evaluateBaseAndHarmonics(x);
         std::cout << "    x=" << std::fixed << std::setprecision(4) << x << " y=" << y << "\n";
     }
 
@@ -1098,7 +1099,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
               << "  Max error: " << std::fixed << std::setprecision(6) << fitB.maxError << "\n";
 
     // ==================== COMPARISON ====================
-    int anchorDiff = static_cast<int>(fitA.anchors.size()) - static_cast<int>(fitB.anchors.size());
+    int const anchorDiff = static_cast<int>(fitA.anchors.size()) - static_cast<int>(fitB.anchors.size());
     std::cout << "\n=== RESULT ===\n";
     std::cout << "Anchor count difference: " << anchorDiff
               << " (A=" << fitA.anchors.size() << ", B=" << fitB.anchors.size() << ")\n";
@@ -1111,7 +1112,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
 
         // Re-setup Case A and bake
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, x);
         }
         ltf->setCoefficient(0, 1.0);
@@ -1121,13 +1122,14 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
         ltf->bakeCompositeToBase();
 
         std::vector<double> bakedA;
-        for (int i = 0; i < ltf->getTableSize(); ++i) {
+        bakedA.reserve(ltf->getTableSize());
+for (int i = 0; i < ltf->getTableSize(); ++i) {
             bakedA.push_back(ltf->getBaseLayerValue(i));
         }
 
         // Re-setup Case B and bake
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, x);
         }
         ltf->setCoefficient(0, 0.0);
@@ -1138,7 +1140,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
         ltf->bakeCompositeToBase();
 
         std::vector<double> bakedB;
-        for (int i = 0; i < ltf->getTableSize(); ++i) {
+        bakedB.reserve(ltf->getTableSize());
+for (int i = 0; i < ltf->getTableSize(); ++i) {
             bakedB.push_back(ltf->getBaseLayerValue(i));
         }
 
@@ -1146,7 +1149,7 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
         double maxBakedDiff = 0.0;
         int maxBakedDiffIdx = 0;
         for (size_t i = 0; i < bakedA.size(); ++i) {
-            double diff = std::abs(bakedA[i] - bakedB[i]);
+            double const diff = std::abs(bakedA[i] - bakedB[i]);
             if (diff > maxBakedDiff) {
                 maxBakedDiff = diff;
                 maxBakedDiffIdx = static_cast<int>(i);
@@ -1157,8 +1160,8 @@ TEST_F(SplineFitterIntegrationTest, BugInvestigation_WTvsH1_FittingDifference) {
                   << " at index " << maxBakedDiffIdx << "\n";
 
         // Show values around max diff
-        int start = std::max(0, maxBakedDiffIdx - 3);
-        int end = std::min(static_cast<int>(bakedA.size()), maxBakedDiffIdx + 4);
+        int const start = std::max(0, maxBakedDiffIdx - 3);
+        int const end = std::min(static_cast<int>(bakedA.size()), maxBakedDiffIdx + 4);
         std::cout << "Baked values around max diff:\n";
         for (int i = start; i < end; ++i) {
             std::cout << "  [" << i << "] A=" << std::fixed << std::setprecision(10) << bakedA[i]

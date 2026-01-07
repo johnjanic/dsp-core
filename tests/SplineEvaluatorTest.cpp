@@ -43,13 +43,13 @@ class SplineEvaluatorTest : public ::testing::Test {
 //==============================================================================
 
 TEST_F(SplineEvaluatorTest, EmptyAnchorsReturnsZero) {
-    std::vector<SplineAnchor> empty;
+    std::vector<SplineAnchor> const empty;
     EXPECT_DOUBLE_EQ(SplineEvaluator::evaluate(empty, 0.0), 0.0);
     EXPECT_DOUBLE_EQ(SplineEvaluator::evaluate(empty, 0.5), 0.0);
 }
 
 TEST_F(SplineEvaluatorTest, SingleAnchorReturnsConstant) {
-    std::vector<SplineAnchor> single = {{0.5, 0.3, false, 0.0}};
+    std::vector<SplineAnchor> const single = {{0.5, 0.3, false, 0.0}};
     EXPECT_DOUBLE_EQ(SplineEvaluator::evaluate(single, -1.0), 0.3);
     EXPECT_DOUBLE_EQ(SplineEvaluator::evaluate(single, 0.0), 0.3);
     EXPECT_DOUBLE_EQ(SplineEvaluator::evaluate(single, 1.0), 0.3);
@@ -67,7 +67,7 @@ TEST_F(SplineEvaluatorTest, EvaluateAtAnchorPositionsReturnsExactValues) {
 
     // Monotonic case
     for (const auto& anchor : monotonicAnchors) {
-        double result = SplineEvaluator::evaluate(monotonicAnchors, anchor.x);
+        double const result = SplineEvaluator::evaluate(monotonicAnchors, anchor.x);
         EXPECT_NEAR(result, anchor.y, kTolerance) << "Failed at anchor x=" << anchor.x;
     }
 }
@@ -116,23 +116,23 @@ TEST_F(SplineEvaluatorTest, HermiteInterpolationPreservesEndpointTangents) {
     // At segment end (t=1), derivative should match p1.tangent
 
     // For linear case with slope=1, derivative should be 1 everywhere
-    double deriv_start = SplineEvaluator::evaluateDerivative(linearAnchors, -1.0);
+    double const deriv_start = SplineEvaluator::evaluateDerivative(linearAnchors, -1.0);
     EXPECT_NEAR(deriv_start, 1.0, 1e-6);
 
-    double deriv_end = SplineEvaluator::evaluateDerivative(linearAnchors, 1.0);
+    double const deriv_end = SplineEvaluator::evaluateDerivative(linearAnchors, 1.0);
     EXPECT_NEAR(deriv_end, 1.0, 1e-6);
 }
 
 TEST_F(SplineEvaluatorTest, SCurveHasFlatEndsAndSteepMiddle) {
     // S-curve should have near-zero derivatives at endpoints
-    double deriv_start = SplineEvaluator::evaluateDerivative(sCurveAnchors, -1.0);
+    double const deriv_start = SplineEvaluator::evaluateDerivative(sCurveAnchors, -1.0);
     EXPECT_NEAR(deriv_start, 0.0, 1e-6);
 
-    double deriv_end = SplineEvaluator::evaluateDerivative(sCurveAnchors, 1.0);
+    double const deriv_end = SplineEvaluator::evaluateDerivative(sCurveAnchors, 1.0);
     EXPECT_NEAR(deriv_end, 0.0, 1e-6);
 
     // Middle should have steeper slope
-    double deriv_middle = SplineEvaluator::evaluateDerivative(sCurveAnchors, 0.0);
+    double const deriv_middle = SplineEvaluator::evaluateDerivative(sCurveAnchors, 0.0);
     EXPECT_GT(deriv_middle, 1.5); // Should be close to 2.0
 }
 
@@ -146,8 +146,8 @@ TEST_F(SplineEvaluatorTest, MonotonicAnchorsProduceMonotonicCurve) {
     double prevY = SplineEvaluator::evaluate(monotonicAnchors, -1.0);
 
     for (int i = 1; i <= numSamples; ++i) {
-        double x = -1.0 + (2.0 * i / numSamples);
-        double y = SplineEvaluator::evaluate(monotonicAnchors, x);
+        double const x = -1.0 + (2.0 * i / numSamples);
+        double const y = SplineEvaluator::evaluate(monotonicAnchors, x);
 
         EXPECT_GE(y, prevY - kTolerance) << "Monotonicity violated at x=" << x << " (y=" << y << ", prevY=" << prevY
                                          << ")";
@@ -162,21 +162,21 @@ TEST_F(SplineEvaluatorTest, MonotonicAnchorsProduceMonotonicCurve) {
 
 TEST_F(SplineEvaluatorTest, DegenerateSegmentWithZeroDx) {
     // Two anchors at same x position (degenerate)
-    std::vector<SplineAnchor> degenerate = {
+    std::vector<SplineAnchor> const degenerate = {
         {0.0, -1.0, false, 0.0}, {0.0, 1.0, false, 0.0} // Same x as previous
     };
 
     // Should return first anchor's y value
-    double result = SplineEvaluator::evaluate(degenerate, 0.0);
+    double const result = SplineEvaluator::evaluate(degenerate, 0.0);
     EXPECT_DOUBLE_EQ(result, -1.0);
 }
 
 TEST_F(SplineEvaluatorTest, VeryCloseAnchors) {
     // Two anchors very close together
-    std::vector<SplineAnchor> close = {{-1.0, -1.0, false, 1.0}, {-0.999999, -0.999999, false, 1.0}};
+    std::vector<SplineAnchor> const close = {{-1.0, -1.0, false, 1.0}, {-0.999999, -0.999999, false, 1.0}};
 
     // Should still interpolate correctly
-    double result = SplineEvaluator::evaluate(close, -0.9999995);
+    double const result = SplineEvaluator::evaluate(close, -0.9999995);
     EXPECT_NEAR(result, -0.9999995, 1e-5);
 }
 
@@ -185,7 +185,7 @@ TEST_F(SplineEvaluatorTest, VeryCloseAnchors) {
 //==============================================================================
 
 TEST_F(SplineEvaluatorTest, DerivativeOfConstantIsZero) {
-    std::vector<SplineAnchor> flat = {{-1.0, 0.5, false, 0.0}, {1.0, 0.5, false, 0.0}};
+    std::vector<SplineAnchor> const flat = {{-1.0, 0.5, false, 0.0}, {1.0, 0.5, false, 0.0}};
 
     // Derivative should be zero everywhere for flat curve
     EXPECT_NEAR(SplineEvaluator::evaluateDerivative(flat, -0.5), 0.0, 1e-6);
@@ -201,12 +201,12 @@ TEST_F(SplineEvaluatorTest, DerivativeOfLinearIsConstant) {
 }
 
 TEST_F(SplineEvaluatorTest, DerivativeBeforeFirstAnchor) {
-    double deriv = SplineEvaluator::evaluateDerivative(linearAnchors, -2.0);
+    double const deriv = SplineEvaluator::evaluateDerivative(linearAnchors, -2.0);
     EXPECT_DOUBLE_EQ(deriv, linearAnchors.front().tangent);
 }
 
 TEST_F(SplineEvaluatorTest, DerivativeAfterLastAnchor) {
-    double deriv = SplineEvaluator::evaluateDerivative(linearAnchors, 2.0);
+    double const deriv = SplineEvaluator::evaluateDerivative(linearAnchors, 2.0);
     EXPECT_DOUBLE_EQ(deriv, linearAnchors.back().tangent);
 }
 
@@ -221,11 +221,11 @@ TEST_F(SplineEvaluatorTest, AnalyticalDerivativeMatchesNumerical) {
     // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
     for (int i = 0; i <= 9; ++i) {
         const double x = -0.9 + i * 0.2;
-        double f_plus = SplineEvaluator::evaluate(monotonicAnchors, x + h);
-        double f_minus = SplineEvaluator::evaluate(monotonicAnchors, x - h);
-        double numerical_deriv = (f_plus - f_minus) / (2.0 * h);
+        double const f_plus = SplineEvaluator::evaluate(monotonicAnchors, x + h);
+        double const f_minus = SplineEvaluator::evaluate(monotonicAnchors, x - h);
+        double const numerical_deriv = (f_plus - f_minus) / (2.0 * h);
 
-        double analytical_deriv = SplineEvaluator::evaluateDerivative(monotonicAnchors, x);
+        double const analytical_deriv = SplineEvaluator::evaluateDerivative(monotonicAnchors, x);
 
         EXPECT_NEAR(analytical_deriv, numerical_deriv, 1e-3) << "Derivative mismatch at x=" << x;
     }
@@ -238,7 +238,7 @@ TEST_F(SplineEvaluatorTest, AnalyticalDerivativeMatchesNumerical) {
 TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
     // Fit y = x² using PCHIP anchors
     // Expected tangents at sample points
-    std::vector<SplineAnchor> quadratic = {
+    std::vector<SplineAnchor> const quadratic = {
         {-1.0, 1.0, false, -2.0},  // y' = 2x at x=-1
         {-0.5, 0.25, false, -1.0}, // y' = 2x at x=-0.5
         {0.0, 0.0, false, 0.0},    // y' = 2x at x=0
@@ -250,8 +250,8 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
     // Use integer loop to avoid float loop counter (clang-analyzer-security.FloatLoopCounter)
     for (int i = 0; i <= 20; ++i) {
         const double x = -1.0 + i * 0.1;
-        double expected = x * x;
-        double actual = SplineEvaluator::evaluate(quadratic, x);
+        double const expected = x * x;
+        double const actual = SplineEvaluator::evaluate(quadratic, x);
 
         // PCHIP should approximate x² very well
         EXPECT_NEAR(actual, expected, 0.01) << "Quadratic approximation poor at x=" << x;
@@ -263,17 +263,17 @@ TEST_F(SplineEvaluatorTest, QuadraticCurveApproximation) {
 //==============================================================================
 
 TEST_F(SplineEvaluatorTest, CustomTangentOverride) {
-    std::vector<SplineAnchor> custom = {
+    std::vector<SplineAnchor> const custom = {
         {-1.0, -1.0, true, 0.0}, // Override to flat start
         {0.0, 0.0, false, 1.0},  // Use computed tangent
         {1.0, 1.0, true, 0.0}    // Override to flat end
     };
 
     // Start and end should be flat
-    double deriv_start = SplineEvaluator::evaluateDerivative(custom, -1.0);
+    double const deriv_start = SplineEvaluator::evaluateDerivative(custom, -1.0);
     EXPECT_NEAR(deriv_start, 0.0, 1e-6);
 
-    double deriv_end = SplineEvaluator::evaluateDerivative(custom, 1.0);
+    double const deriv_end = SplineEvaluator::evaluateDerivative(custom, 1.0);
     EXPECT_NEAR(deriv_end, 0.0, 1e-6);
 }
 
@@ -297,7 +297,7 @@ TEST_F(SplineEvaluatorTest, BatchEvaluateMatchesSingleEvaluate) {
 
     // Compare with individual evaluations
     for (int i = 0; i < count; ++i) {
-        double yIndividual = SplineEvaluator::evaluate(monotonicAnchors, xValues[i]);
+        double const yIndividual = SplineEvaluator::evaluate(monotonicAnchors, xValues[i]);
         EXPECT_NEAR(yBatch[i], yIndividual, kTolerance) << "Mismatch at index " << i << ", x=" << xValues[i];
     }
 }
@@ -307,7 +307,7 @@ TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesEmptyAnchors) {
     std::vector<double> xValues(count, 0.5);
     std::vector<double> yValues(count);
 
-    std::vector<SplineAnchor> empty;
+    std::vector<SplineAnchor> const empty;
     SplineEvaluator::evaluateBatch(empty, xValues.data(), yValues.data(), count);
 
     for (int i = 0; i < count; ++i) {
@@ -324,7 +324,7 @@ TEST_F(SplineEvaluatorTest, BatchEvaluateHandlesSingleAnchor) {
         xValues[i] = -1.0 + (2.0 * i / (count - 1));
     }
 
-    std::vector<SplineAnchor> single = {{0.5, 0.7, false, 0.0}};
+    std::vector<SplineAnchor> const single = {{0.5, 0.7, false, 0.0}};
     SplineEvaluator::evaluateBatch(single, xValues.data(), yValues.data(), count);
 
     for (int i = 0; i < count; ++i) {

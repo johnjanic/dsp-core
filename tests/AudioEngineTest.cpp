@@ -1,5 +1,6 @@
 #include <dsp_core/dsp_core.h>
 #include <gtest/gtest.h>
+#include <array>
 #include <cmath>
 
 namespace dsp_core_test {
@@ -29,8 +30,8 @@ TEST_F(AudioEngineTest, Constructor_InitializesToIdentity) {
     // Test identity function across range
     const std::vector<double> testInputs = {-1.0, -0.5, 0.0, 0.5, 1.0};
 
-    for (double x : testInputs) {
-        double output = engine->applyTransferFunction(x);
+    for (double const x : testInputs) {
+        double const output = engine->applyTransferFunction(x);
         EXPECT_NEAR(output, x, 1e-6) << "Identity function should return input value";
     }
 }
@@ -271,8 +272,8 @@ TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
 
     // Test interpolation (should be accurate for curves)
     const std::vector<double> testInputs = {-0.5, 0.0, 0.5};
-    for (double x : testInputs) {
-        double output = engine->applyTransferFunction(x);
+    for (double const x : testInputs) {
+        double const output = engine->applyTransferFunction(x);
         EXPECT_NEAR(output, x * x, 0.01) << "Catmull-Rom should approximate y = x^2 for input " << x;
     }
 }
@@ -289,11 +290,11 @@ TEST_F(AudioEngineTest, Extrapolation_ClampModeClamps) {
     engine->prepareToPlay(44100.0, 512);
 
     // Test with identity function
-    double testInputs[] = {-2.0, -1.5, 1.5, 2.0};
-    double expectedOutputs[] = {-1.0, -1.0, 1.0, 1.0};
+    const std::array<double, 4> testInputs = {-2.0, -1.5, 1.5, 2.0};
+    const std::array<double, 4> expectedOutputs = {-1.0, -1.0, 1.0, 1.0};
 
     for (int i = 0; i < 4; ++i) {
-        double output = engine->applyTransferFunction(testInputs[i]);
+        double const output = engine->applyTransferFunction(testInputs[i]);
         EXPECT_NEAR(output, expectedOutputs[i], 1e-6)
             << "Clamp mode should clamp " << testInputs[i] << " to " << expectedOutputs[i];
     }
@@ -347,8 +348,8 @@ TEST_F(AudioEngineTest, Smoothstep_Midpoint) {
  */
 TEST_F(AudioEngineTest, Smoothstep_MonotonicallyIncreasing) {
     for (int i = 0; i < 100; ++i) {
-        double t1 = i / 100.0;
-        double t2 = (i + 1) / 100.0;
+        double const t1 = i / 100.0;
+        double const t2 = (i + 1) / 100.0;
         EXPECT_LT(smoothstep(t1), smoothstep(t2))
             << "smoothstep should be strictly increasing: t1=" << t1 << " t2=" << t2;
     }
@@ -363,13 +364,13 @@ TEST_F(AudioEngineTest, Smoothstep_SlowStartAndEnd) {
     const double epsilon = 0.01;
 
     // Start derivative: [0.0, 0.01]
-    double deltaStart = smoothstep(epsilon) - smoothstep(0.0);
+    double const deltaStart = smoothstep(epsilon) - smoothstep(0.0);
 
     // Middle derivative: [0.5, 0.51]
-    double deltaMid = smoothstep(0.5 + epsilon) - smoothstep(0.5);
+    double const deltaMid = smoothstep(0.5 + epsilon) - smoothstep(0.5);
 
     // End derivative: [0.99, 1.0]
-    double deltaEnd = smoothstep(1.0) - smoothstep(1.0 - epsilon);
+    double const deltaEnd = smoothstep(1.0) - smoothstep(1.0 - epsilon);
 
     // S-curve property: Middle should be steeper than start/end
     EXPECT_LT(deltaStart, deltaMid / 5.0) << "Start should be much slower than middle";
@@ -433,8 +434,8 @@ TEST_F(AudioEngineTest, SCurveCrossfade_SmoothTransition) {
     EXPECT_NEAR(endOutput, 1.0, 0.05) << "End should be close to new LUT (1.0)";
 
     // Verify S-curve property: slow start
-    double deltaEarly = earlyOutput - startOutput;  // Change over first 100 samples
-    double deltaMid = midOutput - buffer.getSample(0, crossfadeSamples / 2 - 100);  // Change over middle 200 samples
+    double const deltaEarly = earlyOutput - startOutput;  // Change over first 100 samples
+    double const deltaMid = midOutput - buffer.getSample(0, crossfadeSamples / 2 - 100);  // Change over middle 200 samples
 
     EXPECT_LT(deltaEarly, deltaMid / 2.0) << "Early transition should be slower than middle";
 
@@ -442,7 +443,7 @@ TEST_F(AudioEngineTest, SCurveCrossfade_SmoothTransition) {
     EXPECT_NEAR(midOutput, 0.5, 0.1) << "Midpoint should be approximately halfway";
 
     // Verify S-curve property: slow end
-    double deltaLate = endOutput - lateOutput;  // Change over last 100 samples
+    double const deltaLate = endOutput - lateOutput;  // Change over last 100 samples
     EXPECT_LT(deltaLate, deltaMid / 2.0) << "Late transition should be slower than middle";
 }
 

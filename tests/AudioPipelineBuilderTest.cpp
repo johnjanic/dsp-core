@@ -168,7 +168,7 @@ TEST_F(AudioPipelineBuilderTest, PipelineProcessesAudio) {
 
     // Fill with test signal (sine wave)
     for (int i = 0; i < 512; ++i) {
-        double sample = std::sin(2.0 * M_PI * 440.0 * i / 44100.0);
+        double const sample = std::sin(2.0 * M_PI * 440.0 * i / 44100.0);
         buffer.setSample(0, i, sample);
         buffer.setSample(1, i, sample);
     }

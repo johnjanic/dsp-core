@@ -35,7 +35,7 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             double x = ltf->normalizeIndex(i);
             x = std::clamp(x, -1.0, 1.0);
-            double y = std::sin(3.0 * std::asin(x)); // H3
+            double const y = std::sin(3.0 * std::asin(x)); // H3
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -44,7 +44,7 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
             double x = ltf->normalizeIndex(i);
             x = std::clamp(x, -1.0, 1.0);
-            double y = std::sin(5.0 * std::asin(x)); // H5
+            double const y = std::sin(5.0 * std::asin(x)); // H5
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -69,12 +69,12 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
         // Sample the curve (same as SplineFitter does)
         const int tableSize = ltf->getTableSize();
         std::vector<Sample> samples;
-        samples.reserve(tableSize * 2);
+        samples.reserve(static_cast<size_t>(tableSize) * 2);
 
         // Sample entire curve
         for (int i = 0; i < tableSize; ++i) {
-            double x = ltf->normalizeIndex(i);
-            double y = ltf->evaluateBaseAndHarmonics(x);
+            double const x = ltf->normalizeIndex(i);
+            double const y = ltf->evaluateBaseAndHarmonics(x);
             samples.push_back({x, y});
         }
 
@@ -84,8 +84,8 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
         for (size_t i = 0; i < samples.size(); ++i) {
             densified.push_back(samples[i]);
             if (i < samples.size() - 1) {
-                double midX = (samples[i].x + samples[i + 1].x) / 2.0;
-                double midY = ltf->evaluateBaseAndHarmonics(midX);
+                double const midX = (samples[i].x + samples[i + 1].x) / 2.0;
+                double const midY = ltf->evaluateBaseAndHarmonics(midX);
                 densified.push_back({midX, midY});
             }
         }
@@ -104,15 +104,15 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
             size_t worstIdx = 0;
             double maxErrorBefore = 0.0;
             for (size_t i = 0; i < samples.size(); ++i) {
-                double splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, samples[i].x);
-                double error = std::abs(samples[i].y - splineY);
+                double const splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, samples[i].x);
+                double const error = std::abs(samples[i].y - splineY);
                 if (error > maxErrorBefore) {
                     maxErrorBefore = error;
                     worstIdx = i;
                 }
             }
 
-            double worstX = samples[worstIdx].x;
+            double const worstX = samples[worstIdx].x;
 
             // Check if converged (simplified - no adaptive tolerance for analysis)
             if (maxErrorBefore < config.positionTolerance) {
@@ -123,7 +123,7 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
             auto insertPos = std::lower_bound(anchors.begin(), anchors.end(), worstX,
                                               [](const dsp_core::SplineAnchor& a, double x) { return a.x < x; });
 
-            dsp_core::SplineAnchor newAnchor = {samples[worstIdx].x, samples[worstIdx].y, false, 0.0};
+            dsp_core::SplineAnchor const newAnchor = {samples[worstIdx].x, samples[worstIdx].y, false, 0.0};
 
             anchors.insert(insertPos, newAnchor);
 
@@ -134,15 +134,15 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
             size_t worstIdxAfter = 0;
             double maxErrorAfter = 0.0;
             for (size_t i = 0; i < samples.size(); ++i) {
-                double splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, samples[i].x);
-                double error = std::abs(samples[i].y - splineY);
+                double const splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, samples[i].x);
+                double const error = std::abs(samples[i].y - splineY);
                 if (error > maxErrorAfter) {
                     maxErrorAfter = error;
                     worstIdxAfter = i;
                 }
             }
 
-            double worstXAfter = samples[worstIdxAfter].x;
+            double const worstXAfter = samples[worstIdxAfter].x;
 
             // Record this addition
             AnchorAdditionRecord record;
@@ -155,8 +155,8 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
             record.errorReductionPercent = 100.0 * (maxErrorBefore - maxErrorAfter) / maxErrorBefore;
 
             // Check if error switched sides (for symmetric functions)
-            bool wasBeforeOnLeft = (worstX < 0);
-            bool isAfterOnRight = (worstXAfter > 0);
+            bool const wasBeforeOnLeft = (worstX < 0);
+            bool const isAfterOnRight = (worstXAfter > 0);
             record.errorSwitchedSides = (wasBeforeOnLeft && isAfterOnRight);
 
             // Compute regional errors
@@ -172,7 +172,7 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
                                                         const std::vector<dsp_core::SplineAnchor>& anchors) {
         std::map<std::string, double> regionErrors;
 
-        std::map<std::string, std::pair<double, double>> regions = {{"x<-0.9", {-1.0, -0.9}},
+        std::map<std::string, std::pair<double, double>> const regions = {{"x<-0.9", {-1.0, -0.9}},
                                                                     {"[-0.9,-0.3]", {-0.9, -0.3}},
                                                                     {"[-0.3,0.3]", {-0.3, 0.3}},
                                                                     {"[0.3,0.9]", {0.3, 0.9}},
@@ -182,8 +182,8 @@ class AnchorClusteringAnalysisTest : public ::testing::Test {
             double maxErr = 0.0;
             for (const auto& s : samples) {
                 if (s.x >= range.first && s.x <= range.second) {
-                    double splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, s.x);
-                    double err = std::abs(s.y - splineY);
+                    double const splineY = dsp_core::Services::SplineEvaluator::evaluate(anchors, s.x);
+                    double const err = std::abs(s.y - splineY);
                     maxErr = std::max(maxErr, err);
                 }
             }
@@ -209,70 +209,70 @@ TEST_F(AnchorClusteringAnalysisTest, H3_GreedyFittingStepByStep) {
     auto config = dsp_core::SplineFitConfig::tight();
     config.enableFeatureDetection = false; // Pure greedy for analysis
 
-    std::cout << "\n========================================" << std::endl;
-    std::cout << "H3 GREEDY FITTING STEP-BY-STEP ANALYSIS" << std::endl;
-    std::cout << "========================================\n" << std::endl;
+    std::cout << "\n========================================" << '\n';
+    std::cout << "H3 GREEDY FITTING STEP-BY-STEP ANALYSIS" << '\n';
+    std::cout << "========================================\n" << '\n';
 
     auto records = performInstrumentedGreedyFit(config);
 
-    std::cout << "Total iterations: " << records.size() << "\n" << std::endl;
+    std::cout << "Total iterations: " << records.size() << "\n" << '\n';
 
     // Print first 10 iterations
-    int printCount = std::min(10, static_cast<int>(records.size()));
+    int const printCount = std::min(10, static_cast<int>(records.size()));
 
     for (int i = 0; i < printCount; ++i) {
         const auto& rec = records[i];
 
-        std::cout << "--- Iteration " << rec.iteration << " ---" << std::endl;
+        std::cout << "--- Iteration " << rec.iteration << " ---" << '\n';
         std::cout << "  Max error BEFORE: " << std::fixed << std::setprecision(6) << rec.maxErrorBefore
-                  << " at x=" << rec.maxErrorLocationBefore << std::endl;
-        std::cout << "  Added anchor: x=" << rec.addedAnchor.x << ", y=" << rec.addedAnchor.y << std::endl;
-        std::cout << "  Max error AFTER:  " << rec.maxErrorAfter << " at x=" << rec.maxErrorLocationAfter << std::endl;
-        std::cout << "  Error reduction: " << std::setprecision(1) << rec.errorReductionPercent << "%" << std::endl;
+                  << " at x=" << rec.maxErrorLocationBefore << '\n';
+        std::cout << "  Added anchor: x=" << rec.addedAnchor.x << ", y=" << rec.addedAnchor.y << '\n';
+        std::cout << "  Max error AFTER:  " << rec.maxErrorAfter << " at x=" << rec.maxErrorLocationAfter << '\n';
+        std::cout << "  Error reduction: " << std::setprecision(1) << rec.errorReductionPercent << "%" << '\n';
 
         // CRITICAL CHECK: For symmetric function, did error switch sides?
-        bool anchorOnLeft = (rec.addedAnchor.x < 0);
-        bool errorStillOnLeft = (rec.maxErrorLocationAfter < 0);
+        bool const anchorOnLeft = (rec.addedAnchor.x < 0);
+        bool const errorStillOnLeft = (rec.maxErrorLocationAfter < 0);
 
         if (anchorOnLeft && errorStillOnLeft) {
-            std::cout << "  ⚠️  SYMMETRY VIOLATION: Added anchor on LEFT, max error STILL on LEFT" << std::endl;
+            std::cout << "  ⚠️  SYMMETRY VIOLATION: Added anchor on LEFT, max error STILL on LEFT" << '\n';
             std::cout << "      Expected: Max error should switch to RIGHT side (x=" << -rec.addedAnchor.x << ")"
-                      << std::endl;
-            std::cout << "      Actual: Max error at x=" << rec.maxErrorLocationAfter << std::endl;
-            std::cout << "      → Anchor has POOR radius of influence OR tangent artifact" << std::endl;
+                      << '\n';
+            std::cout << "      Actual: Max error at x=" << rec.maxErrorLocationAfter << '\n';
+            std::cout << "      → Anchor has POOR radius of influence OR tangent artifact" << '\n';
         } else if (rec.errorSwitchedSides) {
-            std::cout << "  ✓ SYMMETRY PRESERVED: Error switched from LEFT to RIGHT" << std::endl;
+            std::cout << "  ✓ SYMMETRY PRESERVED: Error switched from LEFT to RIGHT" << '\n';
         }
 
         // Print regional errors
-        std::cout << "  Regional errors:" << std::endl;
+        std::cout << "  Regional errors:" << '\n';
         for (const auto& [region, error] : rec.regionMaxErrors) {
             std::cout << "    " << std::setw(15) << std::left << region << ": " << std::fixed << std::setprecision(6)
-                      << error << std::endl;
+                      << error << '\n';
         }
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     // Summary analysis
     int symmetryViolations = 0;
     for (const auto& rec : records) {
-        bool anchorOnLeft = (rec.addedAnchor.x < -0.5);
-        bool errorStillOnLeft = (rec.maxErrorLocationAfter < -0.5);
+        bool const anchorOnLeft = (rec.addedAnchor.x < -0.5);
+        bool const errorStillOnLeft = (rec.maxErrorLocationAfter < -0.5);
         if (anchorOnLeft && errorStillOnLeft) {
             symmetryViolations++;
         }
     }
 
-    std::cout << "\n=== SUMMARY ===" << std::endl;
-    std::cout << "Total anchor additions: " << records.size() << std::endl;
-    std::cout << "Symmetry violations: " << symmetryViolations << std::endl;
-    std::cout << "Percentage: " << (100.0 * static_cast<double>(symmetryViolations) / static_cast<double>(records.size())) << "%" << std::endl;
+    std::cout << "\n=== SUMMARY ===" << '\n';
+    std::cout << "Total anchor additions: " << records.size() << '\n';
+    std::cout << "Symmetry violations: " << symmetryViolations << '\n';
+    std::cout << "Percentage: " << (100.0 * static_cast<double>(symmetryViolations) / static_cast<double>(records.size())) << "%" << '\n';
 
     if (symmetryViolations > records.size() / 4) {
-        std::cout << "\n⚠️  ROOT CAUSE IDENTIFIED: POOR ANCHOR INFLUENCE RADIUS" << std::endl;
-        std::cout << "Anchors near boundaries do NOT effectively reduce error" << std::endl;
-        std::cout << "in their local region, causing the greedy algorithm to add" << std::endl;
-        std::cout << "more anchors nearby instead of switching to the symmetric side." << std::endl;
+        std::cout << "\n⚠️  ROOT CAUSE IDENTIFIED: POOR ANCHOR INFLUENCE RADIUS" << '\n';
+        std::cout << "Anchors near boundaries do NOT effectively reduce error" << '\n';
+        std::cout << "in their local region, causing the greedy algorithm to add" << '\n';
+        std::cout << "more anchors nearby instead of switching to the symmetric side." << '\n';
     }
 }
 

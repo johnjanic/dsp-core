@@ -25,16 +25,16 @@ class AnchorEfficiencyMetrics : public ::testing::Test {
 
 void setTanhCurve(dsp_core::LayeredTransferFunction& ltf, double steepness = 2.0) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
-        double x = ltf.normalizeIndex(i);
-        double y = std::tanh(steepness * x);
+        double const x = ltf.normalizeIndex(i);
+        double const y = std::tanh(steepness * x);
         ltf.setBaseLayerValue(i, y);
     }
 }
 
 void setSinCurve(dsp_core::LayeredTransferFunction& ltf, double frequency = 1.0) {
     for (int i = 0; i < ltf.getTableSize(); ++i) {
-        double x = ltf.normalizeIndex(i);
-        double y = std::sin(frequency * M_PI * x);
+        double const x = ltf.normalizeIndex(i);
+        double const y = std::sin(frequency * M_PI * x);
         ltf.setBaseLayerValue(i, y);
     }
 }
@@ -69,8 +69,8 @@ TEST_F(AnchorEfficiencyMetrics, Tanh_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: Tanh_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: Tanh_AnchorCount = " << anchorCount << '\n';
 
     // Sanity check - should use reasonable number of anchors
     EXPECT_GE(anchorCount, 3) << "Too few anchors for tanh";
@@ -85,8 +85,8 @@ TEST_F(AnchorEfficiencyMetrics, Sin_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: Sin_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: Sin_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 4) << "Too few anchors for sin";
     EXPECT_LE(anchorCount, 15) << "Too many anchors for sin";
@@ -100,8 +100,8 @@ TEST_F(AnchorEfficiencyMetrics, H3_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H3_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H3_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 4) << "Too few anchors for H3";
     EXPECT_LE(anchorCount, 20) << "Too many anchors for H3";
@@ -115,8 +115,8 @@ TEST_F(AnchorEfficiencyMetrics, H5_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H5_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H5_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 6) << "Too few anchors for H5";
     EXPECT_LE(anchorCount, 30) << "Too many anchors for H5";
@@ -130,8 +130,8 @@ TEST_F(AnchorEfficiencyMetrics, H10_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H10_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H10_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 10) << "Too few anchors for H10";
     EXPECT_LE(anchorCount, 50) << "Too many anchors for H10";
@@ -145,8 +145,8 @@ TEST_F(AnchorEfficiencyMetrics, H15_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H15_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H15_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 15) << "Too few anchors for H15";
     EXPECT_LE(anchorCount, 70) << "Too many anchors for H15";
@@ -160,8 +160,8 @@ TEST_F(AnchorEfficiencyMetrics, H20_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H20_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H20_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 20) << "Too few anchors for H20";
     EXPECT_LE(anchorCount, 80) << "Too many anchors for H20";
@@ -175,8 +175,8 @@ TEST_F(AnchorEfficiencyMetrics, H30_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H30_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H30_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 30) << "Too few anchors for H30";
     EXPECT_LE(anchorCount, 110) << "Too many anchors for H30";
@@ -190,8 +190,8 @@ TEST_F(AnchorEfficiencyMetrics, H40_AnchorCount) {
 
     ASSERT_TRUE(result.success);
 
-    int anchorCount = static_cast<int>(result.anchors.size());
-    std::cout << "METRIC: H40_AnchorCount = " << anchorCount << std::endl;
+    int const anchorCount = static_cast<int>(result.anchors.size());
+    std::cout << "METRIC: H40_AnchorCount = " << anchorCount << '\n';
 
     EXPECT_GE(anchorCount, 40) << "Too few anchors for H40";
     EXPECT_LE(anchorCount, 130) << "Too many anchors for H40";

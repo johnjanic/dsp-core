@@ -32,7 +32,7 @@ class AlgorithmBenchmark : public ::testing::Test {
             std::cout << std::left << std::setw(20) << curveName << std::setw(18) << algorithmName << std::setw(10)
                       << std::fixed << std::setprecision(3) << fittingTimeMs << " ms" << std::setw(12) << numAnchors
                       << std::setw(15) << std::scientific << std::setprecision(4) << maxError << std::setw(15)
-                      << avgError << std::setw(10) << spuriousExtrema << std::endl;
+                      << avgError << std::setw(10) << spuriousExtrema << '\n';
         }
     };
 
@@ -54,7 +54,7 @@ class AlgorithmBenchmark : public ::testing::Test {
         auto fitResult = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
         auto end = std::chrono::high_resolution_clock::now();
 
-        std::chrono::duration<double, std::milli> duration = end - start;
+        std::chrono::duration<double, std::milli> const duration = end - start;
         result.fittingTimeMs = duration.count();
 
         // Extract quality metrics
@@ -71,8 +71,9 @@ class AlgorithmBenchmark : public ::testing::Test {
     // Simplified extrema count - just count sign changes in fitted spline derivative
     // This is a proxy metric (not perfect, but good enough for comparison)
     int countSpuriousExtrema(const std::vector<dsp_core::SplineAnchor>& anchors) {
-        if (anchors.size() < 3)
+        if (anchors.size() < 3) {
             return 0;
+}
 
         const int NUM_SAMPLES = 1000;
         int extremaCount = 0;
@@ -81,9 +82,9 @@ class AlgorithmBenchmark : public ::testing::Test {
         bool firstSlope = true;
 
         for (int i = 1; i < NUM_SAMPLES; ++i) {
-            double x = -1.0 + (2.0 * i) / (NUM_SAMPLES - 1);
-            double y = ltf->getSplineLayer().evaluate(x);
-            double slope = y - prevY;
+            double const x = -1.0 + (2.0 * i) / (NUM_SAMPLES - 1);
+            double const y = ltf->getSplineLayer().evaluate(x);
+            double const slope = y - prevY;
 
             if (!firstSlope && prevSlope * slope < 0.0) {
                 extremaCount++;
@@ -99,8 +100,8 @@ class AlgorithmBenchmark : public ::testing::Test {
 
     void setupCurve(std::function<double(double)> func) {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
-            double y = func(x);
+            double const x = ltf->normalizeIndex(i);
+            double const y = func(x);
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -118,15 +119,15 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
 
     std::cout << std::left << std::setw(20) << "Curve Type" << std::setw(18) << "Algorithm" << std::setw(10) << "Time"
               << std::setw(12) << "Anchors" << std::setw(15) << "Max Error" << std::setw(15) << "Avg Error"
-              << std::setw(10) << "Extrema" << std::endl;
-    std::cout << std::string(110, '-') << std::endl;
+              << std::setw(10) << "Extrema" << '\n';
+    std::cout << std::string(110, '-') << '\n';
 
     struct TestCurve {
         std::string name;
         std::function<double(double)> func;
     };
 
-    std::vector<TestCurve> curves = {
+    std::vector<TestCurve> const curves = {
         // 1. Soft Saturation (most common in music production)
         {"Soft Saturation", [](double x) { return std::tanh(3.0 * x); }},
 
@@ -142,10 +143,12 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
         // 5. Cubic Soft Clip
         {"Cubic Soft Clip",
          [](double x) {
-             if (x < -1.0)
+             if (x < -1.0) {
                  return -2.0 / 3.0;
-             if (x > 1.0)
+}
+             if (x > 1.0) {
                  return 2.0 / 3.0;
+}
              return x - (x * x * x) / 3.0;
          }},
 
@@ -173,7 +176,7 @@ TEST_F(AlgorithmBenchmark, ComprehensiveComparison) {
         fcResult.print();
         allResults.push_back(fcResult);
 
-        std::cout << std::string(110, '-') << std::endl;
+        std::cout << std::string(110, '-') << '\n';
     }
 
     // Summary statistics
@@ -230,12 +233,12 @@ TEST_F(AlgorithmBenchmark, SteepCurveStressTest) {
 
     std::cout << std::left << std::setw(20) << "Steepness (N)" << std::setw(18) << "Algorithm" << std::setw(10)
               << "Time" << std::setw(12) << "Anchors" << std::setw(15) << "Max Error" << std::setw(10) << "Extrema"
-              << std::endl;
-    std::cout << std::string(100, '-') << std::endl;
+              << '\n';
+    std::cout << std::string(100, '-') << '\n';
 
-    std::vector<double> steepness = {1.0, 3.0, 5.0, 10.0, 20.0, 50.0};
+    std::vector<double> const steepness = {1.0, 3.0, 5.0, 10.0, 20.0, 50.0};
 
-    for (double N : steepness) {
+    for (double const N : steepness) {
         setupCurve([N](double x) { return std::tanh(N * x); });
 
         auto akima = benchmarkAlgorithm(dsp_core::TangentAlgorithm::Akima, "Akima",
@@ -248,13 +251,13 @@ TEST_F(AlgorithmBenchmark, SteepCurveStressTest) {
                   << std::setw(18) << akima.algorithmName << std::setw(10) << std::fixed << std::setprecision(3)
                   << akima.fittingTimeMs << " ms" << std::setw(12) << akima.numAnchors << std::setw(15)
                   << std::scientific << std::setprecision(4) << akima.maxError << std::setw(10) << akima.spuriousExtrema
-                  << std::endl;
+                  << '\n';
 
         std::cout << std::left << std::setw(20) << "" << std::setw(18) << fc.algorithmName << std::setw(10)
                   << std::fixed << std::setprecision(3) << fc.fittingTimeMs << " ms" << std::setw(12) << fc.numAnchors
                   << std::setw(15) << std::scientific << std::setprecision(4) << fc.maxError << std::setw(10)
-                  << fc.spuriousExtrema << std::endl;
-        std::cout << std::string(100, '-') << std::endl;
+                  << fc.spuriousExtrema << '\n';
+        std::cout << std::string(100, '-') << '\n';
     }
 
     std::cout << "\nStress test complete.\n\n";
@@ -288,7 +291,7 @@ TEST_F(AlgorithmBenchmark, RepeatedFittingTest) {
         dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
     }
     auto akimaEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> akimaDuration = akimaEnd - akimaStart;
+    std::chrono::duration<double, std::milli> const akimaDuration = akimaEnd - akimaStart;
 
     // Benchmark Fritsch-Carlson
     auto fcStart = std::chrono::high_resolution_clock::now();
@@ -298,7 +301,7 @@ TEST_F(AlgorithmBenchmark, RepeatedFittingTest) {
         dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
     }
     auto fcEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> fcDuration = fcEnd - fcStart;
+    std::chrono::duration<double, std::milli> const fcDuration = fcEnd - fcStart;
 
     std::cout << "Akima:            " << std::fixed << std::setprecision(2) << akimaDuration.count() << " ms total, "
               << akimaDuration.count() / NUM_ITERATIONS << " ms per fit\n";

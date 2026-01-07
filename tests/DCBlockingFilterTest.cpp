@@ -24,11 +24,12 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Fill buffer with sine wave
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     static void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate,
                              double amplitude = 1.0, double dcOffset = 0.0) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
-                double phase = 2.0 * M_PI * frequency * i / sampleRate;
+                double const phase = 2.0 * M_PI * frequency * i / sampleRate;
                 buffer.setSample(ch, i, amplitude * std::sin(phase) + dcOffset);
             }
         }
@@ -40,7 +41,7 @@ class DCBlockingFilterTest : public ::testing::Test {
         int totalSamples = 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
-                double sample = buffer.getSample(ch, i);
+                double const sample = buffer.getSample(ch, i);
                 sumSquares += sample * sample;
                 totalSamples++;
             }
@@ -82,7 +83,7 @@ TEST_F(DCBlockingFilterTest, RemovesPureDC) {
 
     // After convergence, DC should be significantly reduced
     // 5Hz HPF won't completely remove DC instantly, but should reduce it
-    double meanAfterFiltering = std::abs(measureMean(buffer));
+    double const meanAfterFiltering = std::abs(measureMean(buffer));
 
     EXPECT_LT(meanAfterFiltering, 0.05) << "DC blocking filter should significantly reduce DC offset after convergence";
 
@@ -111,7 +112,7 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     for (int block = 0; block < warmupSamples / 512; ++block) {
         for (int ch = 0; ch < 2; ++ch) {
             for (int i = 0; i < 512; ++i) {
-                double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+                double const samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
                 warmupBuffer.setSample(ch, i, amplitude * std::sin(samplePhase));
             }
         }
@@ -123,12 +124,12 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     juce::AudioBuffer<double> buffer(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
-            double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+            double const samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
             buffer.setSample(ch, i, amplitude * std::sin(samplePhase));
         }
     }
 
-    double rmsBeforeFiltering = measureRMS(buffer);
+    double const rmsBeforeFiltering = measureRMS(buffer);
 
     // Create copy for filtering (to preserve original for comparison)
     juce::AudioBuffer<double> filteredBuffer(2, 512);
@@ -136,12 +137,12 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     filteredBuffer.copyFrom(1, 0, buffer, 1, 0, 512);
 
     filter_->process(filteredBuffer);
-    double rmsAfterFiltering = measureRMS(filteredBuffer);
+    double const rmsAfterFiltering = measureRMS(filteredBuffer);
 
     // At 20Hz with 5Hz cutoff (4x ratio), 1st-order HPF has:
     // H(f) = f/fc / sqrt(1 + (f/fc)^2) = 4 / sqrt(17) ≈ 0.97
     // So we expect ~97% amplitude preservation at 20Hz
-    double attenuationRatio = rmsAfterFiltering / rmsBeforeFiltering;
+    double const attenuationRatio = rmsAfterFiltering / rmsBeforeFiltering;
 
     EXPECT_GT(attenuationRatio, 0.90) << "20Hz sine should pass through with minimal attenuation (ratio: "
                                       << attenuationRatio << ")";
@@ -157,7 +158,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     // Create buffer with 100Hz sine (odd harmonic structure)
     juce::AudioBuffer<double> buffer(1, numSamples);
     for (int i = 0; i < numSamples; ++i) {
-        double phase = 2.0 * M_PI * fundamental * i / sampleRate;
+        double const phase = 2.0 * M_PI * fundamental * i / sampleRate;
         buffer.setSample(0, i, std::sin(phase));
     }
 
@@ -165,7 +166,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     for (int block = 0; block < warmupSamples / 512; ++block) {
         juce::AudioBuffer<double> warmupBuffer(1, 512);
         for (int i = 0; i < 512; ++i) {
-            double phase = 2.0 * M_PI * fundamental * i / sampleRate;
+            double const phase = 2.0 * M_PI * fundamental * i / sampleRate;
             warmupBuffer.setSample(0, i, std::sin(phase));
         }
         filter_->process(warmupBuffer);
@@ -174,7 +175,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     // Process test buffer in chunks
     const int blockSize = 512;
     for (int offset = 0; offset < numSamples; offset += blockSize) {
-        int samplesThisBlock = std::min(blockSize, numSamples - offset);
+        int const samplesThisBlock = std::min(blockSize, numSamples - offset);
         juce::AudioBuffer<double> block(1, samplesThisBlock);
 
         for (int i = 0; i < samplesThisBlock; ++i) {
@@ -195,14 +196,14 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     double fundamentalEnergy = 0.0;
 
     for (int i = 0; i < numSamples; ++i) {
-        double sample = buffer.getSample(0, i);
+        double const sample = buffer.getSample(0, i);
 
         // Correlate with 2nd harmonic (200Hz)
-        double evenPhase = 2.0 * M_PI * (2.0 * fundamental) * i / sampleRate;
+        double const evenPhase = 2.0 * M_PI * (2.0 * fundamental) * i / sampleRate;
         evenHarmonicEnergy += sample * std::sin(evenPhase);
 
         // Correlate with fundamental (100Hz)
-        double fundPhase = 2.0 * M_PI * fundamental * i / sampleRate;
+        double const fundPhase = 2.0 * M_PI * fundamental * i / sampleRate;
         fundamentalEnergy += sample * std::sin(fundPhase);
     }
 
@@ -210,7 +211,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     fundamentalEnergy = std::abs(fundamentalEnergy);
 
     // Even harmonic should be much smaller than fundamental
-    double harmonicRatio = evenHarmonicEnergy / fundamentalEnergy;
+    double const harmonicRatio = evenHarmonicEnergy / fundamentalEnergy;
 
     EXPECT_LT(harmonicRatio, 0.01) << "DC blocking filter should not introduce even harmonics (ratio: " << harmonicRatio
                                    << ")";
@@ -290,7 +291,7 @@ TEST_F(DCBlockingFilterTest, ResetClearsState) {
 
     // Immediately after reset, filter hasn't converged yet
     // So output should still have significant DC (not fully removed)
-    double meanAfterReset = std::abs(measureMean(buffer));
+    double const meanAfterReset = std::abs(measureMean(buffer));
 
     // Should be closer to input DC than fully converged state
     EXPECT_GT(meanAfterReset, 0.1) << "Reset filter should not immediately remove DC (needs convergence)";
@@ -341,7 +342,7 @@ TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
     for (int block = 0; block < warmupSamples / 512; ++block) {
         for (int ch = 0; ch < 2; ++ch) {
             for (int i = 0; i < 512; ++i) {
-                double samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
+                double const samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
                 buffer.setSample(ch, i, amplitude * std::sin(samplePhase) + dcOffset);
             }
         }
@@ -354,12 +355,12 @@ TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
     filter_->process(buffer);
 
     // Check that DC is significantly reduced
-    double mean = std::abs(measureMean(buffer));
+    double const mean = std::abs(measureMean(buffer));
     EXPECT_LT(mean, 0.1) << "DC component should be significantly reduced";
 
     // Check that AC is preserved (RMS should be close to amplitude/sqrt(2))
-    double rms = measureRMS(buffer);
-    double expectedRMS = amplitude / std::sqrt(2.0);
+    double const rms = measureRMS(buffer);
+    double const expectedRMS = amplitude / std::sqrt(2.0);
 
     // Allow some tolerance for filter transient and phase shift
     EXPECT_NEAR(rms, expectedRMS, 0.15) << "AC component should be preserved (RMS: " << rms

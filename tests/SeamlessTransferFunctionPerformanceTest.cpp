@@ -1,5 +1,6 @@
 #include <dsp_core/dsp_core.h>
 #include <gtest/gtest.h>
+#include <array>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -46,7 +47,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
         const char* description;
     };
 
-    std::vector<TestCase> testCases = {
+    std::vector<TestCase> const testCases = {
         {44100.0, 441, "44.1kHz"},
         {48000.0, 480, "48kHz"},
         {88200.0, 882, "88.2kHz"},
@@ -68,13 +69,13 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
         std::vector<double> samples(tc.expectedCrossfadeSamples + 100);
         for (auto& s : samples) s = 0.5;
 
-        double* channelPointers[] = {samples.data()};
-        juce::AudioBuffer<double> buffer(channelPointers, 1, static_cast<int>(samples.size()));
+        const std::array<double const*, 1> channelPointers = {samples.data()};
+        juce::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
         stf->processBuffer(buffer);
 
         // Verify smooth transition (no clicks)
         for (size_t i = 1; i < samples.size(); ++i) {
-            double delta = std::abs(samples[i] - samples[i - 1]);
+            double const delta = std::abs(samples[i] - samples[i - 1]);
             EXPECT_LT(delta, 0.5) << "Click detected at " << tc.description
                                   << " sample " << i;
         }
@@ -107,14 +108,14 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_TradeoffAnalys
 
     std::vector<double> samples(expectedCrossfadeSamples);
     for (auto& s : samples) s = 0.0;
-    double* channelPointers[] = {samples.data()};
-    juce::AudioBuffer<double> buffer(channelPointers, 1, static_cast<int>(samples.size()));
+    const std::array<double const*, 1> channelPointers = {samples.data()};
+    juce::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
     stf->processBuffer(buffer);
 
     // Verify smooth crossfade
     bool smooth = true;
     for (size_t i = 1; i < samples.size(); ++i) {
-        double delta = std::abs(samples[i] - samples[i - 1]);
+        double const delta = std::abs(samples[i] - samples[i - 1]);
         if (delta > 0.1) { // Large jump indicates click
             smooth = false;
             break;
@@ -151,10 +152,10 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Process audio block (this triggers LUT swap if ready)
-    double samples[512];
-    for (int i = 0; i < 512; ++i) samples[i] = 0.5;
-    double* channelPointers[] = {samples};
-    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
+    std::array<double, 512> samples{};
+    for (double & sample : samples) sample = 0.5;
+    const std::array<double const*, 1> channelPointers = {samples.data()};
+    juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     stf->processBuffer(buffer);
 
     // Wait for another polling cycle to ensure LUT is updated
@@ -170,7 +171,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     // - System load variance (±10ms typical)
     EXPECT_LT(latencyMs, 60.0) << "Interactive operation latency should be <60ms (allowing for system variance)";
 
-    std::cout << "[PERFORMANCE] Harmonic edit latency: " << latencyMs << "ms" << std::endl;
+    std::cout << "[PERFORMANCE] Harmonic edit latency: " << latencyMs << "ms" << '\n';
 }
 
 /**
@@ -185,8 +186,8 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_SplineFitting) {
 
     // Create complex base layer that will require spline fitting
     for (int i = 0; i < 16384; ++i) {
-        double x = -1.0 + (i / 16383.0) * 2.0;
-        double y = std::sin(x * 3.14159 * 2.0); // Sine wave
+        double const x = -1.0 + (i / 16383.0) * 2.0;
+        double const y = std::sin(x * 3.14159 * 2.0); // Sine wave
         editingModel.setBaseLayerValue(i, y);
     }
 
@@ -205,7 +206,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_SplineFitting) {
     // SplineFitter latency is acceptable for mode transitions
     EXPECT_LT(latencyMs, 1000.0) << "Spline fitting latency should be <1000ms";
 
-    std::cout << "[PERFORMANCE] Spline fitting latency: " << latencyMs << "ms" << std::endl;
+    std::cout << "[PERFORMANCE] Spline fitting latency: " << latencyMs << "ms" << '\n';
 }
 
 // ============================================================================
@@ -234,8 +235,8 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_PollerOverhead) {
 
     // Note: Actual CPU usage measurement requires platform-specific profiling tools
     // For manual verification: run `top` or Activity Monitor during test
-    std::cout << "[PERFORMANCE] Poller ran for " << elapsedMs << "ms (expected ~1000ms)" << std::endl;
-    std::cout << "[MANUAL CHECK] Verify CPU usage <0.5% in Activity Monitor" << std::endl;
+    std::cout << "[PERFORMANCE] Poller ran for " << elapsedMs << "ms (expected ~1000ms)" << '\n';
+    std::cout << "[MANUAL CHECK] Verify CPU usage <0.5% in Activity Monitor" << '\n';
 }
 
 /**
@@ -255,11 +256,11 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_WorkerThreadPriority
     }
 
     // Process audio simultaneously
-    double samples[512];
-    double* channelPointers[] = {samples};
-    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
+    std::array<double, 512> samples{};
+    const std::array<double const*, 1> channelPointers = {samples.data()};
+    juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     for (int i = 0; i < 100; ++i) {
-        for (int j = 0; j < 512; ++j) samples[j] = 0.5;
+        for (double & sample : samples) sample = 0.5;
         stf->processBuffer(buffer);
     }
 
@@ -288,18 +289,18 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
     }
 
     // Record baseline (manual verification required)
-    std::cout << "[MEMORY CHECK] Baseline established. Check memory usage in Activity Monitor." << std::endl;
+    std::cout << "[MEMORY CHECK] Baseline established. Check memory usage in Activity Monitor." << '\n';
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Heavy editing load (should not accumulate memory)
-    double samples[512];
-    double* channelPointers[] = {samples};
-    juce::AudioBuffer<double> buffer(channelPointers, 1, 512);
+    std::array<double, 512> samples{};
+    const std::array<double const*, 1> channelPointers = {samples.data()};
+    juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     for (int i = 0; i < 1000; ++i) {
         editingModel.setCoefficient(1, 0.5 + i * 0.0001);
 
         // Process audio
-        for (int j = 0; j < 512; ++j) samples[j] = 0.5;
+        for (double & sample : samples) sample = 0.5;
         stf->processBuffer(buffer);
 
         if (i % 100 == 0) {
@@ -307,7 +308,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
         }
     }
 
-    std::cout << "[MEMORY CHECK] After 1000 edits. Memory should be stable (no growth)." << std::endl;
+    std::cout << "[MEMORY CHECK] After 1000 edits. Memory should be stable (no growth)." << '\n';
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Expected memory overhead (from design doc):
@@ -354,11 +355,11 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_TotalOverhead) {
     // - Total: ~1.4MB
 
     // Note: Actual measurement requires platform-specific memory profiling
-    std::cout << "[MEMORY] Expected overhead: ~1.4MB" << std::endl;
-    std::cout << "[MEMORY] Breakdown:" << std::endl;
-    std::cout << "  - Triple-buffered LUTs: 393KB" << std::endl;
-    std::cout << "  - RenderJob queue (8 slots): ~1MB" << std::endl;
-    std::cout << "[MANUAL CHECK] Verify actual memory usage in Activity Monitor" << std::endl;
+    std::cout << "[MEMORY] Expected overhead: ~1.4MB" << '\n';
+    std::cout << "[MEMORY] Breakdown:" << '\n';
+    std::cout << "  - Triple-buffered LUTs: 393KB" << '\n';
+    std::cout << "  - RenderJob queue (8 slots): ~1MB" << '\n';
+    std::cout << "[MANUAL CHECK] Verify actual memory usage in Activity Monitor" << '\n';
 
     SUCCEED() << "Memory overhead documentation complete";
 }
@@ -385,29 +386,29 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_TotalOverhead) {
  * Expected: NO CLICKS or POPS on ANY operation
  */
 TEST_F(SeamlessTransferFunctionPerformanceTest, ManualQA_ClickTestingChecklist) {
-    std::cout << "\n========================================" << std::endl;
-    std::cout << "MANUAL QA CHECKLIST - Task 8.5" << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "\nPerform the following tests with audio playback:" << std::endl;
-    std::cout << "\n1. Rapid harmonic slider drags" << std::endl;
-    std::cout << "   - Drag multiple harmonic sliders quickly" << std::endl;
-    std::cout << "   - Expected: Smooth audio, no clicks" << std::endl;
-    std::cout << "\n2. Paint scribbling (100+ mouse events)" << std::endl;
-    std::cout << "   - Scribble rapidly in Paint mode" << std::endl;
-    std::cout << "   - Expected: Smooth audio, no clicks" << std::endl;
-    std::cout << "\n3. Preset switching during playback" << std::endl;
-    std::cout << "   - Switch between presets while audio plays" << std::endl;
-    std::cout << "   - Expected: Smooth transition, no clicks" << std::endl;
-    std::cout << "\n4. Spline mode entry during playback" << std::endl;
-    std::cout << "   - Enter/exit Spline mode while audio plays" << std::endl;
-    std::cout << "   - Expected: Smooth mode switch, no clicks" << std::endl;
-    std::cout << "\n5. Undo/redo rapidly (10+ undos)" << std::endl;
-    std::cout << "   - Perform rapid undo/redo operations" << std::endl;
-    std::cout << "   - Expected: Smooth history navigation, no clicks" << std::endl;
-    std::cout << "\n6. Mode transitions during playback" << std::endl;
-    std::cout << "   - Switch between Paint, Harmonic, Equation modes" << std::endl;
-    std::cout << "   - Expected: Smooth transitions, no clicks" << std::endl;
-    std::cout << "\n========================================\n" << std::endl;
+    std::cout << "\n========================================" << '\n';
+    std::cout << "MANUAL QA CHECKLIST - Task 8.5" << '\n';
+    std::cout << "========================================" << '\n';
+    std::cout << "\nPerform the following tests with audio playback:" << '\n';
+    std::cout << "\n1. Rapid harmonic slider drags" << '\n';
+    std::cout << "   - Drag multiple harmonic sliders quickly" << '\n';
+    std::cout << "   - Expected: Smooth audio, no clicks" << '\n';
+    std::cout << "\n2. Paint scribbling (100+ mouse events)" << '\n';
+    std::cout << "   - Scribble rapidly in Paint mode" << '\n';
+    std::cout << "   - Expected: Smooth audio, no clicks" << '\n';
+    std::cout << "\n3. Preset switching during playback" << '\n';
+    std::cout << "   - Switch between presets while audio plays" << '\n';
+    std::cout << "   - Expected: Smooth transition, no clicks" << '\n';
+    std::cout << "\n4. Spline mode entry during playback" << '\n';
+    std::cout << "   - Enter/exit Spline mode while audio plays" << '\n';
+    std::cout << "   - Expected: Smooth mode switch, no clicks" << '\n';
+    std::cout << "\n5. Undo/redo rapidly (10+ undos)" << '\n';
+    std::cout << "   - Perform rapid undo/redo operations" << '\n';
+    std::cout << "   - Expected: Smooth history navigation, no clicks" << '\n';
+    std::cout << "\n6. Mode transitions during playback" << '\n';
+    std::cout << "   - Switch between Paint, Harmonic, Equation modes" << '\n';
+    std::cout << "   - Expected: Smooth transitions, no clicks" << '\n';
+    std::cout << "\n========================================\n" << '\n';
 
     SUCCEED() << "Manual QA checklist documented";
 }

@@ -53,7 +53,7 @@ class SymmetryDetectionComparisonTest : public ::testing::Test {
 
     void setTanh(double k) {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::tanh(k * x));
         }
     }
@@ -88,8 +88,8 @@ class SymmetryDetectionComparisonTest : public ::testing::Test {
 
             double y = 0.0;
             for (size_t h = 0; h < harmonics.size(); ++h) {
-                int n = harmonics[h];
-                double w = (h < weights.size()) ? weights[h] : 1.0;
+                int const n = harmonics[h];
+                double const w = (h < weights.size()) ? weights[h] : 1.0;
 
                 double term = 0.0;
                 if (n == 1) {
@@ -152,18 +152,18 @@ class SymmetryDetectionComparisonTest : public ::testing::Test {
     // Output Helpers
     //--------------------------------------------------------------------------
 
-    void printMetrics(const std::string& label, const FitMetrics& m) {
+    static void printMetrics(const std::string& label, const FitMetrics& m) {
         std::cout << std::setw(12) << label << " | " << std::fixed << std::setprecision(4)
                   << std::setw(8) << m.maxError << " | " << std::setw(7) << m.anchorCount << " | "
-                  << std::setw(7) << static_cast<int>(m.pairRatio * 100) << "%" << std::endl;
+                  << std::setw(7) << static_cast<int>(m.pairRatio * 100) << "%" << '\n';
     }
 
-    void printComparison(const std::string& curveName, const FitMetrics& without,
-                         const FitMetrics& withSym) {
-        double errorDiff = (without.maxError > 1e-9)
+    static void printComparison(const std::string& curveName, const FitMetrics& without,
+                                const FitMetrics& withSym) {
+        double const errorDiff = (without.maxError > 1e-9)
                                ? 100.0 * (withSym.maxError - without.maxError) / without.maxError
                                : 0.0;
-        double pairDiff = 100.0 * (withSym.pairRatio - without.pairRatio);
+        double const pairDiff = 100.0 * (withSym.pairRatio - without.pairRatio);
 
         std::string verdict;
         if (withSym.maxError <= without.maxError * 1.05 && pairDiff > 10) {
@@ -176,19 +176,19 @@ class SymmetryDetectionComparisonTest : public ::testing::Test {
             verdict = "SIMILAR";
         }
 
-        std::cout << "\n=== " << curveName << " ===" << std::endl;
+        std::cout << "\n=== " << curveName << " ===" << '\n';
         std::cout << std::setw(12) << "Mode"
                   << " | " << std::setw(8) << "MaxErr"
                   << " | " << std::setw(7) << "Anchors"
-                  << " | " << std::setw(7) << "Paired" << std::endl;
-        std::cout << std::string(48, '-') << std::endl;
+                  << " | " << std::setw(7) << "Paired" << '\n';
+        std::cout << std::string(48, '-') << '\n';
         printMetrics("Without", without);
         printMetrics("With", withSym);
         std::cout << "Error change: " << std::showpos << std::fixed << std::setprecision(1)
-                  << errorDiff << "%" << std::noshowpos << std::endl;
+                  << errorDiff << "%" << std::noshowpos << '\n';
         std::cout << "Paired change: " << std::showpos << std::fixed << std::setprecision(1)
-                  << pairDiff << "%" << std::noshowpos << std::endl;
-        std::cout << "Verdict: " << verdict << std::endl;
+                  << pairDiff << "%" << std::noshowpos << '\n';
+        std::cout << "Verdict: " << verdict << '\n';
     }
 };
 
@@ -197,16 +197,16 @@ class SymmetryDetectionComparisonTest : public ::testing::Test {
 //==============================================================================
 
 TEST_F(SymmetryDetectionComparisonTest, Tanh_AllVariants) {
-    std::cout << "\n==========================================" << std::endl;
-    std::cout << "TANH VARIANTS COMPARISON" << std::endl;
-    std::cout << "==========================================\n" << std::endl;
+    std::cout << "\n==========================================" << '\n';
+    std::cout << "TANH VARIANTS COMPARISON" << '\n';
+    std::cout << "==========================================\n" << '\n';
 
-    for (double k : {1.0, 2.0, 5.0, 10.0}) {
+    for (double const k : {1.0, 2.0, 5.0, 10.0}) {
         setTanh(k);
         auto without = fitWithoutSymmetry();
         auto withSym = fitWithSymmetryAuto();
 
-        std::string name = "tanh(" + std::to_string(static_cast<int>(k)) + "x)";
+        std::string const name = "tanh(" + std::to_string(static_cast<int>(k)) + "x)";
         printComparison(name, without, withSym);
 
         // Verify no severe regression (allow 20% error increase max)
@@ -220,20 +220,20 @@ TEST_F(SymmetryDetectionComparisonTest, Tanh_AllVariants) {
 //==============================================================================
 
 TEST_F(SymmetryDetectionComparisonTest, PureOddHarmonics) {
-    std::cout << "\n==========================================" << std::endl;
-    std::cout << "PURE ODD HARMONICS COMPARISON" << std::endl;
-    std::cout << "==========================================\n" << std::endl;
+    std::cout << "\n==========================================" << '\n';
+    std::cout << "PURE ODD HARMONICS COMPARISON" << '\n';
+    std::cout << "==========================================\n" << '\n';
 
-    for (int n : {3, 5, 15, 39}) {
+    for (int const n : {3, 5, 15, 39}) {
         setHarmonic(n);
         auto without = fitWithoutSymmetry();
         auto withSym = fitWithSymmetryAuto();
 
-        std::string name = "H" + std::to_string(n);
+        std::string const name = "H" + std::to_string(n);
         printComparison(name, without, withSym);
 
         // For high-frequency harmonics, allow more tolerance due to known y-averaging issue
-        double tolerance = (n > 10) ? 1.5 : 1.2;
+        double const tolerance = (n > 10) ? 1.5 : 1.2;
         EXPECT_LE(withSym.maxError, without.maxError * tolerance)
             << name << " has severe regression with symmetry detection";
     }
@@ -244,9 +244,9 @@ TEST_F(SymmetryDetectionComparisonTest, PureOddHarmonics) {
 //==============================================================================
 
 TEST_F(SymmetryDetectionComparisonTest, MixedOddHarmonics) {
-    std::cout << "\n==========================================" << std::endl;
-    std::cout << "MIXED ODD HARMONICS COMPARISON" << std::endl;
-    std::cout << "==========================================\n" << std::endl;
+    std::cout << "\n==========================================" << '\n';
+    std::cout << "MIXED ODD HARMONICS COMPARISON" << '\n';
+    std::cout << "==========================================\n" << '\n';
 
     struct TestCase {
         std::vector<int> harmonics;
@@ -254,7 +254,7 @@ TEST_F(SymmetryDetectionComparisonTest, MixedOddHarmonics) {
         std::string name;
     };
 
-    std::vector<TestCase> cases = {
+    std::vector<TestCase> const cases = {
         {{1, 3}, {1.0, 0.5}, "H1+H3"},
         {{1, 5}, {1.0, 0.5}, "H1+H5"},
         {{1, 15}, {1.0, 0.3}, "H1+H15"},
@@ -277,21 +277,21 @@ TEST_F(SymmetryDetectionComparisonTest, MixedOddHarmonics) {
 //==============================================================================
 
 TEST_F(SymmetryDetectionComparisonTest, AutoModeDetection) {
-    std::cout << "\n==========================================" << std::endl;
-    std::cout << "AUTO MODE VS ALWAYS MODE" << std::endl;
-    std::cout << "==========================================\n" << std::endl;
+    std::cout << "\n==========================================" << '\n';
+    std::cout << "AUTO MODE VS ALWAYS MODE" << '\n';
+    std::cout << "==========================================\n" << '\n';
 
     // Test that Auto mode correctly detects symmetry and behaves like Always
     setTanh(5.0);
     auto autoMetrics = fitWithSymmetryAuto();
     auto alwaysMetrics = fitWithSymmetryAuto();
 
-    std::cout << "\n=== tanh(5x) Auto vs Always ===" << std::endl;
+    std::cout << "\n=== tanh(5x) Auto vs Always ===" << '\n';
     std::cout << std::setw(12) << "Mode"
               << " | " << std::setw(8) << "MaxErr"
               << " | " << std::setw(7) << "Anchors"
-              << " | " << std::setw(7) << "Paired" << std::endl;
-    std::cout << std::string(48, '-') << std::endl;
+              << " | " << std::setw(7) << "Paired" << '\n';
+    std::cout << std::string(48, '-') << '\n';
     printMetrics("Auto", autoMetrics);
     printMetrics("Always", alwaysMetrics);
 
@@ -305,22 +305,22 @@ TEST_F(SymmetryDetectionComparisonTest, AutoModeDetection) {
 //==============================================================================
 
 TEST_F(SymmetryDetectionComparisonTest, SummaryReport) {
-    std::cout << "\n\n==========================================" << std::endl;
-    std::cout << "FULL COMPARISON SUMMARY" << std::endl;
-    std::cout << "==========================================\n" << std::endl;
+    std::cout << "\n\n==========================================" << '\n';
+    std::cout << "FULL COMPARISON SUMMARY" << '\n';
+    std::cout << "==========================================\n" << '\n';
 
     std::cout << std::setw(15) << "Curve" << " | " << std::setw(12) << "Without Err" << " | "
               << std::setw(12) << "With Err" << " | " << std::setw(10) << "Err Diff" << " | "
               << std::setw(12) << "Without Pair" << " | " << std::setw(12) << "With Pair"
-              << std::endl;
-    std::cout << std::string(90, '-') << std::endl;
+              << '\n';
+    std::cout << std::string(90, '-') << '\n';
 
     auto runTest = [&](const std::string& name, auto setupFn) {
         setupFn();
         auto without = fitWithoutSymmetry();
         auto withSym = fitWithSymmetryAuto();
 
-        double errDiff = (without.maxError > 1e-9)
+        double const errDiff = (without.maxError > 1e-9)
                              ? 100.0 * (withSym.maxError - without.maxError) / without.maxError
                              : 0.0;
 
@@ -329,7 +329,7 @@ TEST_F(SymmetryDetectionComparisonTest, SummaryReport) {
                   << withSym.maxError << " | " << std::setw(8) << std::showpos << errDiff << "%"
                   << std::noshowpos << " | " << std::setw(10)
                   << static_cast<int>(without.pairRatio * 100) << "%" << " | " << std::setw(10)
-                  << static_cast<int>(withSym.pairRatio * 100) << "%" << std::endl;
+                  << static_cast<int>(withSym.pairRatio * 100) << "%" << '\n';
     };
 
     // Tanh variants
@@ -338,7 +338,7 @@ TEST_F(SymmetryDetectionComparisonTest, SummaryReport) {
     runTest("tanh(5x)", [&]() { setTanh(5.0); });
     runTest("tanh(10x)", [&]() { setTanh(10.0); });
 
-    std::cout << std::string(90, '-') << std::endl;
+    std::cout << std::string(90, '-') << '\n';
 
     // Pure odd harmonics
     runTest("H3", [&]() { setHarmonic(3); });
@@ -346,12 +346,12 @@ TEST_F(SymmetryDetectionComparisonTest, SummaryReport) {
     runTest("H15", [&]() { setHarmonic(15); });
     runTest("H39", [&]() { setHarmonic(39); });
 
-    std::cout << std::string(90, '-') << std::endl;
+    std::cout << std::string(90, '-') << '\n';
 
     // Mixed harmonics
     runTest("H1+H3", [&]() { setMixedHarmonics({1, 3}, {1.0, 0.5}); });
     runTest("H1+H5", [&]() { setMixedHarmonics({1, 5}, {1.0, 0.5}); });
     runTest("H1+H15", [&]() { setMixedHarmonics({1, 15}, {1.0, 0.3}); });
 
-    std::cout << "\n==========================================\n" << std::endl;
+    std::cout << "\n==========================================\n" << '\n';
 }

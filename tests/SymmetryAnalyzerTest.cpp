@@ -21,7 +21,7 @@ class SymmetryAnalyzerTest : public ::testing::Test {
     // Helper: Set curve to polynomial: y = x^n
     void setPolynomial(int power) {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::pow(x, power));
         }
     }
@@ -29,7 +29,7 @@ class SymmetryAnalyzerTest : public ::testing::Test {
     // Helper: Set curve to tanh
     void setTanh(double steepness = 5.0) {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             ltf->setBaseLayerValue(i, std::tanh(steepness * x));
         }
     }
@@ -37,18 +37,19 @@ class SymmetryAnalyzerTest : public ::testing::Test {
     // Helper: Set curve to harmonic (Chebyshev polynomial)
     void setHarmonic(int n) {
         for (int i = 0; i < ltf->getTableSize(); ++i) {
-            double x = ltf->normalizeIndex(i);
+            double const x = ltf->normalizeIndex(i);
             double y = 0.0;
 
             // Chebyshev polynomial evaluation
-            if (n == 1)
+            if (n == 1) {
                 y = x;
-            else if (n == 2)
+            } else if (n == 2) {
                 y = 2.0 * x * x - 1.0;
-            else if (n == 3)
+            } else if (n == 3) {
                 y = 4.0 * x * x * x - 3.0 * x;
-            else if (n == 5)
+            } else if (n == 5) {
                 y = 16.0 * std::pow(x, 5) - 20.0 * std::pow(x, 3) + 5.0 * x;
+}
 
             ltf->setBaseLayerValue(i, y);
         }
@@ -117,9 +118,9 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_TanhWithBump_ApproximateSymmetry) {
 
     // Add asymmetric bump to right side only (make it larger to ensure score < 0.99)
     for (int i = ltf->getTableSize() / 2; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         if (x > 0.4 && x < 0.6) {
-            double currentY = ltf->getBaseLayerValue(i);
+            double const currentY = ltf->getBaseLayerValue(i);
             ltf->setBaseLayerValue(i, currentY + 0.15); // Larger bump to break perfect symmetry
         }
     }
@@ -196,9 +197,9 @@ TEST_F(SymmetryAnalyzerTest, Symmetry_ConfigThresholds_AffectClassification) {
 
     // Add very small asymmetry (score should be ~0.95-0.98)
     for (int i = ltf->getTableSize() / 2; i < ltf->getTableSize(); ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         if (x > 0.7) {
-            double currentY = ltf->getBaseLayerValue(i);
+            double const currentY = ltf->getBaseLayerValue(i);
             ltf->setBaseLayerValue(i, currentY + 0.01); // Tiny bump
         }
     }

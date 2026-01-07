@@ -59,7 +59,7 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Evaluate (should use direct path since cache invalid)
-    double result = ltf->applyTransferFunction(0.0);
+    double const result = ltf->applyTransferFunction(0.0);
     EXPECT_NEAR(result, 0.5, kTolerance);
 }
 
@@ -86,7 +86,7 @@ TEST_F(LayeredTransferFunctionSplineTest, ModeExclusivity) {
     // Audio thread should use spline, ignoring harmonics
     ltf->setSplineAnchors(linearAnchors);
 
-    double result = ltf->applyTransferFunction(0.0);
+    double const result = ltf->applyTransferFunction(0.0);
     // Result should come from spline (y=x at x=0), not harmonics
     EXPECT_NEAR(result, 0.0, kTolerance);
 }
@@ -124,9 +124,9 @@ TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
     // Note: In spline mode, computeCompositeAt() returns base+harmonics (not spline)
     // The audio thread uses applyTransferFunction() which routes to spline when enabled
     for (int i = 0; i < ltf->getTableSize(); i += 16) {
-        double x = ltf->normalizeIndex(i);
-        double splineDirect = ltf->getSplineLayer().evaluate(x);
-        double audioResult = ltf->applyTransferFunction(x);
+        double const x = ltf->normalizeIndex(i);
+        double const splineDirect = ltf->getSplineLayer().evaluate(x);
+        double const audioResult = ltf->applyTransferFunction(x);
         EXPECT_NEAR(audioResult, splineDirect, kTolerance);
     }
 }
@@ -136,9 +136,9 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineEvaluationPreservesShape) {
     ltf->setRenderingMode(RenderingMode::Spline);
 
     // Check anchor points via audio evaluation path
-    int midIdx = ltf->getTableSize() / 2;
-    double x = ltf->normalizeIndex(midIdx);
-    double midValue = ltf->applyTransferFunction(x);
+    int const midIdx = ltf->getTableSize() / 2;
+    double const x = ltf->normalizeIndex(midIdx);
+    double const midValue = ltf->applyTransferFunction(x);
 
     // Middle of curve should be close to 0.5 (from threePtAnchors)
     EXPECT_GT(midValue, 0.4);
@@ -162,6 +162,6 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
     EXPECT_NEAR(ltf->getNormalizationScalar(), 1.0, 1e-9);
 
     // Result should be close to 2.0 at x=1 (not normalized)
-    double result = ltf->applyTransferFunction(1.0);
+    double const result = ltf->applyTransferFunction(1.0);
     EXPECT_GT(result, 1.5); // Should not be normalized to 1.0
 }

@@ -36,7 +36,7 @@ class SplineLayerTest : public ::testing::Test {
 //==============================================================================
 
 TEST_F(SplineLayerTest, InitialState) {
-    SplineLayer layer;
+    SplineLayer const layer;
     EXPECT_EQ(layer.getAnchors().size(), 0);
 }
 
@@ -108,7 +108,7 @@ TEST_F(SplineLayerTest, ThreadSafetyStressTest) {
     std::thread reader([&]() {
         int iterations = 0;
         while (!stopFlag.load()) {
-            double result = layer.evaluate(0.5);
+            double const result = layer.evaluate(0.5);
             // Result should be reasonable (between -2 and 2)
             if (result < -2.0 || result > 2.0) {
                 errorCount++;
@@ -130,10 +130,10 @@ TEST_F(SplineLayerTest, ThreadSafetyStressTest) {
 TEST_F(SplineLayerTest, SerializationRoundTrip) {
     SplineLayer layer1;
 
-    std::vector<SplineAnchor> anchors = {{-1.0, -1.0, true, 0.5}, {0.0, 0.5, true, 1.0}, {1.0, 1.0, true, -0.5}};
+    std::vector<SplineAnchor> const anchors = {{-1.0, -1.0, true, 0.5}, {0.0, 0.5, true, 1.0}, {1.0, 1.0, true, -0.5}};
     layer1.setAnchors(anchors);
 
-    juce::ValueTree vt = layer1.toValueTree();
+    juce::ValueTree const vt = layer1.toValueTree();
 
     SplineLayer layer2;
     layer2.fromValueTree(vt);
@@ -147,7 +147,7 @@ TEST_F(SplineLayerTest, SerializationPreservesAnchors) {
     SplineLayer layer1;
     layer1.setAnchors(threePtAnchors);
 
-    juce::ValueTree vt = layer1.toValueTree();
+    juce::ValueTree const vt = layer1.toValueTree();
 
     SplineLayer layer2;
     layer2.fromValueTree(vt);
@@ -170,7 +170,7 @@ TEST_F(SplineLayerTest, SerializationPreservesAnchors) {
 
 TEST_F(SplineLayerTest, EmptyAnchorsReturnsZero) {
     SplineLayer layer;
-    std::vector<SplineAnchor> empty;
+    std::vector<SplineAnchor> const empty;
     layer.setAnchors(empty);
 
     EXPECT_NEAR(layer.evaluate(0.0), 0.0, 1e-9);
@@ -180,7 +180,7 @@ TEST_F(SplineLayerTest, EmptyAnchorsReturnsZero) {
 
 TEST_F(SplineLayerTest, SingleAnchorReturnsConstant) {
     SplineLayer layer;
-    std::vector<SplineAnchor> single = {{0.0, 0.5, false, 0.0}};
+    std::vector<SplineAnchor> const single = {{0.0, 0.5, false, 0.0}};
     layer.setAnchors(single);
 
     EXPECT_NEAR(layer.evaluate(-1.0), 0.5, 1e-9);

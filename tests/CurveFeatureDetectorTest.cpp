@@ -17,8 +17,8 @@ class CurveFeatureDetectorTest : public ::testing::Test {
     // Helper: Create tanh curve (monotonic with inflection)
     void createTanhCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i); // [-1, 1]
-            double y = std::tanh(3.0 * x);
+            double const x = ltf->normalizeIndex(i); // [-1, 1]
+            double const y = std::tanh(3.0 * x);
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -26,8 +26,8 @@ class CurveFeatureDetectorTest : public ::testing::Test {
     // Helper: Create sine curve (multiple extrema)
     void createSineCurve(int numPeriods = 2) {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i); // [-1, 1]
-            double y = std::sin(numPeriods * M_PI * x);
+            double const x = ltf->normalizeIndex(i); // [-1, 1]
+            double const y = std::sin(numPeriods * M_PI * x);
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -35,8 +35,8 @@ class CurveFeatureDetectorTest : public ::testing::Test {
     // Helper: Create cubic curve (monotonic with inflection at x=0)
     void createCubicCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i); // [-1, 1]
-            double y = x * x * x;
+            double const x = ltf->normalizeIndex(i); // [-1, 1]
+            double const y = x * x * x;
             ltf->setBaseLayerValue(i, y);
         }
     }
@@ -44,7 +44,7 @@ class CurveFeatureDetectorTest : public ::testing::Test {
     // Helper: Create linear curve (no features)
     void createLinearCurve() {
         for (int i = 0; i < 256; ++i) {
-            double x = ltf->normalizeIndex(i); // [-1, 1]
+            double const x = ltf->normalizeIndex(i); // [-1, 1]
             ltf->setBaseLayerValue(i, x);
         }
     }
@@ -128,7 +128,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsIncludeAllExtrema) {
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf);
 
     // All local extrema should be in mandatory anchors
-    for (int extremumIdx : features.localExtrema) {
+    for (int const extremumIdx : features.localExtrema) {
         auto it = std::find(features.mandatoryAnchors.begin(), features.mandatoryAnchors.end(), extremumIdx);
         EXPECT_NE(it, features.mandatoryAnchors.end())
             << "Extremum at index " << extremumIdx << " should be in mandatory anchors";
@@ -140,7 +140,7 @@ TEST_F(CurveFeatureDetectorTest, MandatoryAnchorsIncludeAllInflectionPoints) {
     auto features = dsp_core::Services::CurveFeatureDetector::detectFeatures(*ltf);
 
     // All inflection points should be in mandatory anchors
-    for (int inflectionIdx : features.inflectionPoints) {
+    for (int const inflectionIdx : features.inflectionPoints) {
         auto it = std::find(features.mandatoryAnchors.begin(), features.mandatoryAnchors.end(), inflectionIdx);
         EXPECT_NE(it, features.mandatoryAnchors.end())
             << "Inflection point at index " << inflectionIdx << " should be in mandatory anchors";
@@ -167,7 +167,7 @@ TEST_F(CurveFeatureDetectorTest, HandlesConstantCurve) {
 TEST_F(CurveFeatureDetectorTest, HandlesStepFunction) {
     // Step function at x=0
     for (int i = 0; i < 256; ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         ltf->setBaseLayerValue(i, x < 0.0 ? -0.5 : 0.5);
     }
 
@@ -201,7 +201,7 @@ TEST_F(CurveFeatureDetectorTest, SecondDerivativeDetectsInflection) {
 
     // Inflection should be near center (index 128)
     if (!features.inflectionPoints.empty()) {
-        int inflectionIdx = features.inflectionPoints[0];
+        int const inflectionIdx = features.inflectionPoints[0];
         EXPECT_NEAR(inflectionIdx, 128, 10) << "Inflection of x³ should be near center";
     }
 }
@@ -217,7 +217,7 @@ TEST_F(CurveFeatureDetectorTest, SecondDerivativeDetectsInflection) {
 TEST_F(CurveFeatureDetectorTest, SignificanceFilter_NoisyScribble_FiltersMinorBumps) {
     // Create curve: identity + many tiny bumps + 3 major peaks
     for (int i = 0; i < 256; ++i) {
-        double x = ltf->normalizeIndex(i);
+        double const x = ltf->normalizeIndex(i);
         double y = x; // Base identity
 
         // Add 50 tiny bumps (±0.002 amplitude = 0.1% of vertical range)
@@ -302,7 +302,7 @@ class ExactExtremaPositioningTest : public ::testing::Test {
     std::vector<double> getExtremaPositions(const dsp_core::Services::CurveFeatureDetector::FeatureResult& features) {
         std::vector<double> positions;
         positions.reserve(features.localExtrema.size());
-        for (int idx : features.localExtrema) {
+        for (int const idx : features.localExtrema) {
             positions.push_back(ltf->normalizeIndex(idx));
         }
         std::sort(positions.begin(), positions.end());
@@ -328,8 +328,8 @@ class ExactExtremaPositioningTest : public ::testing::Test {
 TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
     // Create Harmonic 3: sin(3*asin(x)) = Chebyshev T_3
     for (int i = 0; i < 16384; ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        double const x = ltf->normalizeIndex(i);
+        double const y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -366,8 +366,8 @@ TEST_F(ExactExtremaPositioningTest, Harmonic3_ExactExtremaAt_PlusMinusHalf) {
 TEST_F(ExactExtremaPositioningTest, Harmonic5_ExactExtremaPositions) {
     // Create Harmonic 5
     for (int i = 0; i < 16384; ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = std::sin(5.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        double const x = ltf->normalizeIndex(i);
+        double const y = std::sin(5.0 * std::asin(std::clamp(x, -1.0, 1.0)));
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -410,8 +410,8 @@ TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
 
     // Create downward-facing parabola with vertex at (0.3, 0.5)
     for (int i = 0; i < 16384; ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = -(x - vertexX) * (x - vertexX) + vertexY;
+        double const x = ltf->normalizeIndex(i);
+        double const y = -(x - vertexX) * (x - vertexX) + vertexY;
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -441,8 +441,8 @@ TEST_F(ExactExtremaPositioningTest, Parabola_ExtremumAtExactVertex) {
 TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
     // Create Harmonic 40
     for (int i = 0; i < 16384; ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = std::sin(40.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        double const x = ltf->normalizeIndex(i);
+        double const y = std::sin(40.0 * std::asin(std::clamp(x, -1.0, 1.0)));
         ltf->setBaseLayerValue(i, y);
     }
 
@@ -468,7 +468,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
     // Verify ALL 39 extrema are within tolerance
     int numWithinTolerance = 0;
     for (size_t i = 0; i < expected.size(); ++i) {
-        double error = std::abs(positions[i] - expected[i]);
+        double const error = std::abs(positions[i] - expected[i]);
         if (error < 1e-4) {
             numWithinTolerance++;
         }
@@ -478,7 +478,7 @@ TEST_F(ExactExtremaPositioningTest, Harmonic40_AllExtremaAtExactPositions) {
     }
 
     // Summary metric: what percentage are exact?
-    double accuracy = 100.0 * static_cast<double>(numWithinTolerance) / static_cast<double>(expected.size());
+    double const accuracy = 100.0 * static_cast<double>(numWithinTolerance) / static_cast<double>(expected.size());
     std::cout << "Harmonic 40 extrema accuracy: " << accuracy << "% within 0.01% tolerance\n";
     std::cout << "Exact: " << numWithinTolerance << "/" << expected.size() << "\n";
 }
@@ -501,8 +501,8 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
     // Test with COARSE resolution
     auto ltfCoarse = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
     for (int i = 0; i < 256; ++i) {
-        double x = ltfCoarse->normalizeIndex(i);
-        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        double const x = ltfCoarse->normalizeIndex(i);
+        double const y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
         ltfCoarse->setBaseLayerValue(i, y);
     }
 
@@ -511,7 +511,7 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
     // Expected extrema at x = ±0.5
     std::vector<double> positionsCoarse;
     positionsCoarse.reserve(featuresCoarse.localExtrema.size());
-    for (int idx : featuresCoarse.localExtrema) {
+    for (int const idx : featuresCoarse.localExtrema) {
         positionsCoarse.push_back(ltfCoarse->normalizeIndex(idx));
     }
     std::sort(positionsCoarse.begin(), positionsCoarse.end());
@@ -525,8 +525,8 @@ TEST_F(ExactExtremaPositioningTest, DiscretizationError_DemonstrateIssue) {
     // Test with FINE resolution (production)
     // Create Harmonic 3 for fine resolution test
     for (int i = 0; i < 16384; ++i) {
-        double x = ltf->normalizeIndex(i);
-        double y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
+        double const x = ltf->normalizeIndex(i);
+        double const y = std::sin(3.0 * std::asin(std::clamp(x, -1.0, 1.0)));
         ltf->setBaseLayerValue(i, y);
     }
 
