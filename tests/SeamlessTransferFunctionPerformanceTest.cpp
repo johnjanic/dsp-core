@@ -69,7 +69,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
         std::vector<double> samples(tc.expectedCrossfadeSamples + 100);
         for (auto& s : samples) s = 0.5;
 
-        const std::array<double const*, 1> channelPointers = {samples.data()};
+        std::array<double*, 1> channelPointers = {samples.data()};
         juce::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
         stf->processBuffer(buffer);
 
@@ -108,7 +108,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_TradeoffAnalys
 
     std::vector<double> samples(expectedCrossfadeSamples);
     for (auto& s : samples) s = 0.0;
-    const std::array<double const*, 1> channelPointers = {samples.data()};
+    std::array<double*, 1> channelPointers = {samples.data()};
     juce::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
     stf->processBuffer(buffer);
 
@@ -154,7 +154,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     // Process audio block (this triggers LUT swap if ready)
     std::array<double, 512> samples{};
     for (double & sample : samples) sample = 0.5;
-    const std::array<double const*, 1> channelPointers = {samples.data()};
+    std::array<double*, 1> channelPointers = {samples.data()};
     juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     stf->processBuffer(buffer);
 
@@ -257,7 +257,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_WorkerThreadPriority
 
     // Process audio simultaneously
     std::array<double, 512> samples{};
-    const std::array<double const*, 1> channelPointers = {samples.data()};
+    std::array<double*, 1> channelPointers = {samples.data()};
     juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     for (int i = 0; i < 100; ++i) {
         for (double & sample : samples) sample = 0.5;
@@ -294,7 +294,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
 
     // Heavy editing load (should not accumulate memory)
     std::array<double, 512> samples{};
-    const std::array<double const*, 1> channelPointers = {samples.data()};
+    std::array<double*, 1> channelPointers = {samples.data()};
     juce::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
     for (int i = 0; i < 1000; ++i) {
         editingModel.setCoefficient(1, 0.5 + i * 0.0001);
