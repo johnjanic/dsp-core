@@ -209,4 +209,80 @@ void SeamlessTransferFunction::setVisualizerCallback(std::function<void()> callb
     }
 }
 
+void SeamlessTransferFunction::renderLUTImmediate() {
+    // VERIFY: Called on message thread
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+
+    // Create temporary LayeredTransferFunction for rendering (matches worker thread pattern)
+    LayeredTransferFunction tempLTF(TABLE_SIZE, MIN_VALUE, MAX_VALUE);
+
+    // Copy current editing model state to temporary LTF
+    const auto& model = pimpl->editingModel;
+
+    // Copy base layer
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        tempLTF.setBaseLayerValue(i, model.getBaseLayerValue(i));
+    }
+
+    // Copy harmonic coefficients
+    tempLTF.setHarmonicCoefficients(model.getHarmonicCoefficients());
+
+    // Copy spline anchors
+    tempLTF.setSplineAnchors(model.getSplineLayer().getAnchors());
+
+    // Copy modes and settings
+    tempLTF.setExtrapolationMode(model.getExtrapolationMode());
+    tempLTF.setRenderingMode(model.getRenderingMode());
+
+    // Compute normalization scalar based on rendering mode
+    // Paint and Spline modes: scalar = 1.0 (no normalization needed)
+    // Harmonic mode: compute from composite curve
+    double normScalar = 1.0;
+    if (model.getRenderingMode() == RenderingMode::Harmonic && model.isNormalizationEnabled()) {
+        // Compute normalization scalar by scanning composite values
+        const auto& coeffs = model.getHarmonicCoefficients();
+        double maxAbsValue = 0.0;
+
+        for (int i = 0; i < TABLE_SIZE; ++i) {
+            const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+            const double baseValue = model.getBaseLayerValue(i);
+            const std::vector<double> coeffsVec(coeffs.begin(), coeffs.end());
+            const double harmonicValue = model.getHarmonicLayer().evaluate(x, coeffsVec, TABLE_SIZE);
+            const double unnormalized = coeffs[0] * baseValue + harmonicValue;
+            maxAbsValue = std::max(maxAbsValue, std::abs(unnormalized));
+        }
+
+        constexpr double epsilon = 1e-12;
+        normScalar = (maxAbsValue > epsilon) ? (1.0 / maxAbsValue) : 1.0;
+    }
+
+    // Get the worker target buffer (where we'll write the LUT)
+    const int targetIdx = pimpl->audioEngine.getWorkerTargetIndexReference().load(std::memory_order_relaxed);
+    LUTBuffer* outputBuffer = &pimpl->audioEngine.getLUTBuffers()[targetIdx];
+
+    // Render 16K samples to the output buffer
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        const double x = MIN_VALUE + (i / static_cast<double>(TABLE_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+        outputBuffer->data[i] = tempLTF.evaluateForRendering(x, normScalar);
+    }
+
+    // Set metadata
+    outputBuffer->version = model.getVersion();
+    outputBuffer->extrapolationMode = model.getExtrapolationMode();
+
+    // Signal audio thread that new LUT is ready (using release to ensure LUT writes are visible)
+    pimpl->audioEngine.getNewLUTReadyFlag().store(true, std::memory_order_release);
+
+    // Also update the visualizer LUT to match (so UI is consistent)
+    for (int i = 0; i < VISUALIZER_LUT_SIZE; ++i) {
+        const double x = MIN_VALUE + (i / static_cast<double>(VISUALIZER_LUT_SIZE - 1)) * (MAX_VALUE - MIN_VALUE);
+        pimpl->visualizerLUT[i] = tempLTF.evaluateForRendering(x, normScalar);
+    }
+
+    // Invoke visualizer callback if set (so UI updates)
+    if (pimpl->visualizerCallback) {
+        pimpl->visualizerCallback();
+    }
+}
+
 } // namespace dsp_core

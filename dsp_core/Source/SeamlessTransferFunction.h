@@ -170,6 +170,30 @@ class SeamlessTransferFunction {
     void stopSeamlessUpdates();
 
     /**
+     * Render LUT immediately and synchronously (message thread only)
+     *
+     * Directly renders the current editing model state to the audio thread's
+     * LUT buffer WITHOUT using the worker thread queue. This is intended for
+     * state restoration scenarios where:
+     *   - Audio playback is assumed to not be active yet
+     *   - We need the audio LUT to reflect the restored state immediately
+     *   - The normal 20Hz timer-based update path would be too slow
+     *
+     * IMPORTANT: This bypasses the seamless crossfade system. Use only during
+     * state restoration, not during interactive editing.
+     *
+     * Thread Safety:
+     *   - MUST be called from message thread
+     *   - Safe to call even if seamless updates haven't started yet
+     *   - The next processBlock() will use the newly rendered LUT
+     *
+     * Typical Usage:
+     *   transferFunction.getEditingModel().fromValueTree(savedState);
+     *   transferFunction.renderLUTImmediate();  // Audio LUT now matches restored state
+     */
+    void renderLUTImmediate();
+
+    /**
      * Notify that editing model has changed (message thread)
      *
      * Call this when the editing model's version has incremented to trigger
