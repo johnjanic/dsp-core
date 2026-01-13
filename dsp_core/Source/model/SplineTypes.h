@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <juce_core/juce_core.h>
-#include "Services/CurveFeatureDetector.h"
+#include "../services/CurveFeatureDetector.h"
 
 namespace dsp_core {
 

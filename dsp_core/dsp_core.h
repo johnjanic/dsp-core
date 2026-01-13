@@ -28,30 +28,42 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_dsp/juce_dsp.h>
 
-#include "Source/AudioHistoryBuffer.h"
+// Structures
+#include "Source/structures/AudioHistoryBuffer.h"
+#include "Source/structures/AudioInputBuffer.h"
+
+// Pipeline
+#include "Source/pipeline/AudioProcessingStage.h"
+#include "Source/pipeline/AudioPipeline.h"
+#include "Source/pipeline/AudioPipelineBuilder.h"
+#include "Source/pipeline/GainStage.h"
+#include "Source/pipeline/DryWetMixStage.h"
+#include "Source/pipeline/WaveshapingStage.h"
+#include "Source/pipeline/OversamplingWrapper.h"
+#include "Source/pipeline/DCBlockingFilter.h"
+#include "Source/pipeline/AudioInputWriter.h"
+#include "Source/pipeline/InputPeakTracker.h"
+#include "Source/pipeline/StageHandles.h"
+
+// Model
+#include "Source/model/SplineTypes.h"
+#include "Source/model/TransferFunction.h"
+#include "Source/model/HarmonicLayer.h"
+#include "Source/model/SplineLayer.h"
+#include "Source/model/LayeredTransferFunction.h"
+
+// Engine
+#include "Source/engine/SeamlessTransferFunction.h"
+#include "Source/engine/SeamlessTransferFunctionImpl.h"
+
+// Services
+#include "Source/services/AdaptiveToleranceCalculator.h"
+#include "Source/services/CoordinateSnapper.h"
+#include "Source/services/CurveFeatureDetector.h"
+#include "Source/services/SplineFitter.h"
+#include "Source/services/SplineEvaluator.h"
+#include "Source/services/SymmetryAnalyzer.h"
+#include "Source/services/TransferFunctionOperations.h"
+
+// Utilities (remaining in Source/)
 #include "Source/ExpressionEvaluator.h"
-#include "Source/HarmonicLayer.h"
-#include "Source/LayeredTransferFunction.h"
-#include "Source/SeamlessTransferFunction.h"
-#include "Source/SeamlessTransferFunctionImpl.h"
-#include "Source/SplineLayer.h"
-#include "Source/SplineTypes.h"
-#include "Source/TransferFunction.h"
-#include "Source/Services/AdaptiveToleranceCalculator.h"
-#include "Source/Services/CoordinateSnapper.h"
-#include "Source/Services/CurveFeatureDetector.h"
-#include "Source/Services/SplineFitter.h"
-#include "Source/Services/SplineEvaluator.h"
-#include "Source/Services/SymmetryAnalyzer.h"
-#include "Source/Services/TransferFunctionOperations.h"
-#include "Source/audio_pipeline/AudioProcessingStage.h"
-#include "Source/audio_pipeline/AudioPipeline.h"
-#include "Source/audio_pipeline/GainStage.h"
-#include "Source/audio_pipeline/DryWetMixStage.h"
-#include "Source/audio_pipeline/WaveshapingStage.h"
-#include "Source/audio_pipeline/OversamplingWrapper.h"
-#include "Source/audio_pipeline/DCBlockingFilter.h"
-#include "Source/audio_pipeline/AudioInputBuffer.h"
-#include "Source/audio_pipeline/AudioInputWriter.h"
-#include "Source/audio_pipeline/StageHandles.h"
-#include "Source/audio_pipeline/AudioPipelineBuilder.h"

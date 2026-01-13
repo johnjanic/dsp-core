@@ -1,5 +1,5 @@
 #include "SplineLayer.h"
-#include "Services/SplineEvaluator.h"
+#include "../services/SplineEvaluator.h"
 
 namespace dsp_core {
 

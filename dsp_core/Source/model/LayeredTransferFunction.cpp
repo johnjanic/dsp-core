@@ -1,5 +1,5 @@
 #include "LayeredTransferFunction.h"
-#include "Services/SplineEvaluator.h"
+#include "../services/SplineEvaluator.h"
 #include <algorithm>
 #include <cmath>
 #include <juce_core/juce_core.h>
