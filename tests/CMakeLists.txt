@@ -614,3 +614,153 @@ endif()
 
 add_test(NAME AudioPipelineBuilderTests COMMAND audio_pipeline_builder_tests)
 
+# Decibels tests
+add_executable(decibels_tests
+    DecibelsTest.cpp
+)
+
+target_include_directories(decibels_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(decibels_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(decibels_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(decibels_tests)
+endif()
+
+add_test(NAME DecibelsTests COMMAND decibels_tests)
+
+# SmoothedValue tests
+add_executable(smoothed_value_tests
+    SmoothedValueTest.cpp
+)
+
+target_include_directories(smoothed_value_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(smoothed_value_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(smoothed_value_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(smoothed_value_tests)
+endif()
+
+add_test(NAME SmoothedValueTests COMMAND smoothed_value_tests)
+
+# IIRFilter tests
+add_executable(iir_filter_tests
+    IIRFilterTest.cpp
+)
+
+target_include_directories(iir_filter_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(iir_filter_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(iir_filter_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(iir_filter_tests)
+endif()
+
+add_test(NAME IIRFilterTests COMMAND iir_filter_tests)
+
+# Gain tests
+add_executable(gain_tests
+    GainTest.cpp
+)
+
+target_include_directories(gain_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(gain_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(gain_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(gain_tests)
+endif()
+
+add_test(NAME GainTests COMMAND gain_tests)
+
+# Oversampling tests
+add_executable(oversampling_tests
+    OversamplingTest.cpp
+)
+
+target_include_directories(oversampling_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(oversampling_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(oversampling_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(oversampling_tests)
+endif()
+
+add_test(NAME OversamplingTests COMMAND oversampling_tests)
+
+# Oversampling A/B tests
+add_executable(oversampling_ab_tests
+    OversamplingABTest.cpp
+)
+
+target_include_directories(oversampling_ab_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(oversampling_ab_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(oversampling_ab_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(oversampling_ab_tests)
+endif()
+
+add_test(NAME OversamplingABTests COMMAND oversampling_ab_tests)
+

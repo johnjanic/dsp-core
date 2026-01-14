@@ -1,5 +1,5 @@
 #include "SymmetryAnalyzer.h"
-#include "../LayeredTransferFunction.h"
+#include "../model/LayeredTransferFunction.h"
 #include <cmath>
 #include <numeric>
 #include <algorithm>

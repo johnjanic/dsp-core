@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
-#include "AudioInputBuffer.h"
+#include "../structures/AudioInputBuffer.h"
 
 namespace dsp_core::audio_pipeline {
 

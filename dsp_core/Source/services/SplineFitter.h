@@ -1,6 +1,6 @@
 #pragma once
-#include "../SplineTypes.h"
-#include "../LayeredTransferFunction.h"
+#include "../model/SplineTypes.h"
+#include "../model/LayeredTransferFunction.h"
 
 namespace dsp_core::Services {
 

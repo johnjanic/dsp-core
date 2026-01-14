@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LayeredTransferFunction.h"
+#include "../model/LayeredTransferFunction.h"
 #include <array>
 #include <functional>
 #include <memory>

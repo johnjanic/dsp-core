@@ -28,6 +28,13 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_dsp/juce_dsp.h>
 
+// Primitives
+#include "Source/primitives/Decibels.h"
+#include "Source/primitives/SmoothedValue.h"
+#include "Source/primitives/IIRFilter.h"
+#include "Source/primitives/Gain.h"
+#include "Source/primitives/Oversampling.h"
+
 // Structures
 #include "Source/structures/AudioHistoryBuffer.h"
 #include "Source/structures/AudioInputBuffer.h"

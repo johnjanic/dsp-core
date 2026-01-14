@@ -1,5 +1,5 @@
 #pragma once
-#include "../LayeredTransferFunction.h"
+#include "../model/LayeredTransferFunction.h"
 
 namespace dsp_core::Services {
 

@@ -1,5 +1,5 @@
 #include "CurveFeatureDetector.h"
-#include "../LayeredTransferFunction.h"
+#include "../model/LayeredTransferFunction.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

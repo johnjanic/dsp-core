@@ -1,5 +1,5 @@
 #pragma once
-#include "../SplineTypes.h"
+#include "../model/SplineTypes.h"
 
 namespace dsp_core::Services {
 

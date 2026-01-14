@@ -1,8 +1,8 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
-#include "../SeamlessTransferFunction.h"
-#include "../LayeredTransferFunction.h"
+#include "../engine/SeamlessTransferFunction.h"
+#include "../model/LayeredTransferFunction.h"
 
 namespace dsp_core::audio_pipeline {
 
