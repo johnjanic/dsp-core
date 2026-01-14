@@ -1,32 +1,11 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
+#include "../primitives/IIRFilter.h"
 #include <atomic>
-#include <cmath>
 #include <vector>
 
 namespace dsp_core::audio_pipeline {
-
-/**
- * Simple first-order highpass filter for DC blocking.
- * Implements: y[n] = b0*x[n] + b1*x[n-1] - a1*y[n-1]
- */
-struct FirstOrderHighpass {
-    double b0 = 1.0, b1 = -1.0, a1 = 0.0;
-    double x1 = 0.0, y1 = 0.0;
-
-    double processSample(double input) {
-        double output = b0 * input + b1 * x1 - a1 * y1;
-        x1 = input;
-        y1 = output;
-        return output;
-    }
-
-    void reset() {
-        x1 = 0.0;
-        y1 = 0.0;
-    }
-};
 
 /**
  * DC blocking filter for removing DC offset from audio signals.
@@ -96,7 +75,7 @@ class DCBlockingFilter : public AudioProcessingStage {
     std::atomic<double> cutoffFrequency_{5.0}; // Hz
 
     // Per-channel IIR filters (audio thread only)
-    std::vector<FirstOrderHighpass> filters_;
+    std::vector<dsp::IIRFilter<double>> filters_;
     double sampleRate_ = 48000.0;
 
     // Update all filter coefficients (call after sampleRate or cutoff changes)
