@@ -2,7 +2,7 @@
 
 #include "AudioProcessingStage.h"
 #include "AudioPipeline.h"
-#include <juce_dsp/juce_dsp.h>
+#include "../primitives/Oversampling.h"
 #include <array>
 
 namespace dsp_core::audio_pipeline {
@@ -24,9 +24,8 @@ namespace dsp_core::audio_pipeline {
  *
  *   mainPipeline.addStage(std::move(wrapped));
  *
- * NOTE: This class still uses juce::dsp::Oversampling internally for the
- * oversampling algorithm. The public API uses platform::AudioBuffer.
- * Full migration of the DSP internals is planned for a future step.
+ * Uses dsp::Oversampling with half-band polyphase IIR filters for high-quality
+ * oversampling with minimal aliasing artifacts.
  */
 class OversamplingWrapper : public AudioProcessingStage {
   public:
@@ -65,11 +64,8 @@ class OversamplingWrapper : public AudioProcessingStage {
     std::unique_ptr<AudioProcessingStage> wrappedStage_;
 
     // Pre-allocated oversamplers (1x, 2x, 4x, 8x, 16x)
-    // NOTE: Still uses JUCE DSP for oversampling algorithm
-    std::array<std::unique_ptr<juce::dsp::Oversampling<double>>, 5> oversamplers_;
-
-    // Pre-allocated channel pointers array (avoid std::vector allocation per process call)
-    std::array<double*, 8> channelPointers_; // Max 8 channels (7.1 surround)
+    // Using dsp::Oversampling with half-band polyphase IIR filters
+    std::array<std::unique_ptr<dsp::Oversampling<double>>, 5> oversamplers_;
 
     int currentOrder_ = 0; // 1x default (no oversampling)
     double sampleRate_ = 44100.0;
