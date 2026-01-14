@@ -189,7 +189,7 @@ class SeamlessTransferFunction {
      *   - The next processBlock() will use the newly rendered LUT
      *
      * Typical Usage:
-     *   transferFunction.getEditingModel().fromValueTree(savedState);
+     *   transferFunction.getEditingModel().fromPropertyTree(savedState);
      *   transferFunction.renderLUTImmediate();  // Audio LUT now matches restored state
      */
     void renderLUTImmediate();

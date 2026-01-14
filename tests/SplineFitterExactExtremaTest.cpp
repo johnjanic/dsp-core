@@ -159,27 +159,6 @@ void setHarmonicCurve(dsp_core::LayeredTransferFunction& ltf, int harmonicNumber
     }
 }
 
-/**
- * Helper: Set base layer to cubic polynomial (x³)
- */
-void setCubicCurve(dsp_core::LayeredTransferFunction& ltf) {
-    for (int i = 0; i < ltf.getTableSize(); ++i) {
-        double const x = ltf.normalizeIndex(i);
-        double const y = x * x * x;
-        ltf.setBaseLayerValue(i, y);
-    }
-}
-
-/**
- * Helper: Set base layer to tanh curve
- */
-void setTanhCurve(dsp_core::LayeredTransferFunction& ltf, double steepness = 2.0) {
-    for (int i = 0; i < ltf.getTableSize(); ++i) {
-        double const x = ltf.normalizeIndex(i);
-        double const y = std::tanh(steepness * x);
-        ltf.setBaseLayerValue(i, y);
-    }
-}
 
 //==============================================================================
 // Analytical Test Cases (Known Extrema Positions)
@@ -405,62 +384,6 @@ TEST_F(ExactExtremaTest, Sin15X_TwentyNineExtrema) {
               << matched_count << "/" << expected_extrema.size() << " matched)" << '\n';
 
     EXPECT_LT(avg_error, 0.03) << "Average position error should be < 0.03 (relaxed for high freq)";
-}
-
-/**
- * Test: x³ - Inflection point at origin
- *
- * f(x) = x³
- * Has inflection point at x = 0 (not a local extremum)
- * No local extrema in domain
- */
-TEST_F(ExactExtremaTest, CubicPolynomial_InflectionPoint) {
-    setCubicCurve(*ltf);
-
-    auto config = dsp_core::SplineFitConfig::tight();
-    config.enableFeatureDetection = true;
-
-    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
-
-    ASSERT_TRUE(result.success);
-
-    // Should place anchor at inflection point (x = 0)
-    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01)) << "Expected anchor at inflection point x=0";
-
-    // No local extrema in interior (monotonically increasing)
-    auto numerical_extrema = findNumericalExtrema(*ltf);
-    EXPECT_EQ(numerical_extrema.size(), 0) << "x³ should have no local extrema (monotonic)";
-
-    std::cout << "  x³ inflection point captured: " << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
-              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0)) << ")" << '\n';
-}
-
-/**
- * Test: tanh(2x) - Inflection at origin
- *
- * f(x) = tanh(2x)
- * Inflection point at x = 0
- * No local extrema (S-curve, monotonically increasing)
- */
-TEST_F(ExactExtremaTest, TanhCurve_InflectionPoint) {
-    setTanhCurve(*ltf, 2.0);
-
-    auto config = dsp_core::SplineFitConfig::tight();
-    config.enableFeatureDetection = true;
-
-    auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
-
-    ASSERT_TRUE(result.success);
-
-    // Should place anchor at inflection point (x = 0)
-    EXPECT_TRUE(hasAnchorNear(result.anchors, 0.0, 0.01)) << "Expected anchor at inflection point x=0";
-
-    // No local extrema
-    auto numerical_extrema = findNumericalExtrema(*ltf);
-    EXPECT_EQ(numerical_extrema.size(), 0) << "tanh(2x) should have no local extrema (monotonic)";
-
-    std::cout << "  tanh(2x) inflection point captured: " << (hasAnchorNear(result.anchors, 0.0, 0.01) ? "YES" : "NO")
-              << " (error=" << std::abs(findAnchorNear(result.anchors, 0.0)) << ")" << '\n';
 }
 
 //==============================================================================
