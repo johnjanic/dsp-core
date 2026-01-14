@@ -1,86 +1,29 @@
-# DSP-Core JUCE module
+# DSP-Core Module
+# Platform-independent DSP primitives and audio pipeline.
+# As of Phase 2 completion, this module has ZERO JUCE dependencies.
 
-# Explicitly tell JUCE where the main header is
-juce_add_module(dsp_core
-    HEADER_FILE "${CMAKE_CURRENT_LIST_DIR}/dsp_core/dsp_core.h"
-    DEPENDS juce::juce_core
-            juce::juce_data_structures
-            juce::juce_audio_processors
-            juce::juce_dsp
-)
-
-# Add platform module dependency for AudioBuffer and other platform abstractions
-target_link_libraries(dsp_core INTERFACE platform::platform)
-
-# Add platform include directory explicitly for header compilation
-# (INTERFACE link propagates to consumers, but headers need the include path during compilation)
-target_include_directories(dsp_core INTERFACE "${CMAKE_SOURCE_DIR}/modules/plugin-platform")
-
-# Add exprtk include path (header-only library managed by CPM in root CMakeLists.txt)
-target_include_directories(dsp_core INTERFACE "${CMAKE_SOURCE_DIR}/libs/exprtk")
-
-target_sources(dsp_core PRIVATE
+add_library(dsp_core STATIC
+    # Unity build - dsp_core.cpp includes all implementation files
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/dsp_core.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/dsp_core.h"
-    # Primitives
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/primitives/MathUtils.h"
-    # Structures
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/structures/AudioHistoryBuffer.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/structures/AudioHistoryBuffer.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/structures/AudioInputBuffer.h"
-    # Pipeline
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioProcessingStage.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioPipeline.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioPipeline.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioPipelineBuilder.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioPipelineBuilder.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/GainStage.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/GainStage.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/DryWetMixStage.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/DryWetMixStage.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/WaveshapingStage.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/WaveshapingStage.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/OversamplingWrapper.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/OversamplingWrapper.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/DCBlockingFilter.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/DCBlockingFilter.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/AudioInputWriter.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/InputPeakTracker.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/pipeline/StageHandles.h"
-    # Model
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/SplineTypes.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/TransferFunction.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/TransferFunction.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/HarmonicLayer.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/HarmonicLayer.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/SplineLayer.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/SplineLayer.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/LayeredTransferFunction.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/model/LayeredTransferFunction.cpp"
-    # Engine
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/engine/SeamlessTransferFunction.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/engine/SeamlessTransferFunction.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/engine/SeamlessTransferFunctionImpl.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/engine/SeamlessTransferFunctionImpl.cpp"
-    # Services
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/AdaptiveToleranceCalculator.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/AdaptiveToleranceCalculator.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/CoordinateSnapper.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/CoordinateSnapper.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/CurveFeatureDetector.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/CurveFeatureDetector.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SplineFitter.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SplineFitter.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SplineEvaluator.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SplineEvaluator.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SymmetryAnalyzer.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/SymmetryAnalyzer.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/TransferFunctionOperations.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/services/TransferFunctionOperations.cpp"
-    # Utilities
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/ExpressionEvaluator.h"
-    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/ExpressionEvaluator.cpp"
 )
+add_library(dsp::core ALIAS dsp_core)
+
+# Platform module dependency (provides AudioBuffer, PropertyTree, Timer, Geometry)
+target_link_libraries(dsp_core
+    PUBLIC
+        platform::platform
+)
+
+# Include directories
+target_include_directories(dsp_core
+    PUBLIC
+        "${CMAKE_CURRENT_LIST_DIR}"
+        "${CMAKE_SOURCE_DIR}/modules/plugin-platform"
+        "${CMAKE_SOURCE_DIR}/libs/exprtk"
+)
+
+# C++20 required
+target_compile_features(dsp_core PUBLIC cxx_std_20)
 
 # Add tests subdirectory if testing is enabled
 if(BUILD_TESTING)

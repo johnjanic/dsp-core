@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <atomic>
-#include <juce_core/juce_core.h>
 
 namespace dsp_core {
 

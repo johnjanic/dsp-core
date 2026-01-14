@@ -1,4 +1,5 @@
 #include "HarmonicLayer.h"
+#include <cassert>
 #include <cmath>
 #include <algorithm>
 
@@ -110,28 +111,28 @@ double HarmonicLayer::evaluateChebyshevPolynomial(double x, const std::vector<do
     return x * b_kplus1 - b_kplus2;
 }
 
-juce::ValueTree HarmonicLayer::toValueTree() const {
-    juce::ValueTree vt("HarmonicLayer");
-    vt.setProperty("numHarmonics", numHarmonics, nullptr);
-    vt.setProperty("algorithm", algorithm == Algorithm::Trig ? "trig" : "polynomial", nullptr);
-    return vt;
+platform::PropertyTree HarmonicLayer::toPropertyTree() const {
+    platform::PropertyTree tree("HarmonicLayer");
+    tree.setProperty("numHarmonics", numHarmonics);
+    tree.setProperty("algorithm", algorithm == Algorithm::Trig ? "trig" : "polynomial");
+    return tree;
 }
 
-void HarmonicLayer::fromValueTree(const juce::ValueTree& vt) {
-    if (!vt.isValid() || vt.getType().toString() != "HarmonicLayer") {
+void HarmonicLayer::fromPropertyTree(const platform::PropertyTree& tree) {
+    if (!tree.isValid() || tree.getType() != "HarmonicLayer") {
         return;
     }
 
     // Load numHarmonics (optional - for validation)
-    if (vt.hasProperty("numHarmonics")) {
-        const int loadedNumHarmonics = vt.getProperty("numHarmonics");
+    if (tree.hasProperty("numHarmonics")) {
+        const int loadedNumHarmonics = tree.getProperty<int>("numHarmonics", numHarmonics);
         if (loadedNumHarmonics != numHarmonics) {
-            jassertfalse; // Mismatch in harmonic count
+            assert(false && "Mismatch in harmonic count");
         }
     }
 
     // Load algorithm
-    const juce::String algoStr = vt.getProperty("algorithm", "trig").toString();
+    const std::string algoStr = tree.getProperty<std::string>("algorithm", "trig");
     algorithm = (algoStr == "polynomial") ? Algorithm::Polynomial : Algorithm::Trig;
 
     // Invalidate precomputed data (will be recomputed on next evaluate)

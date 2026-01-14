@@ -42,47 +42,47 @@ double SplineLayer::evaluate(double x) const {
     return Services::SplineEvaluator::evaluate(*ptr, x);
 }
 
-juce::ValueTree SplineLayer::toValueTree() const {
-    juce::ValueTree vt("SplineLayer");
+platform::PropertyTree SplineLayer::toPropertyTree() const {
+    platform::PropertyTree tree("SplineLayer");
 
     auto ptr = std::atomic_load(&anchorsPtr);
     if (ptr && !ptr->empty()) {
-        juce::ValueTree anchorsVT("Anchors");
+        platform::PropertyTree anchorsTree("Anchors");
 
         for (const auto& anchor : *ptr) {
-            juce::ValueTree anchorVT("Anchor");
-            anchorVT.setProperty("x", anchor.x, nullptr);
-            anchorVT.setProperty("y", anchor.y, nullptr);
-            anchorVT.setProperty("tangent", anchor.tangent, nullptr);
-            anchorVT.setProperty("hasCustomTangent", anchor.hasCustomTangent, nullptr);
-            anchorsVT.addChild(anchorVT, -1, nullptr);
+            platform::PropertyTree anchorTree("Anchor");
+            anchorTree.setProperty("x", anchor.x);
+            anchorTree.setProperty("y", anchor.y);
+            anchorTree.setProperty("tangent", anchor.tangent);
+            anchorTree.setProperty("hasCustomTangent", anchor.hasCustomTangent);
+            anchorsTree.addChild(anchorTree);
         }
 
-        vt.addChild(anchorsVT, -1, nullptr);
+        tree.addChild(anchorsTree);
     }
 
-    return vt;
+    return tree;
 }
 
-void SplineLayer::fromValueTree(const juce::ValueTree& vt) {
-    if (!vt.isValid() || vt.getType().toString() != "SplineLayer") {
+void SplineLayer::fromPropertyTree(const platform::PropertyTree& tree) {
+    if (!tree.isValid() || tree.getType() != "SplineLayer") {
         return;
     }
 
-    auto anchorsVT = vt.getChildWithName("Anchors");
-    if (!anchorsVT.isValid()) {
+    const auto* anchorsTree = tree.getChildWithType("Anchors");
+    if (anchorsTree == nullptr) {
         return;
     }
 
     std::vector<SplineAnchor> anchors;
-    for (int i = 0; i < anchorsVT.getNumChildren(); ++i) {
-        auto anchorVT = anchorsVT.getChild(i);
-        if (anchorVT.getType().toString() == "Anchor") {
+    for (int i = 0; i < anchorsTree->getNumChildren(); ++i) {
+        const auto& anchorTree = anchorsTree->getChild(i);
+        if (anchorTree.getType() == "Anchor") {
             SplineAnchor anchor;
-            anchor.x = static_cast<double>(anchorVT.getProperty("x", 0.0));
-            anchor.y = static_cast<double>(anchorVT.getProperty("y", 0.0));
-            anchor.tangent = static_cast<double>(anchorVT.getProperty("tangent", 0.0));
-            anchor.hasCustomTangent = static_cast<bool>(anchorVT.getProperty("hasCustomTangent", false));
+            anchor.x = anchorTree.getProperty<double>("x", 0.0);
+            anchor.y = anchorTree.getProperty<double>("y", 0.0);
+            anchor.tangent = anchorTree.getProperty<double>("tangent", 0.0);
+            anchor.hasCustomTangent = anchorTree.getProperty<bool>("hasCustomTangent", false);
             anchors.push_back(anchor);
         }
     }

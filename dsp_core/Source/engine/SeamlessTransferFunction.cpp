@@ -1,6 +1,7 @@
 #include "SeamlessTransferFunction.h"
 #include "SeamlessTransferFunctionImpl.h"
-#include <juce_core/juce_core.h>
+#include <platform/MessageThread.h>
+#include <cassert>
 
 namespace dsp_core {
 
@@ -12,12 +13,12 @@ namespace dsp_core {
  *   - audioEngine: AudioEngine (audio thread)
  *   - renderer: LUTRendererThread (worker thread, DSP LUT only)
  *   - lutRenderTimer: LUTRenderTimer (20Hz, enqueues DSP render jobs)
- *   - visualizerTimer: VisualizerUpdateTimer (60Hz, direct model reads)
+ *   - visualizerTimer: VisualizerUpdateTimer (120Hz, direct model reads)
  *   - visualizerLUT: UI-owned LUT buffer (message thread only)
  *   - visualizerCallback: Callback for visualizer repaint (message thread)
  *
  * Two-Timer Architecture:
- *   - VisualizerUpdateTimer (60Hz): Samples model directly, updates visualizer
+ *   - VisualizerUpdateTimer (120Hz): Samples model directly, updates visualizer
  *   - LUTRenderTimer (20Hz): Enqueues render jobs, guaranteed final delivery
  *
  * Lifecycle:
@@ -54,7 +55,7 @@ class SeamlessTransferFunction::Impl {
 
     // Two separate timers for decoupled update rates
     std::unique_ptr<LUTRenderTimer> lutRenderTimer;        // 20Hz, DSP LUT (guaranteed delivery)
-    std::unique_ptr<VisualizerUpdateTimer> visualizerTimer; // 60Hz, direct model reads
+    std::unique_ptr<VisualizerUpdateTimer> visualizerTimer; // 120Hz, direct model reads
 
     // Visualizer state (message thread only)
     // NOTE: Visualizer shows the editing model directly (may be slightly ahead
@@ -132,10 +133,10 @@ void SeamlessTransferFunction::releaseResources() {
 
 void SeamlessTransferFunction::startSeamlessUpdates() {
     // VERIFY: Called on message thread
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    assert(platform::MessageThread::isThisTheMessageThread());
 
     // VERIFY: Not already started
-    jassert(pimpl->renderer == nullptr && pimpl->lutRenderTimer == nullptr);
+    assert(pimpl->renderer == nullptr && pimpl->lutRenderTimer == nullptr);
 
     // Create worker thread (DSP LUT only, no visualizer callback)
     pimpl->renderer = std::make_unique<LUTRendererThread>(
@@ -147,16 +148,16 @@ void SeamlessTransferFunction::startSeamlessUpdates() {
     pimpl->renderer->setLUTBuffersPointer(pimpl->audioEngine.getLUTBuffers());
 
     // Start worker thread
-    pimpl->renderer->startThread(juce::Thread::Priority::normal);
+    pimpl->renderer->startThread();
 
     // Create LUT render timer (20Hz, guaranteed delivery via two-version tracking)
     pimpl->lutRenderTimer = std::make_unique<LUTRenderTimer>(pimpl->editingModel, *pimpl->renderer);
     // Timer starts automatically in constructor at 20Hz
 
-    // Create visualizer timer (60Hz, direct model reads)
+    // Create visualizer timer (120Hz, direct model reads)
     pimpl->visualizerTimer = std::make_unique<VisualizerUpdateTimer>(pimpl->editingModel);
     pimpl->visualizerTimer->setVisualizerTarget(&pimpl->visualizerLUT, pimpl->visualizerCallback);
-    // Timer starts automatically in constructor at 60Hz
+    // Timer starts automatically in constructor at 120Hz
 
     // Trigger initial render for both (ensures correct state immediately)
     pimpl->lutRenderTimer->forceRender();
@@ -164,7 +165,7 @@ void SeamlessTransferFunction::startSeamlessUpdates() {
 }
 
 void SeamlessTransferFunction::stopSeamlessUpdates() {
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    assert(platform::MessageThread::isThisTheMessageThread());
 
     // Stop timers first (no more jobs enqueued, no more visualizer updates)
     if (pimpl->visualizerTimer) {
@@ -186,12 +187,12 @@ void SeamlessTransferFunction::stopSeamlessUpdates() {
 
 void SeamlessTransferFunction::notifyEditingModelChanged() {
     // DEPRECATED: This method is no longer needed.
-    // The LUTRenderTimer (20Hz) and VisualizerUpdateTimer (60Hz) now run
+    // The LUTRenderTimer (20Hz) and VisualizerUpdateTimer (120Hz) now run
     // independently and detect version changes automatically.
     //
     // This method is kept as a no-op for backwards compatibility.
     // It can be removed once all callers are updated.
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    assert(platform::MessageThread::isThisTheMessageThread());
 }
 
 const std::array<double, VISUALIZER_LUT_SIZE>&
@@ -200,7 +201,7 @@ SeamlessTransferFunction::getVisualizerLUT() const {
 }
 
 void SeamlessTransferFunction::setVisualizerCallback(std::function<void()> callback) {
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    assert(platform::MessageThread::isThisTheMessageThread());
     pimpl->visualizerCallback = callback;
 
     // Route callback to visualizer timer if it exists
@@ -211,7 +212,7 @@ void SeamlessTransferFunction::setVisualizerCallback(std::function<void()> callb
 
 void SeamlessTransferFunction::renderLUTImmediate() {
     // VERIFY: Called on message thread
-    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    assert(platform::MessageThread::isThisTheMessageThread());
 
     // Create temporary LayeredTransferFunction for rendering (matches worker thread pattern)
     LayeredTransferFunction tempLTF(TABLE_SIZE, MIN_VALUE, MAX_VALUE);

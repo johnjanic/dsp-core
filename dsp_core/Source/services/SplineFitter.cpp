@@ -4,6 +4,7 @@
 #include "AdaptiveToleranceCalculator.h"
 #include "SymmetryAnalyzer.h"
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 namespace dsp_core::Services {
@@ -210,7 +211,7 @@ void SplineFitter::computeTangents(std::vector<SplineAnchor>& anchors, const Spl
         computeFiniteDifferenceTangents(anchors, config);
         break;
     default:
-        jassertfalse;
+        assert(false && "Unknown tangent algorithm");
         computePCHIPTangentsImpl(anchors, config);
         break;
     }

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <vector>
 
 namespace dsp_core_test {

@@ -1,4 +1,5 @@
 #include <dsp_core/dsp_core.h>
+#include <platform/PropertyTree.h>
 #include <gtest/gtest.h>
 #include <thread>
 #include <atomic>
@@ -133,10 +134,10 @@ TEST_F(SplineLayerTest, SerializationRoundTrip) {
     std::vector<SplineAnchor> const anchors = {{-1.0, -1.0, true, 0.5}, {0.0, 0.5, true, 1.0}, {1.0, 1.0, true, -0.5}};
     layer1.setAnchors(anchors);
 
-    juce::ValueTree const vt = layer1.toValueTree();
+    platform::PropertyTree const tree = layer1.toPropertyTree();
 
     SplineLayer layer2;
-    layer2.fromValueTree(vt);
+    layer2.fromPropertyTree(tree);
 
     EXPECT_EQ(layer2.getAnchors().size(), 3);
     EXPECT_NEAR(layer2.evaluate(0.0), layer1.evaluate(0.0), kTolerance);
@@ -147,10 +148,10 @@ TEST_F(SplineLayerTest, SerializationPreservesAnchors) {
     SplineLayer layer1;
     layer1.setAnchors(threePtAnchors);
 
-    juce::ValueTree const vt = layer1.toValueTree();
+    platform::PropertyTree const tree = layer1.toPropertyTree();
 
     SplineLayer layer2;
-    layer2.fromValueTree(vt);
+    layer2.fromPropertyTree(tree);
 
     auto anchors1 = layer1.getAnchors();
     auto anchors2 = layer2.getAnchors();
@@ -161,6 +162,30 @@ TEST_F(SplineLayerTest, SerializationPreservesAnchors) {
         EXPECT_NEAR(anchors1[i].y, anchors2[i].y, 1e-9);
         EXPECT_NEAR(anchors1[i].tangent, anchors2[i].tangent, 1e-9);
         EXPECT_EQ(anchors1[i].hasCustomTangent, anchors2[i].hasCustomTangent);
+    }
+}
+
+TEST_F(SplineLayerTest, SerializationJSONRoundTrip) {
+    SplineLayer layer1;
+    layer1.setAnchors(threePtAnchors);
+
+    // Serialize to JSON and back
+    std::string const json = layer1.toPropertyTree().toJSON();
+    EXPECT_FALSE(json.empty());
+
+    auto tree = platform::PropertyTree::fromJSON(json);
+    EXPECT_TRUE(tree.isValid());
+
+    SplineLayer layer2;
+    layer2.fromPropertyTree(tree);
+
+    auto anchors1 = layer1.getAnchors();
+    auto anchors2 = layer2.getAnchors();
+
+    ASSERT_EQ(anchors1.size(), anchors2.size());
+    for (size_t i = 0; i < anchors1.size(); ++i) {
+        EXPECT_NEAR(anchors1[i].x, anchors2[i].x, 1e-9);
+        EXPECT_NEAR(anchors1[i].y, anchors2[i].y, 1e-9);
     }
 }
 

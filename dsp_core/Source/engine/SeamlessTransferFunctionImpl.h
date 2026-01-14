@@ -2,11 +2,15 @@
 
 #include "../model/LayeredTransferFunction.h"
 #include <platform/AudioBuffer.h>
+#include <platform/Timer.h>
+#include <platform/MessageThread.h>
 #include <array>
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <memory>
-#include <juce_core/juce_core.h>
+#include <mutex>
+#include <thread>
 
 namespace dsp_core {
 
@@ -284,7 +288,7 @@ struct RenderJob {
  * LUTRendererThread - Background worker thread that renders DSP LUTs from RenderJobs
  *
  * Architecture:
- *   - Lock-free job queue (AbstractFifo, 4 slots - sufficient for 20Hz polling)
+ *   - Lock-free job queue (LockFreeFIFO, 8 slots - sufficient for 20Hz polling)
  *   - Job coalescing: drains queue, renders only latest job
  *   - Worker-owned LayeredTransferFunction for isolated rendering
  *   - Writes to lutBuffers[workerTargetIndex] (safe from audio thread)
@@ -304,7 +308,7 @@ struct RenderJob {
  *   - Full state snapshot (base layer, coefficients, spline anchors)
  *   - Renders into temporary LayeredTransferFunction
  */
-class LUTRendererThread : public juce::Thread {
+class LUTRendererThread {
   public:
     /**
      * Construct worker thread
@@ -318,12 +322,25 @@ class LUTRendererThread : public juce::Thread {
                       std::atomic<bool>& readyFlag);
 
     /**
-     * Worker thread main loop
-     *
-     * Waits for jobs, processes with coalescing, renders LUTs.
-     * Runs until stopThread() is called.
+     * Destructor - ensures thread is stopped
      */
-    void run() override;
+    ~LUTRendererThread();
+
+    // Non-copyable, non-movable
+    LUTRendererThread(const LUTRendererThread&) = delete;
+    LUTRendererThread& operator=(const LUTRendererThread&) = delete;
+
+    /**
+     * Start the worker thread
+     */
+    void startThread();
+
+    /**
+     * Stop the worker thread with timeout
+     *
+     * @param timeoutMs Maximum time to wait for thread to finish (ms)
+     */
+    void stopThread(int timeoutMs);
 
     /**
      * Enqueue render job from message thread
@@ -345,6 +362,14 @@ class LUTRendererThread : public juce::Thread {
     void setLUTBuffersPointer(LUTBuffer* buffers);
 
   private:
+    /**
+     * Worker thread main loop
+     *
+     * Waits for jobs, processes with coalescing, renders LUTs.
+     * Runs until stopThread() is called.
+     */
+    void run();
+
     /**
      * Process all pending jobs with coalescing
      *
@@ -375,23 +400,32 @@ class LUTRendererThread : public juce::Thread {
      */
     void renderDSPLUT(const RenderJob& job, LUTBuffer* outputBuffer);
 
-    // Job queue (lock-free, 4 slots is sufficient given 20Hz polling + job coalescing)
-    juce::WaitableEvent wakeEvent;
-    juce::AbstractFifo jobQueue{4};
-    RenderJob jobSlots[4];
+    // Thread management (std::thread replaces juce::Thread)
+    std::thread thread_;
+    std::atomic<bool> shouldExit_{false};
+    std::mutex wakeupMutex_;
+    std::condition_variable wakeupCV_;
+
+    // Job queue (lock-free, 8 slots is sufficient given 20Hz polling + job coalescing)
+    // Note: RenderJob is too large for LockFreeFIFO (which requires trivially copyable).
+    // We use a simple mutex-protected queue instead.
+    std::mutex jobQueueMutex_;
+    RenderJob jobSlots_[8];
+    std::atomic<int> writeIndex_{0};
+    std::atomic<int> readIndex_{0};
 
     // Worker-owned LayeredTransferFunction for rendering
-    std::unique_ptr<LayeredTransferFunction> tempLTF;
+    std::unique_ptr<LayeredTransferFunction> tempLTF_;
 
     // Reference to AudioEngine (for checking crossfade state)
-    AudioEngine& audioEngine;
+    AudioEngine& audioEngine_;
 
     // Atomic references (shared with AudioEngine)
-    std::atomic<int>& workerTargetIndex;
-    std::atomic<bool>& newLUTReady;
+    std::atomic<int>& workerTargetIndex_;
+    std::atomic<bool>& newLUTReady_;
 
     // LUT buffers pointer (from AudioEngine)
-    LUTBuffer* lutBuffers{nullptr};
+    LUTBuffer* lutBuffers_{nullptr};
 };
 
 /**
@@ -401,7 +435,7 @@ class LUTRendererThread : public juce::Thread {
  * Uses two-version tracking to guarantee final changes are never skipped.
  *
  * THREADING CONTRACT (CRITICAL):
- *   - MUST run on message thread (JUCE Timer contract)
+ *   - MUST run on message thread (platform::Timer contract)
  *   - LayeredTransferFunction is mutated from message thread (via controller)
  *   - Reads non-atomic data (coefficients vector, base layer)
  *   - Constructor asserts isThisTheMessageThread()
@@ -420,7 +454,7 @@ class LUTRendererThread : public juce::Thread {
  *   - Full snapshot capture: ~128KB memcpy
  *   - CPU overhead: <0.1%
  */
-class LUTRenderTimer : public juce::Timer {
+class LUTRenderTimer : public platform::Timer {
   public:
     /**
      * Construct LUT render timer (message thread only)
@@ -436,7 +470,7 @@ class LUTRenderTimer : public juce::Timer {
     /**
      * Destructor - stops timer
      */
-    ~LUTRenderTimer();
+    ~LUTRenderTimer() override;
 
     /**
      * Timer callback - polls version and enqueues jobs (message thread)
@@ -478,10 +512,10 @@ class LUTRenderTimer : public juce::Timer {
      */
     RenderJob captureRenderJob();
 
-    LayeredTransferFunction& ltf;
-    LUTRendererThread& renderer;
-    uint64_t lastSeenVersion{0};
-    uint64_t lastRenderedVersion{0};  // For guaranteed final delivery
+    LayeredTransferFunction& ltf_;
+    LUTRendererThread& renderer_;
+    uint64_t lastSeenVersion_{0};
+    uint64_t lastRenderedVersion_{0};  // For guaranteed final delivery
 };
 
 /**
@@ -492,7 +526,7 @@ class LUTRenderTimer : public juce::Timer {
  * message thread without using the worker thread.
  *
  * Threading:
- *   - MUST run on message thread (JUCE Timer contract)
+ *   - MUST run on message thread (platform::Timer contract)
  *   - Reads from editingModel directly (safe - message thread only)
  *   - Writes to visualizerLUT directly (safe - message thread only)
  *
@@ -501,7 +535,7 @@ class LUTRenderTimer : public juce::Timer {
  *   - ~0.5ms per update (1024 points sampled)
  *   - No worker thread overhead
  */
-class VisualizerUpdateTimer : public juce::Timer {
+class VisualizerUpdateTimer : public platform::Timer {
   public:
     /**
      * Construct visualizer timer (message thread only)
@@ -535,10 +569,10 @@ class VisualizerUpdateTimer : public juce::Timer {
     void forceUpdate();
 
   private:
-    LayeredTransferFunction& editingModel;
-    std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr{nullptr};
-    std::function<void()> onVisualizerUpdate;
-    uint64_t lastSeenVersion{0};
+    LayeredTransferFunction& editingModel_;
+    std::array<double, VISUALIZER_LUT_SIZE>* visualizerLUTPtr_{nullptr};
+    std::function<void()> onVisualizerUpdate_;
+    uint64_t lastSeenVersion_{0};
 };
 
 } // namespace dsp_core

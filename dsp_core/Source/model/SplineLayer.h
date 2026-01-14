@@ -1,10 +1,9 @@
 #pragma once
 #include "SplineTypes.h"
+#include <platform/PropertyTree.h>
 #include <vector>
 #include <atomic>
 #include <memory>
-#include <juce_core/juce_core.h>
-#include <juce_data_structures/juce_data_structures.h>
 
 namespace dsp_core {
 
@@ -55,8 +54,8 @@ class SplineLayer {
     double evaluate(double x) const;
 
     // Serialization
-    juce::ValueTree toValueTree() const;
-    void fromValueTree(const juce::ValueTree& vt);
+    platform::PropertyTree toPropertyTree() const;
+    void fromPropertyTree(const platform::PropertyTree& tree);
 
   private:
     // Lock-free anchor storage (C++17 compatible)

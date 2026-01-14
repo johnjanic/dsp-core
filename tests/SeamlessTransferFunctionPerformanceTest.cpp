@@ -1,7 +1,6 @@
 #include <dsp_core/dsp_core.h>
 #include <gtest/gtest.h>
 #include <platform/AudioBuffer.h>
-#include <array>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -67,16 +66,16 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         // Process audio and verify crossfade completes in expected sample count
-        std::vector<double> samples(tc.expectedCrossfadeSamples + 100);
-        for (auto& s : samples) s = 0.5;
-
-        std::array<double*, 1> channelPointers = {samples.data()};
-        platform::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
+        const int numSamples = tc.expectedCrossfadeSamples + 100;
+        platform::AudioBuffer<double> buffer(1, numSamples);
+        for (int i = 0; i < numSamples; ++i) {
+            buffer.setSample(0, i, 0.5);
+        }
         stf->processBuffer(buffer);
 
         // Verify smooth transition (no clicks)
-        for (size_t i = 1; i < samples.size(); ++i) {
-            double const delta = std::abs(samples[i] - samples[i - 1]);
+        for (int i = 1; i < numSamples; ++i) {
+            double const delta = std::abs(buffer.getSample(0, i) - buffer.getSample(0, i - 1));
             EXPECT_LT(delta, 0.5) << "Click detected at " << tc.description
                                   << " sample " << i;
         }
@@ -107,16 +106,14 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_TradeoffAnalys
     editingModel.setCoefficient(1, 0.5);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    std::vector<double> samples(expectedCrossfadeSamples);
-    for (auto& s : samples) s = 0.0;
-    std::array<double*, 1> channelPointers = {samples.data()};
-    platform::AudioBuffer<double> buffer(channelPointers.data(), 1, static_cast<int>(samples.size()));
+    platform::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
+    buffer.clear();
     stf->processBuffer(buffer);
 
     // Verify smooth crossfade
     bool smooth = true;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        double const delta = std::abs(samples[i] - samples[i - 1]);
+    for (int i = 1; i < expectedCrossfadeSamples; ++i) {
+        double const delta = std::abs(buffer.getSample(0, i) - buffer.getSample(0, i - 1));
         if (delta > 0.1) { // Large jump indicates click
             smooth = false;
             break;
@@ -153,10 +150,10 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Process audio block (this triggers LUT swap if ready)
-    std::array<double, 512> samples{};
-    for (double & sample : samples) sample = 0.5;
-    std::array<double*, 1> channelPointers = {samples.data()};
-    platform::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
+    platform::AudioBuffer<double> buffer(1, 512);
+    for (int i = 0; i < 512; ++i) {
+        buffer.setSample(0, i, 0.5);
+    }
     stf->processBuffer(buffer);
 
     // Wait for another polling cycle to ensure LUT is updated
@@ -257,11 +254,11 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_WorkerThreadPriority
     }
 
     // Process audio simultaneously
-    std::array<double, 512> samples{};
-    std::array<double*, 1> channelPointers = {samples.data()};
-    platform::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
+    platform::AudioBuffer<double> buffer(1, 512);
     for (int i = 0; i < 100; ++i) {
-        for (double & sample : samples) sample = 0.5;
+        for (int s = 0; s < 512; ++s) {
+            buffer.setSample(0, s, 0.5);
+        }
         stf->processBuffer(buffer);
     }
 
@@ -294,14 +291,14 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Heavy editing load (should not accumulate memory)
-    std::array<double, 512> samples{};
-    std::array<double*, 1> channelPointers = {samples.data()};
-    platform::AudioBuffer<double> buffer(channelPointers.data(), 1, 512);
+    platform::AudioBuffer<double> buffer(1, 512);
     for (int i = 0; i < 1000; ++i) {
         editingModel.setCoefficient(1, 0.5 + i * 0.0001);
 
         // Process audio
-        for (double & sample : samples) sample = 0.5;
+        for (int s = 0; s < 512; ++s) {
+            buffer.setSample(0, s, 0.5);
+        }
         stf->processBuffer(buffer);
 
         if (i % 100 == 0) {

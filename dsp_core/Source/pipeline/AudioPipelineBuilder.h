@@ -3,6 +3,7 @@
 #include "AudioPipeline.h"
 #include "StageHandles.h"
 #include "DryWetMixStage.h"
+#include <cassert>
 #include <memory>
 #include <tuple>
 
@@ -55,7 +56,7 @@ class AudioPipelineBuilder {
      */
     template <typename StageType, typename... Args>
     AudioPipelineBuilder& addStage(StageTag tag, Args&&... args) {
-        jassert(!built_ && "Cannot modify builder after build()");
+        assert(!built_ && "Cannot modify builder after build()");
 
         auto stage = std::make_unique<StageType>(std::forward<Args>(args)...);
         auto* rawPtr = stage.get();
@@ -85,7 +86,7 @@ class AudioPipelineBuilder {
      */
     template <typename OuterType, typename InnerType, typename... InnerArgs>
     AudioPipelineBuilder& addWrapped(StageTag tag, InnerArgs&&... innerArgs) {
-        jassert(!built_ && "Cannot modify builder after build()");
+        assert(!built_ && "Cannot modify builder after build()");
 
         auto inner = std::make_unique<InnerType>(std::forward<InnerArgs>(innerArgs)...);
         auto outer = std::make_unique<OuterType>(std::move(inner));
@@ -117,7 +118,7 @@ class AudioPipelineBuilder {
         std::tuple<OuterArgs...> outerArgs,
         InnerArgs&&... innerArgs) {
 
-        jassert(!built_ && "Cannot modify builder after build()");
+        assert(!built_ && "Cannot modify builder after build()");
 
         auto inner = std::make_unique<InnerType>(std::forward<InnerArgs>(innerArgs)...);
 

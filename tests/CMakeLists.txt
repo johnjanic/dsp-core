@@ -789,3 +789,28 @@ endif()
 
 add_test(NAME GainStageTests COMMAND gain_stage_tests)
 
+# LockFreeFIFO tests
+add_executable(lock_free_fifo_tests
+    LockFreeFIFOTest.cpp
+)
+
+target_include_directories(lock_free_fifo_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(lock_free_fifo_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(lock_free_fifo_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(lock_free_fifo_tests)
+endif()
+
+add_test(NAME LockFreeFIFOTests COMMAND lock_free_fifo_tests)
+

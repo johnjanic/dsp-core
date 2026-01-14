@@ -1,5 +1,5 @@
 #include "AudioPipelineBuilder.h"
-#include <juce_core/juce_core.h>
+#include <cassert>
 
 namespace dsp_core::audio_pipeline {
 
@@ -7,14 +7,14 @@ AudioPipelineBuilder::AudioPipelineBuilder()
     : pipeline_(std::make_unique<AudioPipeline>()) {}
 
 AudioPipelineBuilder& AudioPipelineBuilder::withDryWetMix() {
-    jassert(!built_ && "Cannot modify builder after build()");
-    jassert(pipeline_->getNumStages() == 0 && "withDryWetMix() must be called before adding stages");
+    assert(!built_ && "Cannot modify builder after build()");
+    assert(pipeline_->getNumStages() == 0 && "withDryWetMix() must be called before adding stages");
     useDryWetMix_ = true;
     return *this;
 }
 
 AudioPipelineBuilder::BuildResult AudioPipelineBuilder::build() {
-    jassert(!built_ && "Builder already consumed");
+    assert(!built_ && "Builder already consumed");
     built_ = true;
 
     if (useDryWetMix_) {

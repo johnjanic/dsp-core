@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/Oversampling.h"
+#include <platform/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -101,16 +102,21 @@ TEST_F(OversamplingABTest, SineSweep_Produces_ValidOutput)
     os.prepare(kTestBlockSize);
 
     auto input = generateSineSweep(kTestBlockSize);
-    os.processSamplesUp(input.constData(), kTestBlockSize);
 
-    TestBuffer output(1, kTestBlockSize);
-    os.processSamplesDown(output.data(), kTestBlockSize);
+    // Create AudioBuffer and copy input data
+    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
+
+    os.processSamplesUp(inputBuffer);
+
+    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    os.processSamplesDown(outputBuffer);
 
     // Verify output is valid (not NaN/Inf)
     for (int i = 0; i < kTestBlockSize; ++i)
     {
-        EXPECT_FALSE(std::isnan(output.getChannel(0)[i]));
-        EXPECT_FALSE(std::isinf(output.getChannel(0)[i]));
+        EXPECT_FALSE(std::isnan(outputBuffer.getSample(0, i)));
+        EXPECT_FALSE(std::isinf(outputBuffer.getSample(0, i)));
     }
 }
 
@@ -120,16 +126,21 @@ TEST_F(OversamplingABTest, WhiteNoise_Produces_ValidOutput)
     os.prepare(kTestBlockSize);
 
     auto input = generateWhiteNoise(kTestBlockSize);
-    os.processSamplesUp(input.constData(), kTestBlockSize);
 
-    TestBuffer output(1, kTestBlockSize);
-    os.processSamplesDown(output.data(), kTestBlockSize);
+    // Create AudioBuffer and copy input data
+    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
+
+    os.processSamplesUp(inputBuffer);
+
+    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    os.processSamplesDown(outputBuffer);
 
     // Verify output is valid
     for (int i = 0; i < kTestBlockSize; ++i)
     {
-        EXPECT_FALSE(std::isnan(output.getChannel(0)[i]));
-        EXPECT_FALSE(std::isinf(output.getChannel(0)[i]));
+        EXPECT_FALSE(std::isnan(outputBuffer.getSample(0, i)));
+        EXPECT_FALSE(std::isinf(outputBuffer.getSample(0, i)));
     }
 }
 
@@ -139,16 +150,21 @@ TEST_F(OversamplingABTest, Impulse_Produces_ValidOutput)
     os.prepare(kTestBlockSize);
 
     auto input = generateImpulse(kTestBlockSize);
-    os.processSamplesUp(input.constData(), kTestBlockSize);
 
-    TestBuffer output(1, kTestBlockSize);
-    os.processSamplesDown(output.data(), kTestBlockSize);
+    // Create AudioBuffer and copy input data
+    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
+
+    os.processSamplesUp(inputBuffer);
+
+    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    os.processSamplesDown(outputBuffer);
 
     // Verify output is valid
     for (int i = 0; i < kTestBlockSize; ++i)
     {
-        EXPECT_FALSE(std::isnan(output.getChannel(0)[i]));
-        EXPECT_FALSE(std::isinf(output.getChannel(0)[i]));
+        EXPECT_FALSE(std::isnan(outputBuffer.getSample(0, i)));
+        EXPECT_FALSE(std::isinf(outputBuffer.getSample(0, i)));
     }
 }
 

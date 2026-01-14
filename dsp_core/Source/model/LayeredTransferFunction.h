@@ -1,10 +1,11 @@
 #pragma once
 #include "HarmonicLayer.h"
 #include "SplineLayer.h"
-#include <juce_core/juce_core.h>
+#include <platform/PropertyTree.h>
 #include <vector>
 #include <atomic>
 #include <memory>
+#include <string>
 
 namespace dsp_core {
 
@@ -526,8 +527,12 @@ class LayeredTransferFunction {
 
     // Serialization
 
-    juce::ValueTree toValueTree() const;
-    void fromValueTree(const juce::ValueTree& vt);
+    platform::PropertyTree toPropertyTree() const;
+    void fromPropertyTree(const platform::PropertyTree& tree);
+
+    // JSON convenience methods
+    std::string toJSON() const;
+    void fromJSON(const std::string& json);
 
   private:
     // Instance tracking for debugging

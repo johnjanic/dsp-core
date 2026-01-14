@@ -1,32 +1,30 @@
 /*******************************************************************************
- The block below describes the properties of this module, and is read by
- the Projucer to automatically generate project code that uses it.
- For details about the syntax and how to create or use a module, see the
- JUCE Module Format.md file.
+ dsp-core Module
 
+ Platform-independent DSP primitives and audio pipeline for TotalHarmonicControl.
 
- BEGIN_JUCE_MODULE_DECLARATION
+ Dependencies:
+ - platform::platform - AudioBuffer, PropertyTree, Timer, Geometry
+ - Standard C++20 - threads, atomics, containers
 
-  ID:                 dsp_core
-  vendor:             tbd
-  version:            1.0.0
-  name:               DSP Core
-  description:        A module for creating and editing transfer functions in audio applications.
-  website:            tbd
-  license:            proprietary/commercial
-  minimumCppStandard: 17
-
-  dependencies:       juce_core, juce_data_structures, juce_audio_processors, juce_dsp
-
- END_JUCE_MODULE_DECLARATION
-
+ As of Phase 2 completion, this module has ZERO JUCE dependencies.
 *******************************************************************************/
 
 #pragma once
 #define DSP_CORE_H_INCLUDED
 
-#include <juce_data_structures/juce_data_structures.h>
-#include <juce_dsp/juce_dsp.h>
+// Standard library
+#include <cmath>
+#include <vector>
+#include <memory>
+#include <atomic>
+#include <string>
+
+// Platform abstractions (from Phase 1)
+#include <platform/AudioBuffer.h>
+#include <platform/PropertyTree.h>
+#include <platform/Timer.h>
+#include <platform/Geometry.h>
 
 // Primitives
 #include "Source/primitives/MathUtils.h"
@@ -35,6 +33,7 @@
 #include "Source/primitives/IIRFilter.h"
 #include "Source/primitives/Gain.h"
 #include "Source/primitives/Oversampling.h"
+#include "Source/primitives/LockFreeFIFO.h"
 
 // Structures
 #include "Source/structures/AudioHistoryBuffer.h"

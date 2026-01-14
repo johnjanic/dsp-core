@@ -2,17 +2,16 @@
 #include "../services/SplineEvaluator.h"
 #include <algorithm>
 #include <cmath>
-#include <juce_core/juce_core.h>
-#include <juce_data_structures/juce_data_structures.h>
+#include <cstring>
 
 // Branch prediction hints (improve CPU branch predictor performance)
 // GCC/Clang support __builtin_expect for optimization
 #if defined(__GNUC__) || defined(__clang__)
-#define juce_likely(x) __builtin_expect(!!(x), 1)
-#define juce_unlikely(x) __builtin_expect(!!(x), 0)
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
-#define juce_likely(x) (x)
-#define juce_unlikely(x) (x)
+#define LIKELY(x) (x)
+#define UNLIKELY(x) (x)
 #endif
 
 namespace dsp_core {
@@ -27,6 +26,66 @@ namespace {
     constexpr int kTotalCoefficients = kNumHarmonics + 1;
     // Epsilon for zero comparison in normalization
     constexpr double kNormalizationEpsilon = 1e-12;
+
+    // Base64 encoding/decoding for binary data serialization
+    const char kBase64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    std::string encodeBase64(const uint8_t* data, size_t len) {
+        std::string result;
+        result.reserve(((len + 2) / 3) * 4);
+
+        for (size_t i = 0; i < len; i += 3) {
+            uint32_t octet_a = i < len ? data[i] : 0;
+            uint32_t octet_b = i + 1 < len ? data[i + 1] : 0;
+            uint32_t octet_c = i + 2 < len ? data[i + 2] : 0;
+
+            uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
+
+            result += kBase64Chars[(triple >> 18) & 0x3F];
+            result += kBase64Chars[(triple >> 12) & 0x3F];
+            result += (i + 1 < len) ? kBase64Chars[(triple >> 6) & 0x3F] : '=';
+            result += (i + 2 < len) ? kBase64Chars[triple & 0x3F] : '=';
+        }
+        return result;
+    }
+
+    int base64CharIndex(char c) {
+        if (c >= 'A' && c <= 'Z') return c - 'A';
+        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+        if (c >= '0' && c <= '9') return c - '0' + 52;
+        if (c == '+') return 62;
+        if (c == '/') return 63;
+        return -1;
+    }
+
+    std::vector<uint8_t> decodeBase64(const std::string& encoded) {
+        std::vector<uint8_t> result;
+        if (encoded.empty()) return result;
+
+        size_t padding = 0;
+        if (encoded.size() >= 1 && encoded[encoded.size() - 1] == '=') padding++;
+        if (encoded.size() >= 2 && encoded[encoded.size() - 2] == '=') padding++;
+
+        result.reserve(((encoded.size() / 4) * 3) - padding);
+
+        for (size_t i = 0; i < encoded.size(); i += 4) {
+            int sextet_a = base64CharIndex(encoded[i]);
+            int sextet_b = i + 1 < encoded.size() ? base64CharIndex(encoded[i + 1]) : 0;
+            int sextet_c = i + 2 < encoded.size() ? base64CharIndex(encoded[i + 2]) : 0;
+            int sextet_d = i + 3 < encoded.size() ? base64CharIndex(encoded[i + 3]) : 0;
+
+            if (sextet_a < 0 || sextet_b < 0) continue;
+
+            uint32_t triple = (sextet_a << 18) | (sextet_b << 12) |
+                             ((sextet_c >= 0 ? sextet_c : 0) << 6) |
+                             (sextet_d >= 0 ? sextet_d : 0);
+
+            result.push_back((triple >> 16) & 0xFF);
+            if (encoded[i + 2] != '=') result.push_back((triple >> 8) & 0xFF);
+            if (encoded[i + 3] != '=') result.push_back(triple & 0xFF);
+        }
+        return result;
+    }
 } // namespace
 
 LayeredTransferFunction::LayeredTransferFunction(int tableSize, double minVal, double maxVal)
@@ -374,7 +433,7 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
 
     // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
     // Computes on-demand from base layer + harmonics (no cached composite table)
-    if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
+    if (LIKELY(extrapMode == ExtrapolationMode::Clamp)) {
         const int idx0 = std::clamp(index - 1, 0, tableSize - 1);
         const int idx1 = std::clamp(index, 0, tableSize - 1);
         const int idx2 = std::clamp(index + 1, 0, tableSize - 1);
@@ -635,52 +694,54 @@ double LayeredTransferFunction::evaluateForRendering(double x, double normScalar
     }
 }
 
-juce::ValueTree LayeredTransferFunction::toValueTree() const {
-    juce::ValueTree vt("LayeredTransferFunction");
+platform::PropertyTree LayeredTransferFunction::toPropertyTree() const {
+    platform::PropertyTree tree("LayeredTransferFunction");
 
-    // Serialize coefficients
-    juce::Array<juce::var> coeffArray;
-    for (const double c : coefficients) {
-        coeffArray.add(c);
+    // Serialize coefficients as a child tree with individual properties
+    platform::PropertyTree coeffTree("Coefficients");
+    coeffTree.setProperty("count", static_cast<int>(coefficients.size()));
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+        coeffTree.setProperty("c" + std::to_string(i), coefficients[i]);
     }
-    vt.setProperty("coefficients", coeffArray, nullptr);
+    tree.addChild(coeffTree);
 
-    // Serialize base layer
+    // Serialize base layer as base64-encoded binary data
     if (tableSize > 0) {
-        juce::ValueTree baseVT("BaseLayer");
-        juce::MemoryBlock baseBlob;
+        platform::PropertyTree baseTree("BaseLayer");
+        std::vector<uint8_t> binaryData(tableSize * sizeof(double));
         for (int i = 0; i < tableSize; ++i) {
             const double value = baseTable[i].load(std::memory_order_acquire);
-            baseBlob.append(&value, sizeof(double));
+            std::memcpy(binaryData.data() + i * sizeof(double), &value, sizeof(double));
         }
-        baseVT.setProperty("tableData", baseBlob, nullptr);
-        vt.addChild(baseVT, -1, nullptr);
+        baseTree.setProperty("tableData", encodeBase64(binaryData.data(), binaryData.size()));
+        baseTree.setProperty("tableSize", tableSize);
+        tree.addChild(baseTree);
     }
 
     // Serialize harmonic layer (algorithm settings only, no coefficients)
     if (harmonicLayer) {
-        vt.addChild(harmonicLayer->toValueTree(), -1, nullptr);
+        tree.addChild(harmonicLayer->toPropertyTree());
     }
 
-    // NEW: Serialize spline layer
+    // Serialize spline layer
     if (splineLayer) {
-        vt.addChild(splineLayer->toValueTree(), -1, nullptr);
+        tree.addChild(splineLayer->toPropertyTree());
     }
 
     // Serialize normalization scalar
-    vt.setProperty("normalizationScalar", normalizationScalar.load(std::memory_order_acquire), nullptr);
+    tree.setProperty("normalizationScalar", normalizationScalar.load(std::memory_order_acquire));
 
     // Serialize normalization enabled state
-    vt.setProperty("normalizationEnabled", normalizationEnabled, nullptr);
+    tree.setProperty("normalizationEnabled", normalizationEnabled);
 
     // Serialize settings
-    vt.setProperty("extrapolationMode", static_cast<int>(extrapMode), nullptr);
+    tree.setProperty("extrapolationMode", static_cast<int>(extrapMode));
 
-    return vt;
+    return tree;
 }
 
-void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
-    if (!vt.isValid() || vt.getType().toString() != "LayeredTransferFunction") {
+void LayeredTransferFunction::fromPropertyTree(const platform::PropertyTree& tree) {
+    if (!tree.isValid() || tree.getType() != "LayeredTransferFunction") {
         return;
     }
 
@@ -688,62 +749,67 @@ void LayeredTransferFunction::fromValueTree(const juce::ValueTree& vt) {
     // Always maintain exactly NUM_HARMONIC_COEFFICIENTS (41) coefficients
     // Old presets may have fewer coefficients - pad with zeros if needed
     coefficients.resize(NUM_HARMONIC_COEFFICIENTS, 0.0); // Reset to 41 zeros
-    if (vt.hasProperty("coefficients")) {
-        const juce::Array<juce::var>* coeffArray = vt.getProperty("coefficients").getArray();
-        if (coeffArray != nullptr) {
-            const int numToLoad = std::min(coeffArray->size(), NUM_HARMONIC_COEFFICIENTS);
-            for (int i = 0; i < numToLoad; ++i) {
-                coefficients[i] = static_cast<double>((*coeffArray)[i]);
-            }
+    const auto* coeffTree = tree.getChildWithType("Coefficients");
+    if (coeffTree != nullptr) {
+        const int count = coeffTree->getProperty<int>("count", 0);
+        const int numToLoad = std::min(count, NUM_HARMONIC_COEFFICIENTS);
+        for (int i = 0; i < numToLoad; ++i) {
+            coefficients[i] = coeffTree->getProperty<double>("c" + std::to_string(i), 0.0);
         }
     }
 
-    // Load base layer
-    const auto baseVT = vt.getChildWithName("BaseLayer");
-    if (baseVT.isValid() && baseVT.hasProperty("tableData")) {
-        const juce::MemoryBlock baseBlob = *baseVT.getProperty("tableData").getBinaryData();
-        const double* data = static_cast<const double*>(baseBlob.getData());
-        const int numValues = static_cast<int>(baseBlob.getSize() / sizeof(double));
+    // Load base layer from base64-encoded binary data
+    const auto* baseTree = tree.getChildWithType("BaseLayer");
+    if (baseTree != nullptr && baseTree->hasProperty("tableData")) {
+        const std::string encoded = baseTree->getProperty<std::string>("tableData", "");
+        const std::vector<uint8_t> binaryData = decodeBase64(encoded);
+        const int numValues = static_cast<int>(binaryData.size() / sizeof(double));
 
         for (int i = 0; i < std::min(numValues, tableSize); ++i) {
-            baseTable[i].store(data[i], std::memory_order_release);
+            double value = 0.0;
+            std::memcpy(&value, binaryData.data() + i * sizeof(double), sizeof(double));
+            baseTable[i].store(value, std::memory_order_release);
         }
     }
 
     // Load harmonic layer (algorithm settings only)
-    const auto harmonicVT = vt.getChildWithName("HarmonicLayer");
-    if (harmonicVT.isValid()) {
-        harmonicLayer->fromValueTree(harmonicVT);
+    const auto* harmonicTree = tree.getChildWithType("HarmonicLayer");
+    if (harmonicTree != nullptr) {
+        harmonicLayer->fromPropertyTree(*harmonicTree);
         harmonicLayer->precomputeBasisFunctions(tableSize, minValue, maxValue);
     }
 
-    // NEW: Load spline layer
-    const auto splineVT = vt.getChildWithName("SplineLayer");
-    if (splineVT.isValid()) {
-        splineLayer->fromValueTree(splineVT);
+    // Load spline layer
+    const auto* splineTree = tree.getChildWithType("SplineLayer");
+    if (splineTree != nullptr) {
+        splineLayer->fromPropertyTree(*splineTree);
     }
 
     // Load normalization scalar (optional - will be recomputed anyway)
-    if (vt.hasProperty("normalizationScalar")) {
-        normalizationScalar.store(static_cast<double>(vt.getProperty("normalizationScalar")),
+    if (tree.hasProperty("normalizationScalar")) {
+        normalizationScalar.store(tree.getProperty<double>("normalizationScalar", 1.0),
                                   std::memory_order_release);
     }
 
     // Load normalization enabled state (default to true if not present for backward compatibility)
-    if (vt.hasProperty("normalizationEnabled")) {
-        normalizationEnabled = static_cast<bool>(vt.getProperty("normalizationEnabled"));
-    } else {
-        normalizationEnabled = true; // Safe default for old presets
-    }
+    normalizationEnabled = tree.getProperty<bool>("normalizationEnabled", true);
 
     // Load settings
-    // Note: interpolationMode is ignored for backward compatibility (Catmull-Rom is now hardcoded)
-    if (vt.hasProperty("extrapolationMode")) {
-        extrapMode = static_cast<ExtrapolationMode>(static_cast<int>(vt.getProperty("extrapolationMode")));
+    if (tree.hasProperty("extrapolationMode")) {
+        extrapMode = static_cast<ExtrapolationMode>(tree.getProperty<int>("extrapolationMode", 0));
     }
 
     // Increment version to trigger LUT render on preset load
     incrementVersionIfNotBatching();
+}
+
+std::string LayeredTransferFunction::toJSON() const {
+    return toPropertyTree().toJSON();
+}
+
+void LayeredTransferFunction::fromJSON(const std::string& json) {
+    auto tree = platform::PropertyTree::fromJSON(json);
+    fromPropertyTree(tree);
 }
 
 } // namespace dsp_core

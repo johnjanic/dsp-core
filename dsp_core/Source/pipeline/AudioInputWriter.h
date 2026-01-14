@@ -14,7 +14,7 @@ namespace dsp_core::audio_pipeline {
  * Thread safety:
  * - Audio thread writes samples via process()
  * - UI thread reads samples via AudioInputBuffer::readAndComputePeak()
- * - Lock-free coordination via juce::AbstractFifo
+ * - Lock-free coordination via dsp::AbstractFIFO
  */
 class AudioInputWriter : public AudioProcessingStage {
   public:

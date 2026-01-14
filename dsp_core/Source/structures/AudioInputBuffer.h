@@ -1,7 +1,7 @@
 #pragma once
 
 #include <platform/AudioBuffer.h>
-#include <juce_core/juce_core.h>
+#include "../primitives/LockFreeFIFO.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -18,15 +18,12 @@ namespace dsp_core::audio_pipeline {
  * Thread safety:
  * - Audio thread: Writes samples (single writer)
  * - UI thread: Reads samples (single reader)
- * - Uses juce::AbstractFifo for lock-free coordination
+ * - Uses dsp::AbstractFIFO for lock-free coordination
  *
  * Design:
  * - Stores the most recent N samples per channel
  * - When buffer fills, oldest samples are overwritten
  * - UI thread reads available samples without blocking audio thread
- *
- * NOTE: Still uses juce::AbstractFifo for lock-free coordination.
- * This is a utility class, not an audio buffer type.
  */
 class AudioInputBuffer {
   public:
@@ -141,7 +138,7 @@ class AudioInputBuffer {
 
   private:
     const int bufferSize_;           // Size per channel
-    juce::AbstractFifo fifo_;        // Lock-free read/write coordination
+    dsp::AbstractFIFO fifo_;         // Lock-free read/write coordination
     int numChannels_;
     std::vector<std::vector<double>> channelBuffers_;  // One vector per channel
 };

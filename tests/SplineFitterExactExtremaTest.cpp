@@ -201,7 +201,7 @@ TEST_F(ExactExtremaTest, SinX_SingleExtremum) {
 
     auto result = dsp_core::Services::SplineFitter::fitCurve(*ltf, config);
 
-    ASSERT_TRUE(result.success) << "Fit failed: " << result.message.toStdString();
+    ASSERT_TRUE(result.success) << "Fit failed: " << result.message;
 
     // Verify extrema positions within ±0.01 (1% of domain)
     EXPECT_TRUE(hasAnchorNear(result.anchors, 0.5, 0.01)) << "Missing anchor at maximum (x=0.5)";

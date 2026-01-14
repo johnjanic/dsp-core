@@ -1,4 +1,5 @@
 #include "AudioHistoryBuffer.h"
+#include <cassert>
 
 AudioHistoryBuffer::AudioHistoryBuffer(int historySize) : buffer(historySize, 0.0), writePos(0), size(historySize) {}
 
@@ -10,7 +11,7 @@ void AudioHistoryBuffer::pushSamples(const double* samples, int numSamples) {
 }
 
 void AudioHistoryBuffer::getHistory(double* outSamples, int numSamples) const {
-    jassert(numSamples <= size);
+    assert(numSamples <= size);
 
     const int start = (writePos - numSamples + size) % size;
     const int firstPart = std::min(size - start, numSamples);
