@@ -5,7 +5,7 @@
 #include <cmath>
 #include <memory>
 #include <algorithm>
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 
 namespace dsp {
 
@@ -276,7 +276,7 @@ public:
      * @param inputBuffer Input audio at original sample rate.
      * @return Reference to internal oversampled buffer.
      */
-    platform::AudioBuffer<T>& processSamplesUp(const platform::AudioBuffer<T>& inputBuffer)
+    audio::AudioBuffer<T>& processSamplesUp(const audio::AudioBuffer<T>& inputBuffer)
     {
         processSamplesUpImpl(inputBuffer.getArrayOfReadPointers(), inputBuffer.getNumSamples());
         return oversampledBuffer_;
@@ -287,7 +287,7 @@ public:
      *
      * @param outputBuffer Output buffer at original sample rate.
      */
-    void processSamplesDown(platform::AudioBuffer<T>& outputBuffer)
+    void processSamplesDown(audio::AudioBuffer<T>& outputBuffer)
     {
         processSamplesDownImpl(outputBuffer.getArrayOfWritePointers(), outputBuffer.getNumSamples());
     }
@@ -297,12 +297,12 @@ public:
      *
      * Use after processSamplesUp() to access oversampled data for processing.
      */
-    [[nodiscard]] platform::AudioBuffer<T>& getOversampledBuffer() noexcept
+    [[nodiscard]] audio::AudioBuffer<T>& getOversampledBuffer() noexcept
     {
         return oversampledBuffer_;
     }
 
-    [[nodiscard]] const platform::AudioBuffer<T>& getOversampledBuffer() const noexcept
+    [[nodiscard]] const audio::AudioBuffer<T>& getOversampledBuffer() const noexcept
     {
         return oversampledBuffer_;
     }
@@ -413,7 +413,7 @@ private:
     std::vector<std::vector<OversamplingStage<T>>> stages_;
 
     // Internal oversampled buffer storage
-    platform::AudioBuffer<T> oversampledBuffer_;
+    audio::AudioBuffer<T> oversampledBuffer_;
 
     // Temporary buffer for cascaded processing
     std::vector<T> tempBuffer_;

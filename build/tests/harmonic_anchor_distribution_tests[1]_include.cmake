@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/harmonic_anchor_distribution_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/harmonic_anchor_distribution_tests[1]_tests.cmake")
+else()
+  add_test(harmonic_anchor_distribution_tests_NOT_BUILT harmonic_anchor_distribution_tests_NOT_BUILT)
+endif()

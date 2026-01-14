@@ -67,7 +67,7 @@ double AudioEngine::applyTransferFunction(double x) const {
     }
 }
 
-void AudioEngine::processBuffer(platform::AudioBuffer<double>& buffer) const {
+void AudioEngine::processBuffer(audio::AudioBuffer<double>& buffer) const {
     checkForNewLUT();
 
     const int numChannels = buffer.getNumChannels();

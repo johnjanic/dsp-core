@@ -29,7 +29,7 @@ void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     }
 }
 
-void DryWetMixStage::process(platform::AudioBuffer<double>& buffer) {
+void DryWetMixStage::process(audio::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
     const int latencySamples = effectsPipeline_->getLatencySamples();
@@ -89,7 +89,7 @@ void DryWetMixStage::setMixAmount(double mix) {
     mixAmount_.setTargetValue(std::clamp(mix, 0.0, 1.0));
 }
 
-void DryWetMixStage::captureDrySignal(const platform::AudioBuffer<double>& buffer) {
+void DryWetMixStage::captureDrySignal(const audio::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
@@ -101,7 +101,7 @@ void DryWetMixStage::captureDrySignal(const platform::AudioBuffer<double>& buffe
     }
 }
 
-void DryWetMixStage::applyMix(platform::AudioBuffer<double>& wetBuffer) {
+void DryWetMixStage::applyMix(audio::AudioBuffer<double>& wetBuffer) {
     const int numChannels = wetBuffer.getNumChannels();
     const int numSamples = wetBuffer.getNumSamples();
 

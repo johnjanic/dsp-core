@@ -42,15 +42,15 @@ double SplineLayer::evaluate(double x) const {
     return Services::SplineEvaluator::evaluate(*ptr, x);
 }
 
-platform::PropertyTree SplineLayer::toPropertyTree() const {
-    platform::PropertyTree tree("SplineLayer");
+plugin::PropertyTree SplineLayer::toPropertyTree() const {
+    plugin::PropertyTree tree("SplineLayer");
 
     auto ptr = std::atomic_load(&anchorsPtr);
     if (ptr && !ptr->empty()) {
-        platform::PropertyTree anchorsTree("Anchors");
+        plugin::PropertyTree anchorsTree("Anchors");
 
         for (const auto& anchor : *ptr) {
-            platform::PropertyTree anchorTree("Anchor");
+            plugin::PropertyTree anchorTree("Anchor");
             anchorTree.setProperty("x", anchor.x);
             anchorTree.setProperty("y", anchor.y);
             anchorTree.setProperty("tangent", anchor.tangent);
@@ -64,7 +64,7 @@ platform::PropertyTree SplineLayer::toPropertyTree() const {
     return tree;
 }
 
-void SplineLayer::fromPropertyTree(const platform::PropertyTree& tree) {
+void SplineLayer::fromPropertyTree(const plugin::PropertyTree& tree) {
     if (!tree.isValid() || tree.getType() != "SplineLayer") {
         return;
     }

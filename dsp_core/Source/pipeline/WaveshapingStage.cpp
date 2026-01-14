@@ -12,7 +12,7 @@ void WaveshapingStage::prepareToPlay(double /*sampleRate*/, int /*samplesPerBloc
     // Waveshaping is stateless, no preparation needed
 }
 
-void WaveshapingStage::process(platform::AudioBuffer<double>& buffer) {
+void WaveshapingStage::process(audio::AudioBuffer<double>& buffer) {
     if (seamlessTransferFunction_ != nullptr) {
         // Use new multi-channel processBuffer() API for correct crossfade handling
         seamlessTransferFunction_->processBuffer(buffer);

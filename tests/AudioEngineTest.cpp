@@ -1,6 +1,6 @@
 #include <dsp_core/dsp_core.h>
 #include <gtest/gtest.h>
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <array>
 #include <cmath>
 
@@ -66,7 +66,7 @@ TEST_F(AudioEngineTest, Constructor_AllBuffersInitialized) {
 TEST_F(AudioEngineTest, PrepareToPlay_CrossfadeDurationScalesWithSampleRate) {
     // 44.1 kHz
     engine->prepareToPlay(44100.0, 512);
-    platform::AudioBuffer<double> buffer(1, 1);
+    audio::AudioBuffer<double> buffer(1, 1);
     buffer.clear();
     engine->processBuffer(buffer);
     // We can't directly check crossfadeSamples (private), but we can verify behavior
@@ -93,14 +93,14 @@ TEST_F(AudioEngineTest, PrepareToPlay_ClampsPositionOnSampleRateChange) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Trigger crossfade
-    platform::AudioBuffer<double> buffer(1, 500);
+    audio::AudioBuffer<double> buffer(1, 500);
     buffer.clear();
     engine->processBuffer(buffer); // Partially through crossfade
 
     // Now change sample rate to 44.1kHz (2205 samples)
     // The crossfade should complete immediately if position >= 2205
     engine->prepareToPlay(44100.0, 512);
-    platform::AudioBuffer<double> buffer2(1, 1);
+    audio::AudioBuffer<double> buffer2(1, 1);
     buffer2.clear();
     engine->processBuffer(buffer2);
 
@@ -134,7 +134,7 @@ TEST_F(AudioEngineTest, Crossfade_GainsSumToOne) {
 
     // Process samples and verify crossfade
     const int expectedCrossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205 samples
-    platform::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
+    audio::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
     buffer.clear(); // Test with x = 0.0
 
     engine->processBuffer(buffer);
@@ -171,7 +171,7 @@ TEST_F(AudioEngineTest, Crossfade_CompletesInCorrectSampleCount) {
 
     // Process exactly the crossfade duration
     const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205
-    platform::AudioBuffer<double> buffer(1, crossfadeSamples);
+    audio::AudioBuffer<double> buffer(1, crossfadeSamples);
     for (int i = 0; i < crossfadeSamples; ++i) {
         buffer.setSample(0, i, 0.5);
     }
@@ -179,7 +179,7 @@ TEST_F(AudioEngineTest, Crossfade_CompletesInCorrectSampleCount) {
     engine->processBuffer(buffer);
 
     // After crossfade, output should be from new LUT
-    platform::AudioBuffer<double> testBuffer(1, 1);
+    audio::AudioBuffer<double> testBuffer(1, 1);
     testBuffer.setSample(0, 0, 0.5);
     engine->processBuffer(testBuffer);
     EXPECT_NEAR(testBuffer.getSample(0, 0), 1.0, 1e-6) << "After crossfade, should use new LUT value";
@@ -201,7 +201,7 @@ TEST_F(AudioEngineTest, Crossfade_NewLUTDefersUntilComplete) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Start crossfade
-    platform::AudioBuffer<double> buffer(1, 100);
+    audio::AudioBuffer<double> buffer(1, 100);
     buffer.clear();
     engine->processBuffer(buffer); // Partially through crossfade
 
@@ -214,28 +214,28 @@ TEST_F(AudioEngineTest, Crossfade_NewLUTDefersUntilComplete) {
     engine->getNewLUTReadyFlag().store(true, std::memory_order_release);
 
     // Process more samples - update is deferred, first crossfade continues
-    platform::AudioBuffer<double> buffer2(1, 100);
+    audio::AudioBuffer<double> buffer2(1, 100);
     buffer2.clear();
     engine->processBuffer(buffer2);
 
     // Complete the FIRST crossfade - output should be 0.5 (first LUT)
     const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
-    platform::AudioBuffer<double> remaining(1, crossfadeSamples);
+    audio::AudioBuffer<double> remaining(1, crossfadeSamples);
     remaining.clear();
     engine->processBuffer(remaining);
 
-    platform::AudioBuffer<double> testBuffer(1, 1);
+    audio::AudioBuffer<double> testBuffer(1, 1);
     testBuffer.setSample(0, 0, 0.0);
     engine->processBuffer(testBuffer);
     EXPECT_NEAR(testBuffer.getSample(0, 0), 0.5, 1e-6) << "Should complete first crossfade to 0.5";
 
     // Now the deferred LUT should trigger a new crossfade
     // Complete the SECOND crossfade - output should be 0.8 (second LUT)
-    platform::AudioBuffer<double> remaining2(1, crossfadeSamples + 1);
+    audio::AudioBuffer<double> remaining2(1, crossfadeSamples + 1);
     remaining2.clear();
     engine->processBuffer(remaining2);
 
-    platform::AudioBuffer<double> testBuffer2(1, 1);
+    audio::AudioBuffer<double> testBuffer2(1, 1);
     testBuffer2.setSample(0, 0, 0.0);
     engine->processBuffer(testBuffer2);
     EXPECT_NEAR(testBuffer2.getSample(0, 0), 0.8, 1e-6) << "Should use second LUT after deferred update";
@@ -267,7 +267,7 @@ TEST_F(AudioEngineTest, Interpolation_CatmullRomWorks) {
 
     // Skip crossfade
     const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
-    platform::AudioBuffer<double> skipBuffer(1, crossfadeSamples);
+    audio::AudioBuffer<double> skipBuffer(1, crossfadeSamples);
     skipBuffer.clear();
     engine->processBuffer(skipBuffer);
 
@@ -307,7 +307,7 @@ TEST_F(AudioEngineTest, Extrapolation_ClampModeClamps) {
  */
 TEST_F(AudioEngineTest, ProcessBlock_HandlesEmptyBlock) {
     engine->prepareToPlay(44100.0, 512);
-    platform::AudioBuffer<double> buffer(1, 0);
+    audio::AudioBuffer<double> buffer(1, 0);
     EXPECT_NO_THROW(engine->processBuffer(buffer));
 }
 
@@ -414,7 +414,7 @@ TEST_F(AudioEngineTest, SCurveCrossfade_SmoothTransition) {
 
     // Process crossfade and capture output progression
     const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0); // 2205 samples
-    platform::AudioBuffer<double> buffer(1, crossfadeSamples);
+    audio::AudioBuffer<double> buffer(1, crossfadeSamples);
 
     // Fill buffer with x=0.0 (so output = mix of 0.0 and 1.0)
     for (int i = 0; i < crossfadeSamples; ++i) {
@@ -472,7 +472,7 @@ TEST_F(AudioEngineTest, SCurveCrossfade_GainsConserved) {
 
     // Process crossfade with x=0.5
     const int crossfadeSamples = static_cast<int>(44100.0 * 50.0 / 1000.0);
-    platform::AudioBuffer<double> buffer(1, crossfadeSamples);
+    audio::AudioBuffer<double> buffer(1, crossfadeSamples);
 
     for (int i = 0; i < crossfadeSamples; ++i) {
         buffer.setSample(0, i, 0.5);

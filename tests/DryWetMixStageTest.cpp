@@ -3,7 +3,7 @@
 #include "../dsp_core/Source/pipeline/AudioPipeline.h"
 #include "../dsp_core/Source/pipeline/GainStage.h"
 #include "../dsp_core/Source/pipeline/OversamplingWrapper.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 
 using namespace dsp_core::audio_pipeline;
@@ -28,7 +28,7 @@ class DryWetMixStageTest : public ::testing::Test {
 TEST_F(DryWetMixStageTest, FullyDry_OutputEqualsInput) {
     dryWetMix_->setMixAmount(0.0); // 100% dry
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 64.0);
@@ -36,7 +36,7 @@ TEST_F(DryWetMixStageTest, FullyDry_OutputEqualsInput) {
     }
 
     // Store expected values (input)
-    platform::AudioBuffer<double> expected(2, 64);
+    audio::AudioBuffer<double> expected(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         expected.copyFrom(ch, 0, buffer, ch, 0, 64);
     }
@@ -56,7 +56,7 @@ TEST_F(DryWetMixStageTest, FullyWet_OutputEqualsProcessed) {
     // Use default gain (1.0) and mix to 100% wet to avoid gain smoothing issues
     dryWetMix_->setMixAmount(1.0); // 100% wet
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 64.0);
@@ -78,7 +78,7 @@ TEST_F(DryWetMixStageTest, FiftyFiftyMix_CorrectBlend) {
     // Use default gain (1.0) and mix to 50/50 to avoid gain smoothing issues
     dryWetMix_->setMixAmount(0.5); // 50% dry, 50% wet
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 64.0);
@@ -100,7 +100,7 @@ TEST_F(DryWetMixStageTest, FiftyFiftyMix_CorrectBlend) {
 TEST_F(DryWetMixStageTest, EdgeCase_SingleSample) {
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(1, 1);
+    audio::AudioBuffer<double> buffer(1, 1);
     buffer.setSample(0, 0, 1.0);
 
     dryWetMix_->process(buffer);
@@ -112,7 +112,7 @@ TEST_F(DryWetMixStageTest, EdgeCase_SingleSample) {
 TEST_F(DryWetMixStageTest, EdgeCase_TwoSamples) {
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(1, 2);
+    audio::AudioBuffer<double> buffer(1, 2);
     buffer.setSample(0, 0, 1.0);
     buffer.setSample(0, 1, 2.0);
 
@@ -127,14 +127,14 @@ TEST_F(DryWetMixStageTest, EdgeCase_Unaligned63Samples) {
     // Test SIMD alignment edge case (not divisible by typical SIMD width)
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(2, 63);
+    audio::AudioBuffer<double> buffer(2, 63);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 63; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 63.0);
         }
     }
 
-    platform::AudioBuffer<double> expected(2, 63);
+    audio::AudioBuffer<double> expected(2, 63);
     for (int ch = 0; ch < 2; ++ch) {
         expected.copyFrom(ch, 0, buffer, ch, 0, 63);
     }
@@ -155,7 +155,7 @@ TEST_F(DryWetMixStageTest, EdgeCase_Aligned64Samples) {
     // Test SIMD alignment (divisible by typical SIMD width)
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 64.0);
@@ -178,7 +178,7 @@ TEST_F(DryWetMixStageTest, EdgeCase_LargeBuffer512Samples) {
     // Test typical audio buffer size
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(2, 512);
+    audio::AudioBuffer<double> buffer(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 512.0);
@@ -201,7 +201,7 @@ TEST_F(DryWetMixStageTest, EdgeCase_513Samples) {
     // Test SIMD edge case (512 + 1)
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(2, 513);
+    audio::AudioBuffer<double> buffer(2, 513);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 513; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 513.0);
@@ -223,7 +223,7 @@ TEST_F(DryWetMixStageTest, EdgeCase_513Samples) {
 TEST_F(DryWetMixStageTest, NegativeValues_HandledCorrectly) {
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, -static_cast<double>(i) / 64.0); // Negative values
@@ -245,7 +245,7 @@ TEST_F(DryWetMixStageTest, NegativeValues_HandledCorrectly) {
 TEST_F(DryWetMixStageTest, MultiChannel_8Channels) {
     dryWetMix_->setMixAmount(0.5);
 
-    platform::AudioBuffer<double> buffer(8, 64);
+    audio::AudioBuffer<double> buffer(8, 64);
     for (int ch = 0; ch < 8; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, static_cast<double>(ch + i) / 64.0);
@@ -304,7 +304,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_2xOversampling) {
     dryWetMix_->setMixAmount(0.5);
 
     // Create impulse signal
-    platform::AudioBuffer<double> buffer(2, 512);
+    audio::AudioBuffer<double> buffer(2, 512);
     buffer.clear();
     buffer.setSample(0, 100, 1.0); // Impulse at sample 100
     buffer.setSample(1, 100, 1.0);
@@ -337,14 +337,14 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_4xOversampling) {
     // Without latency compensation, 50/50 mix would show comb filtering artifacts
 
     // Create impulse signal
-    platform::AudioBuffer<double> impulse(2, 512);
+    audio::AudioBuffer<double> impulse(2, 512);
     impulse.clear();
     impulse.setSample(0, 250, 1.0);
     impulse.setSample(1, 250, 1.0);
 
     // Test 100% wet to see wet path response
     dryWetMix_->setMixAmount(1.0);
-    platform::AudioBuffer<double> wetResponse(2, 512);
+    audio::AudioBuffer<double> wetResponse(2, 512);
     wetResponse.copyFrom(0, 0, impulse, 0, 0, 512);
     wetResponse.copyFrom(1, 0, impulse, 1, 0, 512);
     for (int block = 0; block < 5; ++block) {
@@ -354,7 +354,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_4xOversampling) {
     // Reset and test 50/50 mix
     dryWetMix_->reset();
     dryWetMix_->setMixAmount(0.5);
-    platform::AudioBuffer<double> mixedResponse(2, 512);
+    audio::AudioBuffer<double> mixedResponse(2, 512);
     mixedResponse.copyFrom(0, 0, impulse, 0, 0, 512);
     mixedResponse.copyFrom(1, 0, impulse, 1, 0, 512);
     for (int block = 0; block < 5; ++block) {
@@ -388,7 +388,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_8xOversampling) {
     dryWetMix_->setMixAmount(0.0);
 
     // Create sine wave
-    platform::AudioBuffer<double> buffer(2, 512);
+    audio::AudioBuffer<double> buffer(2, 512);
     const double freq = 1000.0;
     const double sampleRate = 44100.0;
     for (int ch = 0; ch < 2; ++ch) {
@@ -398,7 +398,7 @@ TEST_F(DryWetMixWithLatencyTest, LatencyCompensation_8xOversampling) {
     }
 
     // Store expected output (delayed by latency)
-    platform::AudioBuffer<double> expected(2, 512);
+    audio::AudioBuffer<double> expected(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         expected.copyFrom(ch, 0, buffer, ch, 0, 512);
     }
@@ -442,7 +442,7 @@ TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
     dryWetMix_->setMixAmount(0.5);
 
     // Create test signal
-    platform::AudioBuffer<double> buffer(2, 512);
+    audio::AudioBuffer<double> buffer(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             buffer.setSample(ch, i, static_cast<double>(i) / 512.0);
@@ -450,7 +450,7 @@ TEST_F(DryWetMixWithLatencyTest, NoLatency_BypassesDelayBuffer) {
     }
 
     // Store expected (immediate processing, no delay)
-    platform::AudioBuffer<double> expected(2, 512);
+    audio::AudioBuffer<double> expected(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             double const input = static_cast<double>(i) / 512.0;

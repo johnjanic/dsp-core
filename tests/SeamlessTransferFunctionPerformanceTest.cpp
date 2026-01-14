@@ -1,6 +1,6 @@
 #include <dsp_core/dsp_core.h>
 #include <gtest/gtest.h>
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -67,7 +67,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_ScalesWithSamp
 
         // Process audio and verify crossfade completes in expected sample count
         const int numSamples = tc.expectedCrossfadeSamples + 100;
-        platform::AudioBuffer<double> buffer(1, numSamples);
+        audio::AudioBuffer<double> buffer(1, numSamples);
         for (int i = 0; i < numSamples; ++i) {
             buffer.setSample(0, i, 0.5);
         }
@@ -106,7 +106,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CrossfadeDuration_TradeoffAnalys
     editingModel.setCoefficient(1, 0.5);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    platform::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
+    audio::AudioBuffer<double> buffer(1, expectedCrossfadeSamples);
     buffer.clear();
     stf->processBuffer(buffer);
 
@@ -150,7 +150,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, Latency_InteractiveOperations) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Process audio block (this triggers LUT swap if ready)
-    platform::AudioBuffer<double> buffer(1, 512);
+    audio::AudioBuffer<double> buffer(1, 512);
     for (int i = 0; i < 512; ++i) {
         buffer.setSample(0, i, 0.5);
     }
@@ -254,7 +254,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, CPUProfiler_WorkerThreadPriority
     }
 
     // Process audio simultaneously
-    platform::AudioBuffer<double> buffer(1, 512);
+    audio::AudioBuffer<double> buffer(1, 512);
     for (int i = 0; i < 100; ++i) {
         for (int s = 0; s < 512; ++s) {
             buffer.setSample(0, s, 0.5);
@@ -291,7 +291,7 @@ TEST_F(SeamlessTransferFunctionPerformanceTest, MemoryProfiler_NoLeaks) {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Heavy editing load (should not accumulate memory)
-    platform::AudioBuffer<double> buffer(1, 512);
+    audio::AudioBuffer<double> buffer(1, 512);
     for (int i = 0; i < 1000; ++i) {
         editingModel.setCoefficient(1, 0.5 + i * 0.0001);
 

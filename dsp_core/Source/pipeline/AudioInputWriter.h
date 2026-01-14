@@ -27,7 +27,7 @@ class AudioInputWriter : public AudioProcessingStage {
         // Buffer prepare is called separately by processor
     }
 
-    void process(platform::AudioBuffer<double>& audioBuffer) override {
+    void process(audio::AudioBuffer<double>& audioBuffer) override {
         // Simply write samples to buffer - UI thread handles peak detection
         buffer_.writeSamples(audioBuffer);
     }

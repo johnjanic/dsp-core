@@ -28,7 +28,7 @@ void AudioPipeline::prepareToPlay(double sampleRate, int samplesPerBlock) {
     }
 }
 
-void AudioPipeline::process(platform::AudioBuffer<double>& buffer) {
+void AudioPipeline::process(audio::AudioBuffer<double>& buffer) {
     for (auto& stage : stages_) {
         stage->process(buffer);
     }

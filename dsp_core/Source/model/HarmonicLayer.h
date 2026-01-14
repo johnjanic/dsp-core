@@ -1,5 +1,5 @@
 #pragma once
-#include <platform/PropertyTree.h>
+#include <plugin-core/PropertyTree.h>
 #include <vector>
 
 namespace dsp_core {
@@ -60,8 +60,8 @@ class HarmonicLayer {
     void precomputeBasisFunctions(int tableSize, double minVal, double maxVal);
 
     // Serialization
-    platform::PropertyTree toPropertyTree() const;
-    void fromPropertyTree(const platform::PropertyTree& tree);
+    plugin::PropertyTree toPropertyTree() const;
+    void fromPropertyTree(const plugin::PropertyTree& tree);
 
     bool operator==(const HarmonicLayer& other) const;
 

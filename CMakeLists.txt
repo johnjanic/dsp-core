@@ -8,17 +8,19 @@ add_library(dsp_core STATIC
 )
 add_library(dsp::core ALIAS dsp_core)
 
-# Platform module dependency (provides AudioBuffer, PropertyTree, Timer, Geometry)
+# Modular platform dependencies
 target_link_libraries(dsp_core
     PUBLIC
-        platform::platform
+        audio::primitives   # AudioBuffer
+        plugin::core        # PropertyTree
+        platform::os        # Timer
+        ui::primitives      # Point, Rectangle (Geometry)
 )
 
 # Include directories
 target_include_directories(dsp_core
     PUBLIC
         "${CMAKE_CURRENT_LIST_DIR}"
-        "${CMAKE_SOURCE_DIR}/modules/plugin-platform"
         "${CMAKE_SOURCE_DIR}/libs/exprtk"
 )
 

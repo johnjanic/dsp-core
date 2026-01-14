@@ -4,7 +4,10 @@
  Platform-independent DSP primitives and audio pipeline for TotalHarmonicControl.
 
  Dependencies:
- - platform::platform - AudioBuffer, PropertyTree, Timer, Geometry
+ - audio::primitives - AudioBuffer
+ - plugin::core - PropertyTree
+ - platform::os - Timer
+ - ui::primitives - Geometry (Point, Rectangle)
  - Standard C++20 - threads, atomics, containers
 
  As of Phase 2 completion, this module has ZERO JUCE dependencies.
@@ -20,11 +23,11 @@
 #include <atomic>
 #include <string>
 
-// Platform abstractions (from Phase 1)
-#include <platform/AudioBuffer.h>
-#include <platform/PropertyTree.h>
-#include <platform/Timer.h>
-#include <platform/Geometry.h>
+// Modular platform abstractions
+#include <audio-primitives/AudioBuffer.h>
+#include <plugin-core/PropertyTree.h>
+#include <platform-os/Timer.h>
+#include <ui-primitives/Geometry.h>
 
 // Primitives
 #include "Source/primitives/MathUtils.h"
@@ -65,7 +68,6 @@
 
 // Services
 #include "Source/services/AdaptiveToleranceCalculator.h"
-#include "Source/services/CoordinateSnapper.h"
 #include "Source/services/CurveFeatureDetector.h"
 #include "Source/services/SplineFitter.h"
 #include "Source/services/SplineEvaluator.h"

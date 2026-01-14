@@ -1,9 +1,9 @@
 #pragma once
 
 #include "../model/LayeredTransferFunction.h"
-#include <platform/AudioBuffer.h>
-#include <platform/Timer.h>
-#include <platform/MessageThread.h>
+#include <audio-primitives/AudioBuffer.h>
+#include <platform-os/Timer.h>
+#include <platform-os/MessageThread.h>
 #include <array>
 #include <atomic>
 #include <condition_variable>
@@ -106,7 +106,7 @@ class AudioEngine {
      *
      * @param buffer Multi-channel audio buffer (modified in-place)
      */
-    void processBuffer(platform::AudioBuffer<double>& buffer) const;
+    void processBuffer(audio::AudioBuffer<double>& buffer) const;
 
     /**
      * Get reference to worker target index (for worker thread)

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/Oversampling.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 #include <numeric>
@@ -14,10 +14,10 @@ protected:
     static constexpr int kTestBlockSize = 512;
 
     // Generate sine wave into AudioBuffer
-    platform::AudioBuffer<double> generateSine(int numChannels, int numSamples,
+    audio::AudioBuffer<double> generateSine(int numChannels, int numSamples,
                                                double frequency, double sampleRate)
     {
-        platform::AudioBuffer<double> buffer(numChannels, numSamples);
+        audio::AudioBuffer<double> buffer(numChannels, numSamples);
         for (int ch = 0; ch < numChannels; ++ch)
         {
             for (int i = 0; i < numSamples; ++i)
@@ -29,7 +29,7 @@ protected:
     }
 
     // Calculate RMS from AudioBuffer channel
-    double calculateRMS(const platform::AudioBuffer<double>& buffer, int channel)
+    double calculateRMS(const audio::AudioBuffer<double>& buffer, int channel)
     {
         double sumSq = 0.0;
         const int numSamples = buffer.getNumSamples();
@@ -173,7 +173,7 @@ TEST_F(OversamplingTest, ProcessSamplesDown_RestoresLength)
     auto input = generateSine(1, kTestBlockSize, 1000.0, kSampleRate);
     os.processSamplesUp(input);
 
-    platform::AudioBuffer<double> output(1, kTestBlockSize);
+    audio::AudioBuffer<double> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     EXPECT_EQ(output.getNumSamples(), kTestBlockSize);
@@ -191,13 +191,13 @@ TEST_F(OversamplingTest, RoundTrip_PreservesSignal)
     for (int block = 0; block < 10; ++block)
     {
         os.processSamplesUp(input);
-        platform::AudioBuffer<double> output(1, kTestBlockSize);
+        audio::AudioBuffer<double> output(1, kTestBlockSize);
         os.processSamplesDown(output);
     }
 
     // Final round trip
     os.processSamplesUp(input);
-    platform::AudioBuffer<double> output(1, kTestBlockSize);
+    audio::AudioBuffer<double> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     // Compare RMS (should be similar after settling)
@@ -236,14 +236,14 @@ TEST_F(OversamplingTest, Stereo_ProcessesBothChannels)
     os.prepare(kTestBlockSize);
 
     // Create stereo with different content per channel
-    platform::AudioBuffer<double> input(2, kTestBlockSize);
+    audio::AudioBuffer<double> input(2, kTestBlockSize);
     for (int i = 0; i < kTestBlockSize; ++i)
     {
         input.setSample(0, i, std::sin(2.0 * M_PI * 1000.0 * i / kSampleRate));
         input.setSample(1, i, std::sin(2.0 * M_PI * 2000.0 * i / kSampleRate));
     }
 
-    platform::AudioBuffer<double>& upsampled = os.processSamplesUp(input);
+    audio::AudioBuffer<double>& upsampled = os.processSamplesUp(input);
 
     EXPECT_EQ(os.getNumChannels(), 2);
     EXPECT_EQ(os.getOversampledSize(), kTestBlockSize * 2);
@@ -261,7 +261,7 @@ TEST_F(OversamplingTest, MultiChannel_IndependentProcessing)
     Oversampling<double> os(4, 1);  // 4 channels
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<double> input(4, kTestBlockSize);
+    audio::AudioBuffer<double> input(4, kTestBlockSize);
     // Fill each channel with different DC offset for identification
     for (int ch = 0; ch < 4; ++ch)
     {
@@ -293,20 +293,20 @@ TEST_F(OversamplingTest, Reset_ClearsState)
     os.reset();
 
     // After reset, processing silence should produce silence
-    platform::AudioBuffer<double> silence(1, kTestBlockSize);
+    audio::AudioBuffer<double> silence(1, kTestBlockSize);
     silence.clear();
 
     // Process multiple blocks of silence
     for (int i = 0; i < 10; ++i)
     {
         os.processSamplesUp(silence);
-        platform::AudioBuffer<double> output(1, kTestBlockSize);
+        audio::AudioBuffer<double> output(1, kTestBlockSize);
         os.processSamplesDown(output);
     }
 
     // Final process
     os.processSamplesUp(silence);
-    platform::AudioBuffer<double> output(1, kTestBlockSize);
+    audio::AudioBuffer<double> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     // Output should be near zero
@@ -323,7 +323,7 @@ TEST_F(OversamplingTest, SmallBlockSize_Works)
     Oversampling<double> os(1, 2);
     os.prepare(64);
 
-    platform::AudioBuffer<double> input(1, 64);
+    audio::AudioBuffer<double> input(1, 64);
     for (int i = 0; i < 64; ++i)
     {
         input.setSample(0, i, std::sin(2.0 * M_PI * 1000.0 * i / kSampleRate));
@@ -338,7 +338,7 @@ TEST_F(OversamplingTest, SingleSampleBlock_Works)
     Oversampling<double> os(1, 1);  // 2x
     os.prepare(1);
 
-    platform::AudioBuffer<double> input(1, 1);
+    audio::AudioBuffer<double> input(1, 1);
     input.setSample(0, 0, 0.5);
 
     os.processSamplesUp(input);
@@ -350,19 +350,19 @@ TEST_F(OversamplingTest, ZeroInput_ProducesNearZeroOutput)
     Oversampling<double> os(1, 2);
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<double> input(1, kTestBlockSize);
+    audio::AudioBuffer<double> input(1, kTestBlockSize);
     input.clear();
 
     // Process multiple blocks to clear any initial transients
     for (int i = 0; i < 10; ++i)
     {
         os.processSamplesUp(input);
-        platform::AudioBuffer<double> output(1, kTestBlockSize);
+        audio::AudioBuffer<double> output(1, kTestBlockSize);
         os.processSamplesDown(output);
     }
 
     os.processSamplesUp(input);
-    platform::AudioBuffer<double> output(1, kTestBlockSize);
+    audio::AudioBuffer<double> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     double rms = calculateRMS(output, 0);
@@ -378,7 +378,7 @@ TEST_F(OversamplingTest, FloatPrecision_Works)
     Oversampling<float> os(1, 2);
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<float> input(1, kTestBlockSize);
+    audio::AudioBuffer<float> input(1, kTestBlockSize);
     for (int i = 0; i < kTestBlockSize; ++i)
     {
         input.setSample(0, i, std::sin(2.0f * static_cast<float>(M_PI) * 1000.0f * i / static_cast<float>(kSampleRate)));
@@ -387,7 +387,7 @@ TEST_F(OversamplingTest, FloatPrecision_Works)
     os.processSamplesUp(input);
     EXPECT_EQ(os.getOversampledSize(), kTestBlockSize * 4);
 
-    platform::AudioBuffer<float> output(1, kTestBlockSize);
+    audio::AudioBuffer<float> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     // Verify no NaN or Inf
@@ -425,7 +425,7 @@ TEST_F(OversamplingTest, AudioBuffer_ProcessSamplesUp)
     Oversampling<double> os(2, 2);  // 4x
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<double> input(2, kTestBlockSize);
+    audio::AudioBuffer<double> input(2, kTestBlockSize);
     // Fill with sine wave
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -435,7 +435,7 @@ TEST_F(OversamplingTest, AudioBuffer_ProcessSamplesUp)
         }
     }
 
-    platform::AudioBuffer<double>& upsampled = os.processSamplesUp(input);
+    audio::AudioBuffer<double>& upsampled = os.processSamplesUp(input);
 
     EXPECT_EQ(upsampled.getNumChannels(), 2);
     EXPECT_GE(upsampled.getNumSamples(), kTestBlockSize * 4);
@@ -446,7 +446,7 @@ TEST_F(OversamplingTest, AudioBuffer_ProcessSamplesDown)
     Oversampling<double> os(2, 2);  // 4x
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<double> input(2, kTestBlockSize);
+    audio::AudioBuffer<double> input(2, kTestBlockSize);
     // Fill with sine wave
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -458,7 +458,7 @@ TEST_F(OversamplingTest, AudioBuffer_ProcessSamplesDown)
 
     os.processSamplesUp(input);
 
-    platform::AudioBuffer<double> output(2, kTestBlockSize);
+    audio::AudioBuffer<double> output(2, kTestBlockSize);
     os.processSamplesDown(output);
 
     EXPECT_EQ(output.getNumChannels(), 2);
@@ -480,7 +480,7 @@ TEST_F(OversamplingTest, AudioBuffer_GetOversampledBuffer)
     Oversampling<double> os(2, 1);  // 2x
     os.prepare(kTestBlockSize);
 
-    platform::AudioBuffer<double> input(2, kTestBlockSize);
+    audio::AudioBuffer<double> input(2, kTestBlockSize);
     for (int ch = 0; ch < 2; ++ch)
     {
         for (int i = 0; i < kTestBlockSize; ++i)
@@ -491,7 +491,7 @@ TEST_F(OversamplingTest, AudioBuffer_GetOversampledBuffer)
 
     os.processSamplesUp(input);
 
-    platform::AudioBuffer<double>& oversampledRef = os.getOversampledBuffer();
+    audio::AudioBuffer<double>& oversampledRef = os.getOversampledBuffer();
 
     EXPECT_EQ(oversampledRef.getNumChannels(), 2);
     EXPECT_GE(oversampledRef.getNumSamples(), kTestBlockSize * 2);
@@ -503,7 +503,7 @@ TEST_F(OversamplingTest, AudioBuffer_RoundTrip)
     os.prepare(kTestBlockSize);
 
     // Use low frequency to avoid aliasing effects
-    platform::AudioBuffer<double> input(1, kTestBlockSize);
+    audio::AudioBuffer<double> input(1, kTestBlockSize);
     for (int i = 0; i < kTestBlockSize; ++i)
     {
         input.setSample(0, i, std::sin(2.0 * M_PI * 100.0 * i / kSampleRate));
@@ -513,13 +513,13 @@ TEST_F(OversamplingTest, AudioBuffer_RoundTrip)
     for (int block = 0; block < 10; ++block)
     {
         os.processSamplesUp(input);
-        platform::AudioBuffer<double> output(1, kTestBlockSize);
+        audio::AudioBuffer<double> output(1, kTestBlockSize);
         os.processSamplesDown(output);
     }
 
     // Final round trip
     os.processSamplesUp(input);
-    platform::AudioBuffer<double> output(1, kTestBlockSize);
+    audio::AudioBuffer<double> output(1, kTestBlockSize);
     os.processSamplesDown(output);
 
     // Compare RMS (should be similar after settling)

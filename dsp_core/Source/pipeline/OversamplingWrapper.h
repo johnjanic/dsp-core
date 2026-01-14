@@ -38,7 +38,7 @@ class OversamplingWrapper : public AudioProcessingStage {
     );
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void process(platform::AudioBuffer<double>& buffer) override;
+    void process(audio::AudioBuffer<double>& buffer) override;
     void reset() override;
     std::string getName() const override;
     int getLatencySamples() const override;

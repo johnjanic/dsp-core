@@ -36,7 +36,7 @@ void OversamplingWrapper::prepareToPlay(double sampleRate, int samplesPerBlock) 
     wrappedStage_->prepareToPlay(sampleRate * factor, oversampledBlockSize);
 }
 
-void OversamplingWrapper::process(platform::AudioBuffer<double>& buffer) {
+void OversamplingWrapper::process(audio::AudioBuffer<double>& buffer) {
     auto& oversampler = *oversamplers_[currentOrder_];
 
     // 1. Upsample - returns reference to internal oversampled buffer

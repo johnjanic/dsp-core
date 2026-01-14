@@ -41,7 +41,7 @@ class DryWetMixStage : public AudioProcessingStage {
     explicit DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline);
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void process(platform::AudioBuffer<double>& buffer) override;
+    void process(audio::AudioBuffer<double>& buffer) override;
     void reset() override;
     std::string getName() const override;
     int getLatencySamples() const override;
@@ -73,12 +73,12 @@ class DryWetMixStage : public AudioProcessingStage {
     AudioPipeline* getEffectsPipeline();
 
   private:
-    void captureDrySignal(const platform::AudioBuffer<double>& buffer);
-    void applyMix(platform::AudioBuffer<double>& wetBuffer);
+    void captureDrySignal(const audio::AudioBuffer<double>& buffer);
+    void applyMix(audio::AudioBuffer<double>& wetBuffer);
 
     std::unique_ptr<AudioPipeline> effectsPipeline_;
-    platform::AudioBuffer<double> dryBuffer_;   // Current dry signal
-    platform::AudioBuffer<double> delayBuffer_; // Circular buffer for latency compensation
+    audio::AudioBuffer<double> dryBuffer_;   // Current dry signal
+    audio::AudioBuffer<double> delayBuffer_; // Circular buffer for latency compensation
     int delayBufferWritePos_ = 0;               // Write position in delay buffer
     dsp::SmoothedValue<double> mixAmount_{1.0}; // 100% wet by default, smoothed for click-free changes
 };

@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/transfer_function_operations_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/transfer_function_operations_tests[1]_tests.cmake")
+else()
+  add_test(transfer_function_operations_tests_NOT_BUILT transfer_function_operations_tests_NOT_BUILT)
+endif()

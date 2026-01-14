@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/Gain.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -45,7 +45,7 @@ TEST_F(GainTest, SetGainLinear_AppliesToBuffer)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             buffer.setSample(ch, i, 1.0);
@@ -81,7 +81,7 @@ TEST_F(GainTest, ZeroGain_SilencesOutput)
     gain.setGainLinear(0.0);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             buffer.setSample(ch, i, 1.0);
@@ -100,7 +100,7 @@ TEST_F(GainTest, NegativeDb_AttenuatesSignal)
     gain.setGainDecibels(-20.0);  // 0.1 linear
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i)
         buffer.setSample(0, i, 1.0);
 
@@ -116,7 +116,7 @@ TEST_F(GainTest, PositiveDb_BoostsSignal)
     gain.setGainDecibels(20.0);  // 10.0 linear
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i)
         buffer.setSample(0, i, 1.0);
 
@@ -141,7 +141,7 @@ TEST_F(GainTest, Process_SmoothsChanges)
     int maxIterations = 1000;
     while (gain.isSmoothing() && maxIterations-- > 0)
     {
-        platform::AudioBuffer<double> buffer(1, 64);
+        audio::AudioBuffer<double> buffer(1, 64);
         for (int i = 0; i < 64; ++i)
             buffer.setSample(0, i, 1.0);
         gain.processBlock(buffer);
@@ -267,7 +267,7 @@ TEST_F(GainTest, ProcessBlock_Works)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(1, 5);
+    audio::AudioBuffer<double> buffer(1, 5);
     buffer.setSample(0, 0, 1.0);
     buffer.setSample(0, 1, 2.0);
     buffer.setSample(0, 2, 3.0);
@@ -290,7 +290,7 @@ TEST_F(GainTest, ProcessBlock_MultiChannel)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(4, 64);
+    audio::AudioBuffer<double> buffer(4, 64);
     for (int ch = 0; ch < 4; ++ch)
         for (int i = 0; i < 64; ++i)
             buffer.setSample(ch, i, 1.0);
@@ -309,7 +309,7 @@ TEST_F(GainTest, UnityGain_NoChange)
     gain.setGainLinear(1.0);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             buffer.setSample(ch, i, 0.75);
@@ -331,7 +331,7 @@ TEST_F(GainTest, FloatPrecision_Works)
     gain.setGainLinear(0.5f);
     gain.reset();
 
-    platform::AudioBuffer<float> buffer(1, 64);
+    audio::AudioBuffer<float> buffer(1, 64);
     for (int i = 0; i < 64; ++i)
         buffer.setSample(0, i, 1.0f);
 
@@ -377,7 +377,7 @@ TEST_F(GainTest, ProcessBlock_AudioBuffer_InPlace)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             buffer.setSample(ch, i, 1.0);
@@ -396,8 +396,8 @@ TEST_F(GainTest, ProcessBlock_AudioBuffer_SeparateIO)
     gain.setGainLinear(2.0);
     gain.reset();
 
-    platform::AudioBuffer<double> input(2, 64);
-    platform::AudioBuffer<double> output(2, 64);
+    audio::AudioBuffer<double> input(2, 64);
+    audio::AudioBuffer<double> output(2, 64);
 
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)

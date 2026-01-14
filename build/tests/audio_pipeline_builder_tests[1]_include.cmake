@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/audio_pipeline_builder_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/audio_pipeline_builder_tests[1]_tests.cmake")
+else()
+  add_test(audio_pipeline_builder_tests_NOT_BUILT audio_pipeline_builder_tests_NOT_BUILT)
+endif()

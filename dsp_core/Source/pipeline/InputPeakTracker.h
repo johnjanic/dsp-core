@@ -27,7 +27,7 @@ class InputPeakTracker : public AudioProcessingStage {
     void prepareToPlay(double /*sampleRate*/, int /*samplesPerBlock*/) override {
     }
 
-    void process(platform::AudioBuffer<double>& buffer) override {
+    void process(audio::AudioBuffer<double>& buffer) override {
         double currentPeak = 0.0;
 
         for (int channel = 0; channel < buffer.getNumChannels(); ++channel) {

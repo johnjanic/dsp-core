@@ -20,7 +20,7 @@ void DCBlockingFilter::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
     updateFilterCoefficients();
 }
 
-void DCBlockingFilter::process(platform::AudioBuffer<double>& buffer) {
+void DCBlockingFilter::process(audio::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 

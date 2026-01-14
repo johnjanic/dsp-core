@@ -88,7 +88,7 @@ class AudioPipeline : public AudioProcessingStage {
     /**
      * Process buffer through all stages in order.
      */
-    void process(platform::AudioBuffer<double>& buffer) override;
+    void process(audio::AudioBuffer<double>& buffer) override;
 
     /**
      * Reset all stages.

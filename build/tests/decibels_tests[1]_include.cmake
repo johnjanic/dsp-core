@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/decibels_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/decibels_tests[1]_tests.cmake")
+else()
+  add_test(decibels_tests_NOT_BUILT decibels_tests_NOT_BUILT)
+endif()

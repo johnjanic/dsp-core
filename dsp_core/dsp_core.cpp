@@ -28,7 +28,6 @@
 
 // Services
 #include "Source/services/AdaptiveToleranceCalculator.cpp"
-#include "Source/services/CoordinateSnapper.cpp"
 #include "Source/services/CurveFeatureDetector.cpp"
 #include "Source/services/SplineFitter.cpp"
 #include "Source/services/SplineEvaluator.cpp"

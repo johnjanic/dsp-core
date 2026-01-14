@@ -1,5 +1,5 @@
 #include <dsp_core/dsp_core.h>
-#include <platform/PropertyTree.h>
+#include <plugin-core/PropertyTree.h>
 #include <gtest/gtest.h>
 #include <thread>
 #include <atomic>
@@ -134,7 +134,7 @@ TEST_F(SplineLayerTest, SerializationRoundTrip) {
     std::vector<SplineAnchor> const anchors = {{-1.0, -1.0, true, 0.5}, {0.0, 0.5, true, 1.0}, {1.0, 1.0, true, -0.5}};
     layer1.setAnchors(anchors);
 
-    platform::PropertyTree const tree = layer1.toPropertyTree();
+    plugin::PropertyTree const tree = layer1.toPropertyTree();
 
     SplineLayer layer2;
     layer2.fromPropertyTree(tree);
@@ -148,7 +148,7 @@ TEST_F(SplineLayerTest, SerializationPreservesAnchors) {
     SplineLayer layer1;
     layer1.setAnchors(threePtAnchors);
 
-    platform::PropertyTree const tree = layer1.toPropertyTree();
+    plugin::PropertyTree const tree = layer1.toPropertyTree();
 
     SplineLayer layer2;
     layer2.fromPropertyTree(tree);
@@ -173,7 +173,7 @@ TEST_F(SplineLayerTest, SerializationJSONRoundTrip) {
     std::string const json = layer1.toPropertyTree().toJSON();
     EXPECT_FALSE(json.empty());
 
-    auto tree = platform::PropertyTree::fromJSON(json);
+    auto tree = plugin::PropertyTree::fromJSON(json);
     EXPECT_TRUE(tree.isValid());
 
     SplineLayer layer2;

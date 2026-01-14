@@ -2,7 +2,7 @@
 
 #include "Decibels.h"
 #include "SmoothedValue.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <algorithm>
 
 namespace dsp {
@@ -115,7 +115,7 @@ public:
      *
      * @param buffer AudioBuffer to process.
      */
-    void processBlock(platform::AudioBuffer<T>& buffer) noexcept
+    void processBlock(audio::AudioBuffer<T>& buffer) noexcept
     {
         processBlockImpl(buffer.getArrayOfWritePointers(),
                          buffer.getNumChannels(),
@@ -128,8 +128,8 @@ public:
      * @param input Input AudioBuffer.
      * @param output Output AudioBuffer.
      */
-    void processBlock(const platform::AudioBuffer<T>& input,
-                      platform::AudioBuffer<T>& output) noexcept
+    void processBlock(const audio::AudioBuffer<T>& input,
+                      audio::AudioBuffer<T>& output) noexcept
     {
         processBlockImpl(input.getArrayOfReadPointers(),
                          output.getArrayOfWritePointers(),

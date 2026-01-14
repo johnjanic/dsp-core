@@ -1,6 +1,6 @@
 #pragma once
 
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include "../primitives/LockFreeFIFO.h"
 #include <algorithm>
 #include <atomic>
@@ -61,7 +61,7 @@ class AudioInputBuffer {
      * Write samples from audio thread (non-blocking).
      * Overwrites oldest samples when buffer is full.
      */
-    void writeSamples(const platform::AudioBuffer<double>& buffer) {
+    void writeSamples(const audio::AudioBuffer<double>& buffer) {
         const int numSamples = buffer.getNumSamples();
         const int numChans = std::min(buffer.getNumChannels(), numChannels_);
 

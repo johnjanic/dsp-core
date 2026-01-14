@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/IIRFilter.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -474,7 +474,7 @@ TEST_F(IIRFilterTest, ProcessBlock_AudioBuffer_SingleChannel)
 {
     IIRFilter<double> filter;  // Pass-through
 
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     // Fill channel 0 with 0.5
     for (int i = 0; i < 64; ++i)
     {

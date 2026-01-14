@@ -1,6 +1,6 @@
 #pragma once
 #include "SplineTypes.h"
-#include <platform/PropertyTree.h>
+#include <plugin-core/PropertyTree.h>
 #include <vector>
 #include <atomic>
 #include <memory>
@@ -54,8 +54,8 @@ class SplineLayer {
     double evaluate(double x) const;
 
     // Serialization
-    platform::PropertyTree toPropertyTree() const;
-    void fromPropertyTree(const platform::PropertyTree& tree);
+    plugin::PropertyTree toPropertyTree() const;
+    void fromPropertyTree(const plugin::PropertyTree& tree);
 
   private:
     // Lock-free anchor storage (C++17 compatible)

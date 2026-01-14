@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/oversampling_ab_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/oversampling_ab_tests[1]_tests.cmake")
+else()
+  add_test(oversampling_ab_tests_NOT_BUILT oversampling_ab_tests_NOT_BUILT)
+endif()

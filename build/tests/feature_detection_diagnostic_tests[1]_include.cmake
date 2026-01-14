@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/feature_detection_diagnostic_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/feature_detection_diagnostic_tests[1]_tests.cmake")
+else()
+  add_test(feature_detection_diagnostic_tests_NOT_BUILT feature_detection_diagnostic_tests_NOT_BUILT)
+endif()

@@ -1,7 +1,7 @@
 #pragma once
 #include "HarmonicLayer.h"
 #include "SplineLayer.h"
-#include <platform/PropertyTree.h>
+#include <plugin-core/PropertyTree.h>
 #include <vector>
 #include <atomic>
 #include <memory>
@@ -527,8 +527,8 @@ class LayeredTransferFunction {
 
     // Serialization
 
-    platform::PropertyTree toPropertyTree() const;
-    void fromPropertyTree(const platform::PropertyTree& tree);
+    plugin::PropertyTree toPropertyTree() const;
+    void fromPropertyTree(const plugin::PropertyTree& tree);
 
     // JSON convenience methods
     std::string toJSON() const;

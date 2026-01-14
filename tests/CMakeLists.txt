@@ -238,31 +238,6 @@ endif()
 
 add_test(NAME AlgorithmBenchmarkTests COMMAND algorithm_benchmark_tests)
 
-# CoordinateSnapper tests
-add_executable(coordinate_snapper_tests
-    CoordinateSnapperTest.cpp
-)
-
-target_include_directories(coordinate_snapper_tests
-    PRIVATE
-    ${GOOGLETEST_SOURCE_DIR}/googletest/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-target_link_libraries(coordinate_snapper_tests
-    PRIVATE
-    dsp_core
-    GTest::gtest_main
-)
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-  gtest_discover_tests(coordinate_snapper_tests DISCOVERY_MODE PRE_TEST)
-else()
-  gtest_discover_tests(coordinate_snapper_tests)
-endif()
-
-add_test(NAME CoordinateSnapperTests COMMAND coordinate_snapper_tests)
-
 # AdaptiveTolerance tests
 add_executable(adaptive_tolerance_tests
     AdaptiveToleranceTest.cpp

@@ -1,0 +1,5 @@
+if(EXISTS "/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/extrema_quality_metrics_tests[1]_tests.cmake")
+  include("/Users/johnjaniczek/Code/black-diamond-distortion-vst3-sdk/modules/dsp-core/build/tests/extrema_quality_metrics_tests[1]_tests.cmake")
+else()
+  add_test(extrema_quality_metrics_tests_NOT_BUILT extrema_quality_metrics_tests_NOT_BUILT)
+endif()

@@ -39,7 +39,7 @@ class DCBlockingFilter : public AudioProcessingStage {
 
     // AudioProcessingStage interface
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void process(platform::AudioBuffer<double>& buffer) override;
+    void process(audio::AudioBuffer<double>& buffer) override;
     void reset() override;
     std::string getName() const override {
         return "DCBlockingFilter";

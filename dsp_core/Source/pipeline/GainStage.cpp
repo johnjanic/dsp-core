@@ -6,7 +6,7 @@ void GainStage::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     gain_.prepare(sampleRate);
 }
 
-void GainStage::process(platform::AudioBuffer<double>& buffer) {
+void GainStage::process(audio::AudioBuffer<double>& buffer) {
     gain_.processBlock(buffer);
 }
 

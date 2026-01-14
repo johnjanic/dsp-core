@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "../dsp_core/Source/pipeline/GainStage.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 
 using namespace dsp_core::audio_pipeline;
@@ -15,7 +15,7 @@ class GainStageTest : public ::testing::Test {
 };
 
 TEST_F(GainStageTest, DefaultGain_IsUnity) {
-    platform::AudioBuffer<double> buffer(2, 64);
+    audio::AudioBuffer<double> buffer(2, 64);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, 1.0);
@@ -37,7 +37,7 @@ TEST_F(GainStageTest, SetGainDecibels_AppliesCorrectly) {
     stage_.setGainDecibels(-6.0);
     stage_.reset(); // Snap to target (skip smoothing)
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i) {
         buffer.setSample(0, i, 1.0);
     }
@@ -52,7 +52,7 @@ TEST_F(GainStageTest, SetGainLinear_AppliesCorrectly) {
     stage_.setGainLinear(0.5);
     stage_.reset(); // Snap to target
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i) {
         buffer.setSample(0, i, 1.0);
     }
@@ -76,7 +76,7 @@ TEST_F(GainStageTest, LegacySetGainDB_Works) {
     stage_.setGainDB(-6.0);
     stage_.reset();
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i) {
         buffer.setSample(0, i, 1.0);
     }
@@ -94,7 +94,7 @@ TEST_F(GainStageTest, Smoothing_GradualChange) {
     // Set to -20dB gain
     stage_.setGainDecibels(-20.0);
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i) {
         buffer.setSample(0, i, 1.0);
     }
@@ -117,7 +117,7 @@ TEST_F(GainStageTest, MultiChannel_ProcessesAllChannels) {
     stage_.setGainLinear(0.5);
     stage_.reset();
 
-    platform::AudioBuffer<double> buffer(8, 64);
+    audio::AudioBuffer<double> buffer(8, 64);
     for (int ch = 0; ch < 8; ++ch) {
         for (int i = 0; i < 64; ++i) {
             buffer.setSample(ch, i, 1.0);
@@ -138,7 +138,7 @@ TEST_F(GainStageTest, Reset_SnapsToTarget) {
     stage_.setGainLinear(0.1);
     stage_.reset(); // Snap to target
 
-    platform::AudioBuffer<double> buffer(1, 64);
+    audio::AudioBuffer<double> buffer(1, 64);
     for (int i = 0; i < 64; ++i) {
         buffer.setSample(0, i, 1.0);
     }

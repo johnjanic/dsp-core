@@ -1,6 +1,6 @@
 #include "SeamlessTransferFunction.h"
 #include "SeamlessTransferFunctionImpl.h"
-#include <platform/MessageThread.h>
+#include <platform-os/MessageThread.h>
 #include <cassert>
 
 namespace dsp_core {
@@ -103,7 +103,7 @@ double SeamlessTransferFunction::applyTransferFunction(double x) const {
     return pimpl->audioEngine.applyTransferFunction(x);
 }
 
-void SeamlessTransferFunction::processBuffer(platform::AudioBuffer<double>& buffer) const {
+void SeamlessTransferFunction::processBuffer(audio::AudioBuffer<double>& buffer) const {
     // Audio thread: process entire multi-channel buffer with shared crossfade state
     // Change detection happens on the Editor's timer (25Hz) via notifyEditingModelChanged()
     pimpl->audioEngine.processBuffer(buffer);

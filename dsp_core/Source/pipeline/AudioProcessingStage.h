@@ -1,6 +1,6 @@
 #pragma once
 
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <string>
 
 namespace dsp_core::audio_pipeline {
@@ -38,7 +38,7 @@ class AudioProcessingStage {
      *
      * @param buffer Audio buffer to process (modified in-place)
      */
-    virtual void process(platform::AudioBuffer<double>& buffer) = 0;
+    virtual void process(audio::AudioBuffer<double>& buffer) = 0;
 
     /**
      * Reset internal state (e.g., filter coefficients, delay lines).

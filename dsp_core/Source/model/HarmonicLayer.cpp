@@ -111,14 +111,14 @@ double HarmonicLayer::evaluateChebyshevPolynomial(double x, const std::vector<do
     return x * b_kplus1 - b_kplus2;
 }
 
-platform::PropertyTree HarmonicLayer::toPropertyTree() const {
-    platform::PropertyTree tree("HarmonicLayer");
+plugin::PropertyTree HarmonicLayer::toPropertyTree() const {
+    plugin::PropertyTree tree("HarmonicLayer");
     tree.setProperty("numHarmonics", numHarmonics);
     tree.setProperty("algorithm", algorithm == Algorithm::Trig ? "trig" : "polynomial");
     return tree;
 }
 
-void HarmonicLayer::fromPropertyTree(const platform::PropertyTree& tree) {
+void HarmonicLayer::fromPropertyTree(const plugin::PropertyTree& tree) {
     if (!tree.isValid() || tree.getType() != "HarmonicLayer") {
         return;
     }

@@ -694,11 +694,11 @@ double LayeredTransferFunction::evaluateForRendering(double x, double normScalar
     }
 }
 
-platform::PropertyTree LayeredTransferFunction::toPropertyTree() const {
-    platform::PropertyTree tree("LayeredTransferFunction");
+plugin::PropertyTree LayeredTransferFunction::toPropertyTree() const {
+    plugin::PropertyTree tree("LayeredTransferFunction");
 
     // Serialize coefficients as a child tree with individual properties
-    platform::PropertyTree coeffTree("Coefficients");
+    plugin::PropertyTree coeffTree("Coefficients");
     coeffTree.setProperty("count", static_cast<int>(coefficients.size()));
     for (size_t i = 0; i < coefficients.size(); ++i) {
         coeffTree.setProperty("c" + std::to_string(i), coefficients[i]);
@@ -707,7 +707,7 @@ platform::PropertyTree LayeredTransferFunction::toPropertyTree() const {
 
     // Serialize base layer as base64-encoded binary data
     if (tableSize > 0) {
-        platform::PropertyTree baseTree("BaseLayer");
+        plugin::PropertyTree baseTree("BaseLayer");
         std::vector<uint8_t> binaryData(tableSize * sizeof(double));
         for (int i = 0; i < tableSize; ++i) {
             const double value = baseTable[i].load(std::memory_order_acquire);
@@ -740,7 +740,7 @@ platform::PropertyTree LayeredTransferFunction::toPropertyTree() const {
     return tree;
 }
 
-void LayeredTransferFunction::fromPropertyTree(const platform::PropertyTree& tree) {
+void LayeredTransferFunction::fromPropertyTree(const plugin::PropertyTree& tree) {
     if (!tree.isValid() || tree.getType() != "LayeredTransferFunction") {
         return;
     }
@@ -808,7 +808,7 @@ std::string LayeredTransferFunction::toJSON() const {
 }
 
 void LayeredTransferFunction::fromJSON(const std::string& json) {
-    auto tree = platform::PropertyTree::fromJSON(json);
+    auto tree = plugin::PropertyTree::fromJSON(json);
     fromPropertyTree(tree);
 }
 

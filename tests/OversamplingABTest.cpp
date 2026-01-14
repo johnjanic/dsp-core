@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/Oversampling.h"
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -104,12 +104,12 @@ TEST_F(OversamplingABTest, SineSweep_Produces_ValidOutput)
     auto input = generateSineSweep(kTestBlockSize);
 
     // Create AudioBuffer and copy input data
-    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
     std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
 
     os.processSamplesUp(inputBuffer);
 
-    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
     os.processSamplesDown(outputBuffer);
 
     // Verify output is valid (not NaN/Inf)
@@ -128,12 +128,12 @@ TEST_F(OversamplingABTest, WhiteNoise_Produces_ValidOutput)
     auto input = generateWhiteNoise(kTestBlockSize);
 
     // Create AudioBuffer and copy input data
-    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
     std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
 
     os.processSamplesUp(inputBuffer);
 
-    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
     os.processSamplesDown(outputBuffer);
 
     // Verify output is valid
@@ -152,12 +152,12 @@ TEST_F(OversamplingABTest, Impulse_Produces_ValidOutput)
     auto input = generateImpulse(kTestBlockSize);
 
     // Create AudioBuffer and copy input data
-    platform::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> inputBuffer(1, kTestBlockSize);
     std::memcpy(inputBuffer.getWritePointer(0), input.getChannel(0), sizeof(double) * kTestBlockSize);
 
     os.processSamplesUp(inputBuffer);
 
-    platform::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
+    audio::AudioBuffer<double> outputBuffer(1, kTestBlockSize);
     os.processSamplesDown(outputBuffer);
 
     // Verify output is valid

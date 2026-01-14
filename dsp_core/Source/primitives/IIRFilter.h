@@ -3,7 +3,7 @@
 #include <cmath>
 #include <array>
 #include <algorithm>
-#include <platform/AudioBuffer.h>
+#include <audio-primitives/AudioBuffer.h>
 
 namespace dsp {
 
@@ -281,7 +281,7 @@ public:
      * @param buffer AudioBuffer to process.
      * @param channel Channel index to process.
      */
-    void processBlock(platform::AudioBuffer<T>& buffer, int channel) noexcept
+    void processBlock(audio::AudioBuffer<T>& buffer, int channel) noexcept
     {
         T* samples = buffer.getWritePointer(channel);
         const int numSamples = buffer.getNumSamples();
