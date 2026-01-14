@@ -1,6 +1,5 @@
 #pragma once
-#include <juce_core/juce_core.h>
-#include <juce_graphics/juce_graphics.h>
+#include <platform/Geometry.h>
 
 namespace dsp_core::Services {
 
@@ -38,7 +37,7 @@ class CoordinateSnapper {
      * @param snapY Enable snapping on Y axis
      * @return Snapped point with selected axes snapped to grid
      */
-    static juce::Point<double> snapPoint(const juce::Point<double>& point, double gridStep, bool snapX = true,
+    static platform::Point<double> snapPoint(const platform::Point<double>& point, double gridStep, bool snapX = true,
                                          bool snapY = true);
 
     /**

@@ -14,7 +14,7 @@ double CoordinateSnapper::snapValue(double value, double gridStep) {
     return std::round(value / gridStep) * gridStep;
 }
 
-juce::Point<double> CoordinateSnapper::snapPoint(const juce::Point<double>& point, double gridStep, bool snapX,
+platform::Point<double> CoordinateSnapper::snapPoint(const platform::Point<double>& point, double gridStep, bool snapX,
                                                  bool snapY) {
     return {snapX ? snapValue(point.x, gridStep) : point.x, snapY ? snapValue(point.y, gridStep) : point.y};
 }

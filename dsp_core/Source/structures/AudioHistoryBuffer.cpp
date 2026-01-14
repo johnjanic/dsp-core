@@ -13,7 +13,7 @@ void AudioHistoryBuffer::getHistory(double* outSamples, int numSamples) const {
     jassert(numSamples <= size);
 
     const int start = (writePos - numSamples + size) % size;
-    const int firstPart = juce::jmin(size - start, numSamples);
+    const int firstPart = std::min(size - start, numSamples);
     const int secondPart = numSamples - firstPart;
 
     std::memcpy(outSamples, buffer.data() + start, firstPart * sizeof(double));

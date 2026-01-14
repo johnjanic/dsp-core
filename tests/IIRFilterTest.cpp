@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/IIRFilter.h"
+#include <platform/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -93,7 +94,8 @@ TEST_F(IIRFilterTest, HighPass_AttenuatesLowFreq)
     auto input = generateSine(100.0, 4096);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 1000, output.end()));
@@ -112,7 +114,8 @@ TEST_F(IIRFilterTest, HighPass_PassesHighFreq)
     auto input = generateSine(10000.0, 4096);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 1000, output.end()));
@@ -135,7 +138,8 @@ TEST_F(IIRFilterTest, LowPass_AttenuatesHighFreq)
     auto input = generateSine(10000.0, 4096);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 1000, output.end()));
@@ -154,7 +158,8 @@ TEST_F(IIRFilterTest, LowPass_PassesLowFreq)
     auto input = generateSine(100.0, 4096);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 1000, output.end()));
@@ -209,7 +214,8 @@ TEST_F(IIRFilterTest, ProcessBlock_MultiSample)
     std::vector<double> input = {0.1, 0.2, 0.3, 0.4, 0.5};
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     for (size_t i = 0; i < input.size(); ++i)
     {
@@ -223,7 +229,8 @@ TEST_F(IIRFilterTest, ProcessBlock_InPlace)
     std::vector<double> samples = {0.1, 0.2, 0.3, 0.4, 0.5};
     std::vector<double> expected = samples;
 
-    filter.processBlock(samples.data(), static_cast<int>(samples.size()));
+    for (size_t i = 0; i < samples.size(); ++i)
+        samples[i] = filter.processSample(samples[i]);
 
     for (size_t i = 0; i < samples.size(); ++i)
     {
@@ -245,7 +252,8 @@ TEST_F(IIRFilterTest, FrequencyResponse_HighPassAtCutoff)
     auto input = generateSine(cutoff, 8192);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 2000, output.end()));
@@ -265,7 +273,8 @@ TEST_F(IIRFilterTest, FrequencyResponse_LowPassAtCutoff)
     auto input = generateSine(cutoff, 8192);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 2000, output.end()));
@@ -392,7 +401,8 @@ TEST_F(IIRFilterTest, BandPass_PassesCenterFreq)
     auto input = generateSine(centerFreq, 8192);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 2000, output.end()));
@@ -412,7 +422,8 @@ TEST_F(IIRFilterTest, Notch_AttenuatesCenterFreq)
     auto input = generateSine(centerFreq, 8192);
     std::vector<double> output(input.size());
 
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 2000, output.end()));
@@ -444,7 +455,8 @@ TEST_F(IIRFilterTest, SetCoefficients_ChangesFilterBehavior)
     // Now verify it filters
     auto input = generateSine(10000.0, 4096);
     std::vector<double> output(input.size());
-    filter.processBlock(input.data(), output.data(), static_cast<int>(input.size()));
+    for (size_t i = 0; i < input.size(); ++i)
+        output[i] = filter.processSample(input[i]);
 
     double inputRMS = calculateRMS(input);
     double outputRMS = calculateRMS(std::vector<double>(output.begin() + 1000, output.end()));
@@ -452,4 +464,36 @@ TEST_F(IIRFilterTest, SetCoefficients_ChangesFilterBehavior)
     // High frequency should be attenuated
     double gainDb = 20.0 * std::log10(outputRMS / inputRMS);
     EXPECT_LT(gainDb, -20.0);
+}
+
+// =============================================================================
+// AudioBuffer API Tests
+// =============================================================================
+
+TEST_F(IIRFilterTest, ProcessBlock_AudioBuffer_SingleChannel)
+{
+    IIRFilter<double> filter;  // Pass-through
+
+    platform::AudioBuffer<double> buffer(2, 64);
+    // Fill channel 0 with 0.5
+    for (int i = 0; i < 64; ++i)
+    {
+        buffer.setSample(0, i, 0.5);
+        buffer.setSample(1, i, 0.25);
+    }
+
+    // Process only channel 0
+    filter.processBlock(buffer, 0);
+
+    // Channel 0 should be unchanged (pass-through)
+    for (int i = 0; i < 64; ++i)
+    {
+        EXPECT_NEAR(buffer.getSample(0, i), 0.5, kTolerance);
+    }
+
+    // Channel 1 should be untouched
+    for (int i = 0; i < 64; ++i)
+    {
+        EXPECT_NEAR(buffer.getSample(1, i), 0.25, kTolerance);
+    }
 }

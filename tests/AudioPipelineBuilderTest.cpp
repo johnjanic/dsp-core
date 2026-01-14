@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <dsp_core/dsp_core.h>
+#include <platform/AudioBuffer.h>
 #include <cmath>
 
 using namespace dsp_core::audio_pipeline;
@@ -163,7 +164,7 @@ TEST_F(AudioPipelineBuilderTest, PipelineProcessesAudio) {
 
     pipeline->prepareToPlay(44100.0, 512);
 
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     buffer.clear();
 
     // Fill with test signal (sine wave)
@@ -197,7 +198,7 @@ TEST_F(AudioPipelineBuilderTest, StageParametersCanBeModified) {
     gainStage->setGainDB(6.0);
 
     // Process multiple buffers to allow smoothing to settle
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     for (int block = 0; block < 10; ++block) {
         for (int i = 0; i < 512; ++i) {
             buffer.setSample(0, i, 0.5);

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <juce_audio_basics/juce_audio_basics.h>
+#include <platform/AudioBuffer.h>
+#include <string>
 
 namespace dsp_core::audio_pipeline {
 
@@ -37,7 +38,7 @@ class AudioProcessingStage {
      *
      * @param buffer Audio buffer to process (modified in-place)
      */
-    virtual void process(juce::AudioBuffer<double>& buffer) = 0;
+    virtual void process(platform::AudioBuffer<double>& buffer) = 0;
 
     /**
      * Reset internal state (e.g., filter coefficients, delay lines).
@@ -48,7 +49,7 @@ class AudioProcessingStage {
     /**
      * Get stage name for debugging/profiling.
      */
-    virtual juce::String getName() const = 0;
+    virtual std::string getName() const = 0;
 
     /**
      * Get latency introduced by this stage (in samples).

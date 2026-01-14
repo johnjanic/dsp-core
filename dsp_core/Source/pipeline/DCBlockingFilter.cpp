@@ -1,12 +1,14 @@
 #include "DCBlockingFilter.h"
+#include <algorithm>
 #include <cmath>
 
 namespace dsp_core::audio_pipeline {
 
 namespace {
-    // Cutoff frequency limits (safety: preserve low-end, avoid audible filtering)
-    constexpr double kMinFrequencyHz = 1.0;
-    constexpr double kMaxFrequencyHz = 20.0;
+// Cutoff frequency limits (safety: preserve low-end, avoid audible filtering)
+constexpr double kMinFrequencyHz = 1.0;
+constexpr double kMaxFrequencyHz = 20.0;
+constexpr double kPi = 3.14159265358979323846;
 } // namespace
 
 void DCBlockingFilter::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
@@ -20,7 +22,7 @@ void DCBlockingFilter::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
     updateFilterCoefficients();
 }
 
-void DCBlockingFilter::process(juce::AudioBuffer<double>& buffer) {
+void DCBlockingFilter::process(platform::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
@@ -54,7 +56,7 @@ void DCBlockingFilter::reset() {
 
 void DCBlockingFilter::setCutoffFrequency(double frequencyHz) {
     // Clamp to 1-20Hz range (safety: preserve low-end, avoid audible filtering)
-    frequencyHz = juce::jlimit(kMinFrequencyHz, kMaxFrequencyHz, frequencyHz);
+    frequencyHz = std::clamp(frequencyHz, kMinFrequencyHz, kMaxFrequencyHz);
 
     // Store with atomic release
     cutoffFrequency_.store(frequencyHz, std::memory_order_release);
@@ -67,13 +69,23 @@ void DCBlockingFilter::updateFilterCoefficients() {
     // Load cutoff frequency
     const double cutoffHz = cutoffFrequency_.load(std::memory_order_acquire);
 
-    // Design 1st-order Butterworth highpass filter
-    // H(s) = s / (s + ωc), where ωc = 2π * cutoffHz
-    auto coefficients = juce::dsp::IIR::Coefficients<double>::makeFirstOrderHighPass(sampleRate_, cutoffHz);
+    // Design 1st-order Butterworth highpass filter using bilinear transform
+    // Analog prototype: H(s) = s / (s + ωc)
+    // Bilinear transform: s = 2*fs * (1 - z^-1) / (1 + z^-1)
+    const double wc = 2.0 * kPi * cutoffHz;
+    const double k = std::tan(wc / (2.0 * sampleRate_));
+
+    // Coefficients for highpass: y[n] = b0*x[n] + b1*x[n-1] - a1*y[n-1]
+    const double norm = 1.0 / (1.0 + k);
+    const double b0 = norm;
+    const double b1 = -norm;
+    const double a1 = (k - 1.0) * norm;
 
     // Update all filters
     for (auto& filter : filters_) {
-        *filter.coefficients = *coefficients;
+        filter.b0 = b0;
+        filter.b1 = b1;
+        filter.a1 = a1;
     }
 }
 

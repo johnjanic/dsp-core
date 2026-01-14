@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "dsp_core/Source/primitives/Gain.h"
+#include <platform/AudioBuffer.h>
 #include <cmath>
 #include <vector>
 
@@ -10,30 +11,6 @@ protected:
     static constexpr double kSampleRate = 44100.0;
     static constexpr double kTolerance = 1e-9;
     static constexpr float kToleranceF = 1e-6f;
-
-    // Create test buffer with known values (multi-channel)
-    struct TestBuffer
-    {
-        std::vector<std::vector<double>> channels;
-        std::vector<double*> channelPointers;
-
-        TestBuffer(int numChannels, int numSamples, double value = 1.0)
-        {
-            channels.resize(numChannels);
-            channelPointers.resize(numChannels);
-            for (int ch = 0; ch < numChannels; ++ch)
-            {
-                channels[ch].resize(numSamples, value);
-                channelPointers[ch] = channels[ch].data();
-            }
-        }
-
-        double** data() { return channelPointers.data(); }
-        int getNumChannels() const { return static_cast<int>(channels.size()); }
-        int getNumSamples() const { return channels.empty() ? 0 : static_cast<int>(channels[0].size()); }
-        double* getChannel(int ch) { return channels[ch].data(); }
-        const double* getChannel(int ch) const { return channels[ch].data(); }
-    };
 };
 
 // =============================================================================
@@ -66,22 +43,18 @@ TEST_F(GainTest, SetGainLinear_AppliesToBuffer)
     Gain<double> gain;
     gain.prepare(kSampleRate);
     gain.setGainLinear(0.5);
-
-    // Skip smoothing by resetting
     gain.reset();
 
-    TestBuffer buffer(2, 64, 1.0);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(2, 64);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(ch, i, 1.0);
 
-    // All samples should be 0.5
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-    {
-        const double* data = buffer.getChannel(ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            EXPECT_NEAR(data[i], 0.5, kTolerance);
-        }
-    }
+    gain.processBlock(buffer);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            EXPECT_NEAR(buffer.getSample(ch, i), 0.5, kTolerance);
 }
 
 TEST_F(GainTest, SetGainDecibels_ConvertsCorrectly)
@@ -108,17 +81,16 @@ TEST_F(GainTest, ZeroGain_SilencesOutput)
     gain.setGainLinear(0.0);
     gain.reset();
 
-    TestBuffer buffer(2, 64, 1.0);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(2, 64);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(ch, i, 1.0);
 
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-    {
-        const double* data = buffer.getChannel(ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            EXPECT_NEAR(data[i], 0.0, kTolerance);
-        }
-    }
+    gain.processBlock(buffer);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            EXPECT_NEAR(buffer.getSample(ch, i), 0.0, kTolerance);
 }
 
 TEST_F(GainTest, NegativeDb_AttenuatesSignal)
@@ -128,11 +100,13 @@ TEST_F(GainTest, NegativeDb_AttenuatesSignal)
     gain.setGainDecibels(-20.0);  // 0.1 linear
     gain.reset();
 
-    TestBuffer buffer(1, 64, 1.0);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(1, 64);
+    for (int i = 0; i < 64; ++i)
+        buffer.setSample(0, i, 1.0);
 
-    const double* data = buffer.getChannel(0);
-    EXPECT_NEAR(data[0], 0.1, kTolerance);
+    gain.processBlock(buffer);
+
+    EXPECT_NEAR(buffer.getSample(0, 0), 0.1, kTolerance);
 }
 
 TEST_F(GainTest, PositiveDb_BoostsSignal)
@@ -142,11 +116,13 @@ TEST_F(GainTest, PositiveDb_BoostsSignal)
     gain.setGainDecibels(20.0);  // 10.0 linear
     gain.reset();
 
-    TestBuffer buffer(1, 64, 1.0);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(1, 64);
+    for (int i = 0; i < 64; ++i)
+        buffer.setSample(0, i, 1.0);
 
-    const double* data = buffer.getChannel(0);
-    EXPECT_NEAR(data[0], 10.0, kTolerance);
+    gain.processBlock(buffer);
+
+    EXPECT_NEAR(buffer.getSample(0, 0), 10.0, kTolerance);
 }
 
 // =============================================================================
@@ -165,8 +141,10 @@ TEST_F(GainTest, Process_SmoothsChanges)
     int maxIterations = 1000;
     while (gain.isSmoothing() && maxIterations-- > 0)
     {
-        TestBuffer buffer(1, 64, 1.0);
-        gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+        platform::AudioBuffer<double> buffer(1, 64);
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(0, i, 1.0);
+        gain.processBlock(buffer);
     }
 
     EXPECT_FALSE(gain.isSmoothing());
@@ -289,14 +267,20 @@ TEST_F(GainTest, ProcessBlock_Works)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    std::vector<double> samples = {1.0, 2.0, 3.0, 4.0, 5.0};
-    gain.processBlock(samples.data(), static_cast<int>(samples.size()));
+    platform::AudioBuffer<double> buffer(1, 5);
+    buffer.setSample(0, 0, 1.0);
+    buffer.setSample(0, 1, 2.0);
+    buffer.setSample(0, 2, 3.0);
+    buffer.setSample(0, 3, 4.0);
+    buffer.setSample(0, 4, 5.0);
 
-    EXPECT_NEAR(samples[0], 0.5, kTolerance);
-    EXPECT_NEAR(samples[1], 1.0, kTolerance);
-    EXPECT_NEAR(samples[2], 1.5, kTolerance);
-    EXPECT_NEAR(samples[3], 2.0, kTolerance);
-    EXPECT_NEAR(samples[4], 2.5, kTolerance);
+    gain.processBlock(buffer);
+
+    EXPECT_NEAR(buffer.getSample(0, 0), 0.5, kTolerance);
+    EXPECT_NEAR(buffer.getSample(0, 1), 1.0, kTolerance);
+    EXPECT_NEAR(buffer.getSample(0, 2), 1.5, kTolerance);
+    EXPECT_NEAR(buffer.getSample(0, 3), 2.0, kTolerance);
+    EXPECT_NEAR(buffer.getSample(0, 4), 2.5, kTolerance);
 }
 
 TEST_F(GainTest, ProcessBlock_MultiChannel)
@@ -306,17 +290,16 @@ TEST_F(GainTest, ProcessBlock_MultiChannel)
     gain.setGainLinear(0.5);
     gain.reset();
 
-    TestBuffer buffer(4, 64, 1.0);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(4, 64);
+    for (int ch = 0; ch < 4; ++ch)
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(ch, i, 1.0);
+
+    gain.processBlock(buffer);
 
     for (int ch = 0; ch < 4; ++ch)
-    {
-        const double* data = buffer.getChannel(ch);
         for (int i = 0; i < 64; ++i)
-        {
-            EXPECT_NEAR(data[i], 0.5, kTolerance) << "Channel " << ch << " sample " << i;
-        }
-    }
+            EXPECT_NEAR(buffer.getSample(ch, i), 0.5, kTolerance) << "Channel " << ch << " sample " << i;
 }
 
 TEST_F(GainTest, UnityGain_NoChange)
@@ -326,14 +309,15 @@ TEST_F(GainTest, UnityGain_NoChange)
     gain.setGainLinear(1.0);
     gain.reset();
 
-    TestBuffer buffer(2, 64, 0.75);
-    gain.processBlock(buffer.data(), buffer.getNumChannels(), buffer.getNumSamples());
+    platform::AudioBuffer<double> buffer(2, 64);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(ch, i, 0.75);
 
-    const double* data = buffer.getChannel(0);
+    gain.processBlock(buffer);
+
     for (int i = 0; i < 64; ++i)
-    {
-        EXPECT_NEAR(data[i], 0.75, kTolerance);
-    }
+        EXPECT_NEAR(buffer.getSample(0, i), 0.75, kTolerance);
 }
 
 // =============================================================================
@@ -347,10 +331,13 @@ TEST_F(GainTest, FloatPrecision_Works)
     gain.setGainLinear(0.5f);
     gain.reset();
 
-    std::vector<float> samples(64, 1.0f);
-    gain.processBlock(samples.data(), static_cast<int>(samples.size()));
+    platform::AudioBuffer<float> buffer(1, 64);
+    for (int i = 0; i < 64; ++i)
+        buffer.setSample(0, i, 1.0f);
 
-    EXPECT_NEAR(samples[0], 0.5f, kToleranceF);
+    gain.processBlock(buffer);
+
+    EXPECT_NEAR(buffer.getSample(0, 0), 0.5f, kToleranceF);
 }
 
 // =============================================================================
@@ -377,4 +364,48 @@ TEST_F(GainTest, LargeGain_Works)
 
     double output = gain.processSample(1.0);
     EXPECT_NEAR(output, 1000.0, kTolerance);
+}
+
+// =============================================================================
+// AudioBuffer API Tests (In-Place and Separate I/O)
+// =============================================================================
+
+TEST_F(GainTest, ProcessBlock_AudioBuffer_InPlace)
+{
+    Gain<double> gain;
+    gain.prepare(kSampleRate);
+    gain.setGainLinear(0.5);
+    gain.reset();
+
+    platform::AudioBuffer<double> buffer(2, 64);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            buffer.setSample(ch, i, 1.0);
+
+    gain.processBlock(buffer);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            EXPECT_NEAR(buffer.getSample(ch, i), 0.5, kTolerance);
+}
+
+TEST_F(GainTest, ProcessBlock_AudioBuffer_SeparateIO)
+{
+    Gain<double> gain;
+    gain.prepare(kSampleRate);
+    gain.setGainLinear(2.0);
+    gain.reset();
+
+    platform::AudioBuffer<double> input(2, 64);
+    platform::AudioBuffer<double> output(2, 64);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            input.setSample(ch, i, 0.25);
+
+    gain.processBlock(input, output);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            EXPECT_NEAR(output.getSample(ch, i), 0.5, kTolerance);
 }

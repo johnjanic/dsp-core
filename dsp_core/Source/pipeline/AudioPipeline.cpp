@@ -1,10 +1,11 @@
 #include "AudioPipeline.h"
+#include <cassert>
 #include <string>
 
 namespace dsp_core::audio_pipeline {
 
 void AudioPipeline::addStage(std::unique_ptr<AudioProcessingStage> stage, const std::string& tag) {
-    jassert(stage != nullptr);
+    assert(stage != nullptr);
 
     std::string finalTag = tag;
     if (finalTag.empty()) {
@@ -27,7 +28,7 @@ void AudioPipeline::prepareToPlay(double sampleRate, int samplesPerBlock) {
     }
 }
 
-void AudioPipeline::process(juce::AudioBuffer<double>& buffer) {
+void AudioPipeline::process(platform::AudioBuffer<double>& buffer) {
     for (auto& stage : stages_) {
         stage->process(buffer);
     }
@@ -39,8 +40,8 @@ void AudioPipeline::reset() {
     }
 }
 
-juce::String AudioPipeline::getName() const {
-    juce::String name = "Pipeline[";
+std::string AudioPipeline::getName() const {
+    std::string name = "Pipeline[";
     for (size_t i = 0; i < stages_.size(); ++i) {
         if (i > 0) {
             name += " -> ";
@@ -72,7 +73,7 @@ AudioProcessingStage* AudioPipeline::getStage(const std::string& tag) {
     }
 
     const size_t index = it->second;
-    jassert(index < stages_.size());
+    assert(index < stages_.size());
     return stages_[index].get();
 }
 

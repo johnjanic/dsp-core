@@ -17,7 +17,7 @@ double TransferFunction::normalizeIndex(int index) const {
     if (index < 0 || index >= tableSize) {
         return 0.0;
     }
-    return juce::jmap(static_cast<double>(index), 0.0, static_cast<double>(tableSize - 1), minSignalValue,
+    return dsp::mapValue(static_cast<double>(index), 0.0, static_cast<double>(tableSize - 1), minSignalValue,
                       maxSignalValue);
 }
 
@@ -72,7 +72,7 @@ double TransferFunction::getSample(int i) const {
         const double slope = table[tableSize - 1].load() - table[tableSize - 2].load();
         return table[tableSize - 1].load() + slope * (i - tableSize + 1);
     }
-    const int clampedIdx = juce::jlimit(0, tableSize - 1, i);
+    const int clampedIdx = std::clamp(i, 0, tableSize - 1);
     return table[clampedIdx].load();
 }
 

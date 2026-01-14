@@ -102,7 +102,7 @@ double SeamlessTransferFunction::applyTransferFunction(double x) const {
     return pimpl->audioEngine.applyTransferFunction(x);
 }
 
-void SeamlessTransferFunction::processBuffer(juce::AudioBuffer<double>& buffer) const {
+void SeamlessTransferFunction::processBuffer(platform::AudioBuffer<double>& buffer) const {
     // Audio thread: process entire multi-channel buffer with shared crossfade state
     // Change detection happens on the Editor's timer (25Hz) via notifyEditingModelChanged()
     pimpl->audioEngine.processBuffer(buffer);

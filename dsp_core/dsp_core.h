@@ -29,6 +29,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 // Primitives
+#include "Source/primitives/MathUtils.h"
 #include "Source/primitives/Decibels.h"
 #include "Source/primitives/SmoothedValue.h"
 #include "Source/primitives/IIRFilter.h"

@@ -23,12 +23,11 @@ class AudioInputWriter : public AudioProcessingStage {
      */
     explicit AudioInputWriter(AudioInputBuffer& buffer) : buffer_(buffer) {}
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
-        juce::ignoreUnused(sampleRate, samplesPerBlock);
+    void prepareToPlay(double /*sampleRate*/, int /*samplesPerBlock*/) override {
         // Buffer prepare is called separately by processor
     }
 
-    void process(juce::AudioBuffer<double>& audioBuffer) override {
+    void process(platform::AudioBuffer<double>& audioBuffer) override {
         // Simply write samples to buffer - UI thread handles peak detection
         buffer_.writeSamples(audioBuffer);
     }
@@ -37,7 +36,7 @@ class AudioInputWriter : public AudioProcessingStage {
         buffer_.reset();
     }
 
-    juce::String getName() const override {
+    std::string getName() const override {
         return "AudioInputWriter";
     }
 

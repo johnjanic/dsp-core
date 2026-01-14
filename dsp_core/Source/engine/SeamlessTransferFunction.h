@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/LayeredTransferFunction.h"
+#include <platform/AudioBuffer.h>
 #include <array>
 #include <functional>
 #include <memory>
@@ -127,7 +128,7 @@ class SeamlessTransferFunction {
      *
      * @param buffer Multi-channel audio buffer (modified in-place)
      */
-    void processBuffer(juce::AudioBuffer<double>& buffer) const;
+    void processBuffer(platform::AudioBuffer<double>& buffer) const;
 
     /**
      * Prepare for playback (audio thread)

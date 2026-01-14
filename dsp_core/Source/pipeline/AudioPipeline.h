@@ -88,7 +88,7 @@ class AudioPipeline : public AudioProcessingStage {
     /**
      * Process buffer through all stages in order.
      */
-    void process(juce::AudioBuffer<double>& buffer) override;
+    void process(platform::AudioBuffer<double>& buffer) override;
 
     /**
      * Reset all stages.
@@ -98,7 +98,7 @@ class AudioPipeline : public AudioProcessingStage {
     /**
      * Get name of pipeline (lists all stages).
      */
-    juce::String getName() const override;
+    std::string getName() const override;
 
     /**
      * Get total latency of all stages combined.

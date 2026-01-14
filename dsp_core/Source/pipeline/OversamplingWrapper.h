@@ -23,6 +23,10 @@ namespace dsp_core::audio_pipeline {
  *   );
  *
  *   mainPipeline.addStage(std::move(wrapped));
+ *
+ * NOTE: This class still uses juce::dsp::Oversampling internally for the
+ * oversampling algorithm. The public API uses platform::AudioBuffer.
+ * Full migration of the DSP internals is planned for a future step.
  */
 class OversamplingWrapper : public AudioProcessingStage {
   public:
@@ -35,9 +39,9 @@ class OversamplingWrapper : public AudioProcessingStage {
     );
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void process(juce::AudioBuffer<double>& buffer) override;
+    void process(platform::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override;
+    std::string getName() const override;
     int getLatencySamples() const override;
 
     /**
@@ -61,6 +65,7 @@ class OversamplingWrapper : public AudioProcessingStage {
     std::unique_ptr<AudioProcessingStage> wrappedStage_;
 
     // Pre-allocated oversamplers (1x, 2x, 4x, 8x, 16x)
+    // NOTE: Still uses JUCE DSP for oversampling algorithm
     std::array<std::unique_ptr<juce::dsp::Oversampling<double>>, 5> oversamplers_;
 
     // Pre-allocated channel pointers array (avoid std::vector allocation per process call)

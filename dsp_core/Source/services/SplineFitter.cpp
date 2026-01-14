@@ -72,7 +72,7 @@ SplineFitResult SplineFitter::fitCurve(const LayeredTransferFunction& ltf, const
     result.numAnchors = static_cast<int>(result.anchors.size());
     result.maxError = maxErr;
     result.averageError = sumErr / static_cast<double>(samples.size());
-    result.message = "Fitted " + juce::String(result.numAnchors) + " anchors, max error: " + juce::String(maxErr, 4);
+    result.message = "Fitted " + std::to_string(result.numAnchors) + " anchors, max error: " + std::to_string(maxErr);
 
     return result;
 }
@@ -187,8 +187,8 @@ void SplineFitter::enforceMonotonicity(std::vector<Sample>& samples) {
 
 void SplineFitter::clampToRange(std::vector<Sample>& samples) {
     for (auto& s : samples) {
-        s.x = juce::jlimit(-1.0, 1.0, s.x);
-        s.y = juce::jlimit(-1.0, 1.0, s.y);
+        s.x = std::clamp(s.x, -1.0, 1.0);
+        s.y = std::clamp(s.y, -1.0, 1.0);
     }
 }
 
@@ -264,7 +264,7 @@ void SplineFitter::computePCHIPTangentsImpl(std::vector<SplineAnchor>& anchors, 
         }
 
         // Enforce slope caps (for anti-aliasing)
-        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, anchors[i].tangent);
+        anchors[i].tangent = std::clamp(anchors[i].tangent, config.minSlope, config.maxSlope);
     }
 
     // Overshoot detection and correction
@@ -388,7 +388,7 @@ void SplineFitter::computeFritschCarlsonTangents(std::vector<SplineAnchor>& anch
 
     // 5. Apply tangents to anchors and enforce slope bounds
     for (int i = 0; i < n; ++i) {
-        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangents[i]);
+        anchors[i].tangent = std::clamp(tangents[i], config.minSlope, config.maxSlope);
     }
 }
 
@@ -439,7 +439,7 @@ void SplineFitter::computeAkimaTangents(std::vector<SplineAnchor>& anchors, cons
 
     // 3. Apply tangents to anchors and enforce slope bounds
     for (int i = 0; i < n; ++i) {
-        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangents[i]);
+        anchors[i].tangent = std::clamp(tangents[i], config.minSlope, config.maxSlope);
     }
 }
 
@@ -474,7 +474,7 @@ void SplineFitter::computeFiniteDifferenceTangents(std::vector<SplineAnchor>& an
             }
         }
 
-        anchors[i].tangent = juce::jlimit(config.minSlope, config.maxSlope, tangent);
+        anchors[i].tangent = std::clamp(tangent, config.minSlope, config.maxSlope);
     }
 }
 

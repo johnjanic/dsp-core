@@ -353,7 +353,7 @@ double LayeredTransferFunction::normalizeIndex(int index) const {
     if (index < 0 || index >= tableSize) {
         return 0.0;
     }
-    return juce::jmap(static_cast<double>(index), 0.0, static_cast<double>(tableSize - 1), minValue, maxValue);
+    return dsp::mapValue(static_cast<double>(index), 0.0, static_cast<double>(tableSize - 1), minValue, maxValue);
 }
 
 double LayeredTransferFunction::applyTransferFunction(double x) const {
@@ -375,10 +375,10 @@ double LayeredTransferFunction::interpolateCatmullRom(double x) const {
     // PERFORMANCE: Fast path for Clamp mode (most common, default case ~95%)
     // Computes on-demand from base layer + harmonics (no cached composite table)
     if (juce_likely(extrapMode == ExtrapolationMode::Clamp)) {
-        const int idx0 = juce::jlimit(0, tableSize - 1, index - 1);
-        const int idx1 = juce::jlimit(0, tableSize - 1, index);
-        const int idx2 = juce::jlimit(0, tableSize - 1, index + 1);
-        const int idx3 = juce::jlimit(0, tableSize - 1, index + 2);
+        const int idx0 = std::clamp(index - 1, 0, tableSize - 1);
+        const int idx1 = std::clamp(index, 0, tableSize - 1);
+        const int idx2 = std::clamp(index + 1, 0, tableSize - 1);
+        const int idx3 = std::clamp(index + 2, 0, tableSize - 1);
 
         const double y0 = computeCompositeAt(idx0);
         const double y1 = computeCompositeAt(idx1);
@@ -469,8 +469,8 @@ double LayeredTransferFunction::evaluateBaseAndHarmonics(double x) const {
     const int index = static_cast<int>(x_proj);
     const double t = x_proj - index;
 
-    const int idx0 = juce::jlimit(0, tableSize - 1, index);
-    const int idx1 = juce::jlimit(0, tableSize - 1, index + 1);
+    const int idx0 = std::clamp(index, 0, tableSize - 1);
+    const int idx1 = std::clamp(index + 1, 0, tableSize - 1);
 
     const double y0 = baseTable[idx0].load(std::memory_order_relaxed);
     const double y1 = baseTable[idx1].load(std::memory_order_relaxed);

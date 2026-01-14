@@ -1,8 +1,10 @@
 #pragma once
 
-#include <juce_audio_basics/juce_audio_basics.h>
+#include <platform/AudioBuffer.h>
 #include <juce_core/juce_core.h>
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <vector>
 
 namespace dsp_core::audio_pipeline {
@@ -22,6 +24,9 @@ namespace dsp_core::audio_pipeline {
  * - Stores the most recent N samples per channel
  * - When buffer fills, oldest samples are overwritten
  * - UI thread reads available samples without blocking audio thread
+ *
+ * NOTE: Still uses juce::AbstractFifo for lock-free coordination.
+ * This is a utility class, not an audio buffer type.
  */
 class AudioInputBuffer {
   public:
@@ -59,9 +64,9 @@ class AudioInputBuffer {
      * Write samples from audio thread (non-blocking).
      * Overwrites oldest samples when buffer is full.
      */
-    void writeSamples(const juce::AudioBuffer<double>& buffer) {
+    void writeSamples(const platform::AudioBuffer<double>& buffer) {
         const int numSamples = buffer.getNumSamples();
-        const int numChans = juce::jmin(buffer.getNumChannels(), numChannels_);
+        const int numChans = std::min(buffer.getNumChannels(), numChannels_);
 
         // Get write region from FIFO
         int start1, size1, start2, size2;

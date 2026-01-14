@@ -1,5 +1,5 @@
 #include "DryWetMixStage.h"
-#include <juce_core/juce_core.h>
+#include <cassert>
 
 namespace dsp_core::audio_pipeline {
 
@@ -9,7 +9,7 @@ constexpr int kMaxChannels = 8; // Support stereo, 5.1, 7.1
 
 DryWetMixStage::DryWetMixStage(std::unique_ptr<AudioPipeline> effectsPipeline)
     : effectsPipeline_(std::move(effectsPipeline)) {
-    jassert(effectsPipeline_ != nullptr);
+    assert(effectsPipeline_ != nullptr);
 }
 
 void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
@@ -26,7 +26,7 @@ void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     }
 }
 
-void DryWetMixStage::process(juce::AudioBuffer<double>& buffer) {
+void DryWetMixStage::process(platform::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
     const int latencySamples = effectsPipeline_->getLatencySamples();
@@ -68,7 +68,7 @@ void DryWetMixStage::reset() {
     delayBufferWritePos_ = 0;
 }
 
-juce::String DryWetMixStage::getName() const {
+std::string DryWetMixStage::getName() const {
     return "DryWetMix(" + effectsPipeline_->getName() + ")";
 }
 
@@ -81,22 +81,22 @@ AudioPipeline* DryWetMixStage::getEffectsPipeline() {
 }
 
 void DryWetMixStage::setMixAmount(double mix) {
-    mixAmount_ = juce::jlimit(0.0, 1.0, mix);
+    mixAmount_ = std::clamp(mix, 0.0, 1.0);
 }
 
-void DryWetMixStage::captureDrySignal(const juce::AudioBuffer<double>& buffer) {
+void DryWetMixStage::captureDrySignal(const platform::AudioBuffer<double>& buffer) {
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
-    jassert(numChannels <= dryBuffer_.getNumChannels());
-    jassert(numSamples <= dryBuffer_.getNumSamples());
+    assert(numChannels <= dryBuffer_.getNumChannels());
+    assert(numSamples <= dryBuffer_.getNumSamples());
 
     for (int ch = 0; ch < numChannels; ++ch) {
         dryBuffer_.copyFrom(ch, 0, buffer, ch, 0, numSamples);
     }
 }
 
-void DryWetMixStage::applyMix(juce::AudioBuffer<double>& wetBuffer) {
+void DryWetMixStage::applyMix(platform::AudioBuffer<double>& wetBuffer) {
     const int numChannels = wetBuffer.getNumChannels();
     const int numSamples = wetBuffer.getNumSamples();
 
@@ -107,8 +107,10 @@ void DryWetMixStage::applyMix(juce::AudioBuffer<double>& wetBuffer) {
         double* wetData = wetBuffer.getWritePointer(ch);
         const double* dryData = dryBuffer_.getReadPointer(ch);
 
-        juce::FloatVectorOperations::multiply(wetData, wetGain, numSamples);
-        juce::FloatVectorOperations::addWithMultiply(wetData, dryData, dryGain, numSamples);
+        // Apply: wetData = wetData * wetGain + dryData * dryGain
+        for (int i = 0; i < numSamples; ++i) {
+            wetData[i] = wetData[i] * wetGain + dryData[i] * dryGain;
+        }
     }
 }
 

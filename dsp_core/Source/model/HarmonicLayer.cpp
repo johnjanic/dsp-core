@@ -46,7 +46,7 @@ void HarmonicLayer::precomputeBasisFunctions(int tableSize, double minVal, doubl
         for (int i = 0; i < tableSize; ++i) {
             // Map table index to x ∈ [minVal, maxVal]
             // Uses same formula as TransferFunction::normalizeIndex()
-            double x = juce::jmap(static_cast<double>(i), 0.0, static_cast<double>(tableSize - 1), minVal, maxVal);
+            double x = dsp::mapValue(static_cast<double>(i), 0.0, static_cast<double>(tableSize - 1), minVal, maxVal);
             x = std::max(-1.0, std::min(1.0, x)); // Clamp to valid domain
 
             if (n == 0) {
@@ -150,7 +150,7 @@ int HarmonicLayer::xToTableIndex(double x, int tableSize, double minVal, double 
     // with normalizeIndex(). Without rounding, floating-point precision errors cause
     // off-by-one index lookups (e.g., 948.9999... truncates to 948 instead of 949),
     // which creates subtle differences in baked values between equivalent curves.
-    return static_cast<int>(std::round(juce::jmap(x, minVal, maxVal, 0.0, static_cast<double>(tableSize - 1))));
+    return static_cast<int>(std::round(dsp::mapValue(x, minVal, maxVal, 0.0, static_cast<double>(tableSize - 1))));
 }
 
 } // namespace dsp_core

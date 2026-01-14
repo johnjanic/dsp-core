@@ -9,12 +9,21 @@ juce_add_module(dsp_core
             juce::juce_dsp
 )
 
+# Add platform module dependency for AudioBuffer and other platform abstractions
+target_link_libraries(dsp_core INTERFACE platform::platform)
+
+# Add platform include directory explicitly for header compilation
+# (INTERFACE link propagates to consumers, but headers need the include path during compilation)
+target_include_directories(dsp_core INTERFACE "${CMAKE_SOURCE_DIR}/modules/plugin-platform")
+
 # Add exprtk include path (header-only library managed by CPM in root CMakeLists.txt)
 target_include_directories(dsp_core INTERFACE "${CMAKE_SOURCE_DIR}/libs/exprtk")
 
 target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/dsp_core.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/dsp_core.h"
+    # Primitives
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/primitives/MathUtils.h"
     # Structures
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/structures/AudioHistoryBuffer.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/structures/AudioHistoryBuffer.cpp"

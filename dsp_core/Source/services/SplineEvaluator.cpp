@@ -1,7 +1,6 @@
 #include "SplineEvaluator.h"
 #include <algorithm>
 #include <cmath>
-#include <juce_core/juce_core.h>
 
 namespace dsp_core::Services {
 
@@ -118,7 +117,7 @@ double SplineEvaluator::evaluateSegment(const SplineAnchor& p0, const SplineAnch
         return p0.y; // Degenerate segment
 
     double t = (x - p0.x) / dx;
-    t = juce::jlimit(0.0, 1.0, t); // Clamp to segment bounds
+    t = std::clamp(t, 0.0, 1.0); // Clamp to segment bounds
 
     // Cubic Hermite basis functions
     // h00(t) = 2t³ - 3t² + 1 = (1 + 2t)(1-t)²
@@ -153,7 +152,7 @@ double SplineEvaluator::evaluateSegmentDerivative(const SplineAnchor& p0, const 
         return 0.0; // Degenerate segment
 
     double t = (x - p0.x) / dx;
-    t = juce::jlimit(0.0, 1.0, t); // Clamp to segment bounds
+    t = std::clamp(t, 0.0, 1.0); // Clamp to segment bounds
 
     // Derivatives of cubic Hermite basis functions (with respect to t)
     // h00'(t) = 6t² - 6t = 6t(t-1)

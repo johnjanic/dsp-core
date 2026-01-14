@@ -1,12 +1,12 @@
 #pragma once
 
 #include "../model/LayeredTransferFunction.h"
+#include <platform/AudioBuffer.h>
 #include <array>
 #include <atomic>
 #include <functional>
 #include <memory>
 #include <juce_core/juce_core.h>
-#include <juce_audio_basics/juce_audio_basics.h>
 
 namespace dsp_core {
 
@@ -102,7 +102,7 @@ class AudioEngine {
      *
      * @param buffer Multi-channel audio buffer (modified in-place)
      */
-    void processBuffer(juce::AudioBuffer<double>& buffer) const;
+    void processBuffer(platform::AudioBuffer<double>& buffer) const;
 
     /**
      * Get reference to worker target index (for worker thread)

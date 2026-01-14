@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
-#include <juce_dsp/juce_dsp.h>
+#include <cmath>
 
 namespace dsp_core::audio_pipeline {
 
@@ -18,9 +18,9 @@ class GainStage : public AudioProcessingStage {
     GainStage() = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void process(juce::AudioBuffer<double>& buffer) override;
+    void process(platform::AudioBuffer<double>& buffer) override;
     void reset() override;
-    juce::String getName() const override {
+    std::string getName() const override {
         return "Gain";
     }
 
@@ -31,12 +31,19 @@ class GainStage : public AudioProcessingStage {
     void setGainDB(double gainDB);
 
   private:
-    juce::dsp::Gain<double> gainProcessor_;
-    juce::LinearSmoothedValue<double> smoothedGain_{1.0};
+    // Linear smoothing state
+    double currentGain_ = 1.0;
+    double targetGain_ = 1.0;
+    double gainStep_ = 0.0;
+    int samplesRemaining_ = 0;
+
     double sampleRate_ = 44100.0;
     int maxBlockSize_ = 512;
-    int numChannels_ = 2;
     bool isPrepared_ = false;
+
+    static constexpr double kGainRampTimeSeconds = 0.01; // 10ms ramp time
+
+    void updateSmoothing();
 };
 
 } // namespace dsp_core::audio_pipeline

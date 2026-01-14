@@ -3,6 +3,7 @@
 #include <cmath>
 #include <array>
 #include <algorithm>
+#include <platform/AudioBuffer.h>
 
 namespace dsp {
 
@@ -275,31 +276,18 @@ public:
     }
 
     /**
-     * @brief Process a block of samples in-place.
+     * @brief Process a single channel of an AudioBuffer in-place.
      *
-     * @param samples Pointer to sample buffer.
-     * @param numSamples Number of samples to process.
+     * @param buffer AudioBuffer to process.
+     * @param channel Channel index to process.
      */
-    void processBlock(T* samples, int numSamples) noexcept
+    void processBlock(platform::AudioBuffer<T>& buffer, int channel) noexcept
     {
+        T* samples = buffer.getWritePointer(channel);
+        const int numSamples = buffer.getNumSamples();
         for (int i = 0; i < numSamples; ++i)
         {
             samples[i] = processSample(samples[i]);
-        }
-    }
-
-    /**
-     * @brief Process a block with separate input/output buffers.
-     *
-     * @param input Input sample buffer.
-     * @param output Output sample buffer.
-     * @param numSamples Number of samples to process.
-     */
-    void processBlock(const T* input, T* output, int numSamples) noexcept
-    {
-        for (int i = 0; i < numSamples; ++i)
-        {
-            output[i] = processSample(input[i]);
         }
     }
 

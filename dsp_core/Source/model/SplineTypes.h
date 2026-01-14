@@ -1,6 +1,6 @@
 #pragma once
+#include <string>
 #include <vector>
-#include <juce_core/juce_core.h>
 #include "../services/CurveFeatureDetector.h"
 
 namespace dsp_core {
@@ -35,7 +35,7 @@ struct SplineFitResult {
     std::vector<SplineAnchor> anchors;
     double maxError = 0.0; // Peak absolute error |y - ŷ|
     int numAnchors = 0;
-    juce::String message; // User-facing feedback
+    std::string message; // User-facing feedback
 
     // Statistics for user feedback
     double averageError = 0.0;

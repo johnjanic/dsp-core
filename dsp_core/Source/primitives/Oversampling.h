@@ -5,6 +5,7 @@
 #include <cmath>
 #include <memory>
 #include <algorithm>
+#include <platform/AudioBuffer.h>
 
 namespace dsp {
 
@@ -195,14 +196,8 @@ public:
         // Allocate work buffers for maximum oversampled size
         int maxOversampledSize = maxBlockSize * factor_;
 
-        // Allocate internal buffer storage
-        oversampledData_.resize(numChannels_);
-        oversampledPtrs_.resize(numChannels_);
-        for (int ch = 0; ch < numChannels_; ++ch)
-        {
-            oversampledData_[ch].resize(maxOversampledSize, T(0));
-            oversampledPtrs_[ch] = oversampledData_[ch].data();
-        }
+        // Allocate internal AudioBuffer storage
+        oversampledBuffer_.setSize(numChannels_, maxOversampledSize);
 
         // Intermediate buffer for cascaded stages
         if (order_ > 1)
@@ -226,11 +221,8 @@ public:
             }
         }
 
-        // Clear oversampled buffers
-        for (auto& channelData : oversampledData_)
-        {
-            std::fill(channelData.begin(), channelData.end(), T(0));
-        }
+        // Clear oversampled buffer
+        oversampledBuffer_.clear();
     }
 
     /**
@@ -271,13 +263,53 @@ public:
     }
 
     /**
-     * @brief Upsample multi-channel audio.
-     *
-     * @param inputChannels Array of pointers to input channel data.
-     * @param numInputSamples Number of samples in each input channel.
-     * @return Array of pointers to oversampled channel data (size = numInputSamples * factor).
+     * @brief Get the current oversampled buffer size (after last processSamplesUp call).
      */
-    T** processSamplesUp(const T* const* inputChannels, int numInputSamples)
+    [[nodiscard]] int getOversampledSize() const noexcept
+    {
+        return currentOversampledSize_;
+    }
+
+    /**
+     * @brief Upsample the input buffer.
+     *
+     * @param inputBuffer Input audio at original sample rate.
+     * @return Reference to internal oversampled buffer.
+     */
+    platform::AudioBuffer<T>& processSamplesUp(const platform::AudioBuffer<T>& inputBuffer)
+    {
+        processSamplesUpImpl(inputBuffer.getArrayOfReadPointers(), inputBuffer.getNumSamples());
+        return oversampledBuffer_;
+    }
+
+    /**
+     * @brief Downsample to the output buffer.
+     *
+     * @param outputBuffer Output buffer at original sample rate.
+     */
+    void processSamplesDown(platform::AudioBuffer<T>& outputBuffer)
+    {
+        processSamplesDownImpl(outputBuffer.getArrayOfWritePointers(), outputBuffer.getNumSamples());
+    }
+
+    /**
+     * @brief Get reference to internal oversampled buffer.
+     *
+     * Use after processSamplesUp() to access oversampled data for processing.
+     */
+    [[nodiscard]] platform::AudioBuffer<T>& getOversampledBuffer() noexcept
+    {
+        return oversampledBuffer_;
+    }
+
+    [[nodiscard]] const platform::AudioBuffer<T>& getOversampledBuffer() const noexcept
+    {
+        return oversampledBuffer_;
+    }
+
+private:
+    // Internal implementation using raw pointers for efficiency
+    void processSamplesUpImpl(const T* const* inputChannels, int numInputSamples)
     {
         const int outputSamples = numInputSamples * factor_;
         currentOversampledSize_ = outputSamples;
@@ -288,15 +320,15 @@ public:
             for (int ch = 0; ch < numChannels_; ++ch)
             {
                 std::copy(inputChannels[ch], inputChannels[ch] + numInputSamples,
-                          oversampledData_[ch].data());
+                          oversampledBuffer_.getWritePointer(ch));
             }
-            return oversampledPtrs_.data();
+            return;
         }
 
         for (int channel = 0; channel < numChannels_; ++channel)
         {
             const T* input = inputChannels[channel];
-            T* output = oversampledData_[channel].data();
+            T* output = oversampledBuffer_.getWritePointer(channel);
 
             // First stage: 1x -> 2x
             int currentSize = numInputSamples;
@@ -330,25 +362,17 @@ public:
                 currentSize *= 2;
             }
         }
-
-        return oversampledPtrs_.data();
     }
 
-    /**
-     * @brief Downsample multi-channel audio.
-     *
-     * @param outputChannels Array of pointers to output channel data.
-     * @param numOutputSamples Number of samples expected in each output channel.
-     */
-    void processSamplesDown(T** outputChannels, int numOutputSamples)
+    void processSamplesDownImpl(T** outputChannels, int numOutputSamples)
     {
         if (order_ == 0)
         {
             // Bypass mode - just copy
             for (int ch = 0; ch < numChannels_; ++ch)
             {
-                std::copy(oversampledData_[ch].data(),
-                          oversampledData_[ch].data() + numOutputSamples,
+                std::copy(oversampledBuffer_.getReadPointer(ch),
+                          oversampledBuffer_.getReadPointer(ch) + numOutputSamples,
                           outputChannels[ch]);
             }
             return;
@@ -359,7 +383,7 @@ public:
         for (int channel = 0; channel < numChannels_; ++channel)
         {
             T* output = outputChannels[channel];
-            const T* currentInput = oversampledData_[channel].data();
+            const T* currentInput = oversampledBuffer_.getReadPointer(channel);
             T* currentOutput = tempBuffer_.data();
 
             // Process stages in reverse order
@@ -379,30 +403,6 @@ public:
         }
     }
 
-    /**
-     * @brief Get array of pointers to internal oversampled buffers.
-     *
-     * Use after processSamplesUp() to access oversampled data for processing.
-     */
-    [[nodiscard]] T** getOversampledBuffers() noexcept
-    {
-        return oversampledPtrs_.data();
-    }
-
-    [[nodiscard]] T* const* getOversampledBuffers() const noexcept
-    {
-        return oversampledPtrs_.data();
-    }
-
-    /**
-     * @brief Get the current oversampled buffer size (after last processSamplesUp call).
-     */
-    [[nodiscard]] int getOversampledSize() const noexcept
-    {
-        return currentOversampledSize_;
-    }
-
-private:
     int numChannels_;
     int order_;
     int factor_;
@@ -413,8 +413,7 @@ private:
     std::vector<std::vector<OversamplingStage<T>>> stages_;
 
     // Internal oversampled buffer storage
-    std::vector<std::vector<T>> oversampledData_;
-    std::vector<T*> oversampledPtrs_;
+    platform::AudioBuffer<T> oversampledBuffer_;
 
     // Temporary buffer for cascaded processing
     std::vector<T> tempBuffer_;

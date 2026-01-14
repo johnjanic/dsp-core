@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "../dsp_core/Source/audio_pipeline/DCBlockingFilter.h"
-#include <juce_audio_basics/juce_audio_basics.h>
+#include "../dsp_core/Source/pipeline/DCBlockingFilter.h"
+#include <platform/AudioBuffer.h>
 #include <cmath>
 
 using namespace dsp_core::audio_pipeline;
@@ -15,7 +15,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     std::unique_ptr<DCBlockingFilter> filter_;
 
     // Helper: Fill buffer with DC offset
-    static void fillWithDC(juce::AudioBuffer<double>& buffer, double dcValue) {
+    static void fillWithDC(platform::AudioBuffer<double>& buffer, double dcValue) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
                 buffer.setSample(ch, i, dcValue);
@@ -25,7 +25,7 @@ class DCBlockingFilterTest : public ::testing::Test {
 
     // Helper: Fill buffer with sine wave
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    static void fillWithSine(juce::AudioBuffer<double>& buffer, double frequency, double sampleRate,
+    static void fillWithSine(platform::AudioBuffer<double>& buffer, double frequency, double sampleRate,
                              double amplitude = 1.0, double dcOffset = 0.0) {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
             for (int i = 0; i < buffer.getNumSamples(); ++i) {
@@ -36,7 +36,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Measure RMS of buffer
-    static double measureRMS(const juce::AudioBuffer<double>& buffer) {
+    static double measureRMS(const platform::AudioBuffer<double>& buffer) {
         double sumSquares = 0.0;
         int totalSamples = 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
@@ -50,7 +50,7 @@ class DCBlockingFilterTest : public ::testing::Test {
     }
 
     // Helper: Measure mean (DC) of buffer
-    static double measureMean(const juce::AudioBuffer<double>& buffer) {
+    static double measureMean(const platform::AudioBuffer<double>& buffer) {
         double sum = 0.0;
         int totalSamples = 0;
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
@@ -71,7 +71,7 @@ TEST_F(DCBlockingFilterTest, RemovesPureDC) {
     const int warmupSamples = 10000;
 
     // Create buffer with pure DC
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     fillWithDC(buffer, dcOffset);
 
     // Process multiple blocks to allow filter to converge
@@ -107,7 +107,7 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     const int warmupSamples = 10000;
 
     // Warmup filter with continuous sine wave
-    juce::AudioBuffer<double> warmupBuffer(2, 512);
+    platform::AudioBuffer<double> warmupBuffer(2, 512);
     double phase = 0.0;
     for (int block = 0; block < warmupSamples / 512; ++block) {
         for (int ch = 0; ch < 2; ++ch) {
@@ -121,7 +121,7 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     }
 
     // Continue with same phase for test measurement
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     for (int ch = 0; ch < 2; ++ch) {
         for (int i = 0; i < 512; ++i) {
             double const samplePhase = phase + (2.0 * M_PI * frequency * i / sampleRate);
@@ -132,7 +132,7 @@ TEST_F(DCBlockingFilterTest, Preserves20HzSine) {
     double const rmsBeforeFiltering = measureRMS(buffer);
 
     // Create copy for filtering (to preserve original for comparison)
-    juce::AudioBuffer<double> filteredBuffer(2, 512);
+    platform::AudioBuffer<double> filteredBuffer(2, 512);
     filteredBuffer.copyFrom(0, 0, buffer, 0, 0, 512);
     filteredBuffer.copyFrom(1, 0, buffer, 1, 0, 512);
 
@@ -156,7 +156,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     const int warmupSamples = 2000;
 
     // Create buffer with 100Hz sine (odd harmonic structure)
-    juce::AudioBuffer<double> buffer(1, numSamples);
+    platform::AudioBuffer<double> buffer(1, numSamples);
     for (int i = 0; i < numSamples; ++i) {
         double const phase = 2.0 * M_PI * fundamental * i / sampleRate;
         buffer.setSample(0, i, std::sin(phase));
@@ -164,7 +164,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
 
     // Warmup filter
     for (int block = 0; block < warmupSamples / 512; ++block) {
-        juce::AudioBuffer<double> warmupBuffer(1, 512);
+        platform::AudioBuffer<double> warmupBuffer(1, 512);
         for (int i = 0; i < 512; ++i) {
             double const phase = 2.0 * M_PI * fundamental * i / sampleRate;
             warmupBuffer.setSample(0, i, std::sin(phase));
@@ -176,7 +176,7 @@ TEST_F(DCBlockingFilterTest, HarmonicPreservation) {
     const int blockSize = 512;
     for (int offset = 0; offset < numSamples; offset += blockSize) {
         int const samplesThisBlock = std::min(blockSize, numSamples - offset);
-        juce::AudioBuffer<double> block(1, samplesThisBlock);
+        platform::AudioBuffer<double> block(1, samplesThisBlock);
 
         for (int i = 0; i < samplesThisBlock; ++i) {
             block.setSample(0, i, buffer.getSample(0, offset + i));
@@ -222,11 +222,11 @@ TEST_F(DCBlockingFilterTest, EnabledDisabledState) {
     const double dcOffset = 0.5;
 
     // Create buffer with DC
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     fillWithDC(buffer, dcOffset);
 
     // Store original
-    juce::AudioBuffer<double> original(2, 512);
+    platform::AudioBuffer<double> original(2, 512);
     original.copyFrom(0, 0, buffer, 0, 0, 512);
     original.copyFrom(1, 0, buffer, 1, 0, 512);
 
@@ -276,7 +276,7 @@ TEST_F(DCBlockingFilterTest, ResetClearsState) {
     const double dcOffset = 0.5;
 
     // Process some DC offset
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
     for (int block = 0; block < 5; ++block) {
         fillWithDC(buffer, dcOffset);
         filter_->process(buffer);
@@ -303,7 +303,7 @@ TEST_F(DCBlockingFilterTest, MultiChannelProcessing) {
     const double dcOffset = 0.3;
     const int warmupSamples = 10000;
 
-    juce::AudioBuffer<double> buffer(numChannels, 512);
+    platform::AudioBuffer<double> buffer(numChannels, 512);
 
     // Warmup
     for (int block = 0; block < warmupSamples / 512; ++block) {
@@ -335,7 +335,7 @@ TEST_F(DCBlockingFilterTest, RemovesDCPreservesAC) {
     const double dcOffset = 0.3;
     const int warmupSamples = 10000;
 
-    juce::AudioBuffer<double> buffer(2, 512);
+    platform::AudioBuffer<double> buffer(2, 512);
 
     // Warmup filter with continuous waveform
     double phase = 0.0;

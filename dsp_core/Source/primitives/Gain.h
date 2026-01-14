@@ -2,6 +2,8 @@
 
 #include "Decibels.h"
 #include "SmoothedValue.h"
+#include <platform/AudioBuffer.h>
+#include <algorithm>
 
 namespace dsp {
 
@@ -109,45 +111,38 @@ public:
     }
 
     /**
-     * @brief Process raw sample array in-place (single channel).
+     * @brief Process AudioBuffer in-place.
      *
-     * @param samples Pointer to sample array.
-     * @param numSamples Number of samples to process.
+     * @param buffer AudioBuffer to process.
      */
-    void processBlock(T* samples, int numSamples) noexcept
+    void processBlock(platform::AudioBuffer<T>& buffer) noexcept
     {
-        if (smoothedGain.isSmoothing())
-        {
-            for (int i = 0; i < numSamples; ++i)
-            {
-                samples[i] *= smoothedGain.getNextValue();
-            }
-        }
-        else
-        {
-            const T gain = smoothedGain.getTargetValue();
-            if (gain != T(1))
-            {
-                for (int i = 0; i < numSamples; ++i)
-                {
-                    samples[i] *= gain;
-                }
-            }
-        }
+        processBlockImpl(buffer.getArrayOfWritePointers(),
+                         buffer.getNumChannels(),
+                         buffer.getNumSamples());
     }
 
     /**
-     * @brief Process multi-channel audio in-place.
+     * @brief Process with separate input/output AudioBuffers.
      *
-     * @param channelData Array of pointers to channel sample data.
-     * @param numChannels Number of channels.
-     * @param numSamples Number of samples per channel.
+     * @param input Input AudioBuffer.
+     * @param output Output AudioBuffer.
      */
-    void processBlock(T** channelData, int numChannels, int numSamples) noexcept
+    void processBlock(const platform::AudioBuffer<T>& input,
+                      platform::AudioBuffer<T>& output) noexcept
+    {
+        processBlockImpl(input.getArrayOfReadPointers(),
+                         output.getArrayOfWritePointers(),
+                         std::min(input.getNumChannels(), output.getNumChannels()),
+                         std::min(input.getNumSamples(), output.getNumSamples()));
+    }
+
+private:
+    // Internal implementation using raw pointers for efficiency
+    void processBlockImpl(T** channelData, int numChannels, int numSamples) noexcept
     {
         if (smoothedGain.isSmoothing())
         {
-            // Apply ramped gain
             for (int sample = 0; sample < numSamples; ++sample)
             {
                 const T gain = smoothedGain.getNextValue();
@@ -159,7 +154,6 @@ public:
         }
         else
         {
-            // Apply constant gain (more efficient)
             const T gain = smoothedGain.getTargetValue();
             if (gain != T(1))
             {
@@ -174,16 +168,8 @@ public:
         }
     }
 
-    /**
-     * @brief Process multi-channel audio with separate input/output.
-     *
-     * @param inputData Array of pointers to input channel sample data.
-     * @param outputData Array of pointers to output channel sample data.
-     * @param numChannels Number of channels.
-     * @param numSamples Number of samples per channel.
-     */
-    void processBlock(const T* const* inputData, T** outputData,
-                      int numChannels, int numSamples) noexcept
+    void processBlockImpl(const T* const* inputData, T** outputData,
+                          int numChannels, int numSamples) noexcept
     {
         if (smoothedGain.isSmoothing())
         {
@@ -209,7 +195,6 @@ public:
         }
     }
 
-private:
     SmoothedValue<T> smoothedGain{T(1)};
     T targetGain = T(1);
 };
