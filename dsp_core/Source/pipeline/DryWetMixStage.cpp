@@ -16,6 +16,9 @@ void DryWetMixStage::prepareToPlay(double sampleRate, int samplesPerBlock) {
     dryBuffer_.setSize(kMaxChannels, samplesPerBlock, false, true, true);
     effectsPipeline_->prepareToPlay(sampleRate, samplesPerBlock);
 
+    // Configure mix smoother: 20ms ramp time for click-free transitions
+    mixAmount_.reset(sampleRate, 0.02);
+
     const int latencySamples = effectsPipeline_->getLatencySamples();
     if (latencySamples > 0) {
         const int delayBufferSize = latencySamples + samplesPerBlock;
@@ -66,6 +69,8 @@ void DryWetMixStage::reset() {
     dryBuffer_.clear();
     delayBuffer_.clear();
     delayBufferWritePos_ = 0;
+    // Snap to target immediately on reset (no smoothing during initialization)
+    mixAmount_.setCurrentAndTargetValue(mixAmount_.getTargetValue());
 }
 
 std::string DryWetMixStage::getName() const {
@@ -81,7 +86,7 @@ AudioPipeline* DryWetMixStage::getEffectsPipeline() {
 }
 
 void DryWetMixStage::setMixAmount(double mix) {
-    mixAmount_ = std::clamp(mix, 0.0, 1.0);
+    mixAmount_.setTargetValue(std::clamp(mix, 0.0, 1.0));
 }
 
 void DryWetMixStage::captureDrySignal(const platform::AudioBuffer<double>& buffer) {
@@ -100,16 +105,32 @@ void DryWetMixStage::applyMix(platform::AudioBuffer<double>& wetBuffer) {
     const int numChannels = wetBuffer.getNumChannels();
     const int numSamples = wetBuffer.getNumSamples();
 
-    const double dryGain = 1.0 - mixAmount_;
-    const double wetGain = mixAmount_;
-
-    for (int ch = 0; ch < numChannels; ++ch) {
-        double* wetData = wetBuffer.getWritePointer(ch);
-        const double* dryData = dryBuffer_.getReadPointer(ch);
-
-        // Apply: wetData = wetData * wetGain + dryData * dryGain
+    if (mixAmount_.isSmoothing()) {
+        // Sample-by-sample processing during smoothing for click-free transitions
         for (int i = 0; i < numSamples; ++i) {
-            wetData[i] = wetData[i] * wetGain + dryData[i] * dryGain;
+            const double mix = mixAmount_.getNextValue();
+            const double dryGain = 1.0 - mix;
+            const double wetGain = mix;
+
+            for (int ch = 0; ch < numChannels; ++ch) {
+                double* wetData = wetBuffer.getWritePointer(ch);
+                const double* dryData = dryBuffer_.getReadPointer(ch);
+                wetData[i] = wetData[i] * wetGain + dryData[i] * dryGain;
+            }
+        }
+    } else {
+        // Optimized constant mix processing when not smoothing
+        const double mix = mixAmount_.getTargetValue();
+        const double dryGain = 1.0 - mix;
+        const double wetGain = mix;
+
+        for (int ch = 0; ch < numChannels; ++ch) {
+            double* wetData = wetBuffer.getWritePointer(ch);
+            const double* dryData = dryBuffer_.getReadPointer(ch);
+
+            for (int i = 0; i < numSamples; ++i) {
+                wetData[i] = wetData[i] * wetGain + dryData[i] * dryGain;
+            }
         }
     }
 }

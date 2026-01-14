@@ -2,6 +2,7 @@
 
 #include "AudioProcessingStage.h"
 #include "AudioPipeline.h"
+#include "../primitives/SmoothedValue.h"
 #include <memory>
 
 namespace dsp_core::audio_pipeline {
@@ -52,10 +53,17 @@ class DryWetMixStage : public AudioProcessingStage {
     void setMixAmount(double mix);
 
     /**
-     * Get current mix amount.
+     * Get current mix amount (target value).
      */
     double getMixAmount() const {
-        return mixAmount_;
+        return mixAmount_.getTargetValue();
+    }
+
+    /**
+     * Check if mix is currently smoothing towards target.
+     */
+    [[nodiscard]] bool isSmoothing() const {
+        return mixAmount_.isSmoothing();
     }
 
     /**
@@ -72,7 +80,7 @@ class DryWetMixStage : public AudioProcessingStage {
     platform::AudioBuffer<double> dryBuffer_;   // Current dry signal
     platform::AudioBuffer<double> delayBuffer_; // Circular buffer for latency compensation
     int delayBufferWritePos_ = 0;               // Write position in delay buffer
-    double mixAmount_ = 1.0;                    // 100% wet by default
+    dsp::SmoothedValue<double> mixAmount_{1.0}; // 100% wet by default, smoothed for click-free changes
 };
 
 } // namespace dsp_core::audio_pipeline
