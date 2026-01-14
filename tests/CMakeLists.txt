@@ -764,3 +764,28 @@ endif()
 
 add_test(NAME OversamplingABTests COMMAND oversampling_ab_tests)
 
+# GainStage tests
+add_executable(gain_stage_tests
+    GainStageTest.cpp
+)
+
+target_include_directories(gain_stage_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(gain_stage_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(gain_stage_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(gain_stage_tests)
+endif()
+
+add_test(NAME GainStageTests COMMAND gain_stage_tests)
+

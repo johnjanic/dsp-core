@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AudioProcessingStage.h"
-#include <cmath>
+#include "../primitives/Gain.h"
 
 namespace dsp_core::audio_pipeline {
 
@@ -11,7 +11,7 @@ namespace dsp_core::audio_pipeline {
  * Features:
  * - Automatic channel count detection
  * - 10ms smoothing time for parameter changes
- * - dB-based gain control
+ * - dB and linear gain control
  */
 class GainStage : public AudioProcessingStage {
   public:
@@ -28,22 +28,29 @@ class GainStage : public AudioProcessingStage {
      * Set gain in decibels.
      * Smoothed over ~10ms to prevent clicks.
      */
-    void setGainDB(double gainDB);
+    void setGainDecibels(double gainDB);
+
+    /**
+     * Set gain as linear multiplier.
+     * Smoothed over ~10ms to prevent clicks.
+     */
+    void setGainLinear(double gain);
+
+    /**
+     * Get target gain in decibels.
+     */
+    [[nodiscard]] double getGainDecibels() const;
+
+    /**
+     * Get target gain as linear multiplier.
+     */
+    [[nodiscard]] double getGainLinear() const;
+
+    // Legacy alias for backward compatibility
+    void setGainDB(double gainDB) { setGainDecibels(gainDB); }
 
   private:
-    // Linear smoothing state
-    double currentGain_ = 1.0;
-    double targetGain_ = 1.0;
-    double gainStep_ = 0.0;
-    int samplesRemaining_ = 0;
-
-    double sampleRate_ = 44100.0;
-    int maxBlockSize_ = 512;
-    bool isPrepared_ = false;
-
-    static constexpr double kGainRampTimeSeconds = 0.01; // 10ms ramp time
-
-    void updateSmoothing();
+    dsp::Gain<double> gain_;
 };
 
 } // namespace dsp_core::audio_pipeline
