@@ -416,6 +416,10 @@ double LayeredTransferFunction::normalizeIndex(int index) const {
 }
 
 double LayeredTransferFunction::applyTransferFunction(double x) const {
+    // In spline mode, evaluate spline directly (bypasses base + harmonics)
+    if (getRenderingMode() == RenderingMode::Spline) {
+        return splineLayer->evaluate(x);
+    }
     return interpolateCatmullRom(x);
 }
 
