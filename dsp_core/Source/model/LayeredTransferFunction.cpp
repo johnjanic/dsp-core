@@ -242,6 +242,11 @@ bool LayeredTransferFunction::isPaintStrokeActive() const {
 void LayeredTransferFunction::setNormalizationEnabled(bool enabled) {
     normalizationEnabled = enabled;
 
+    // Update the cached scalar immediately
+    // When disabled: sets scalar to 1.0 (identity - no scaling)
+    // When enabled: recomputes scalar from current composite
+    updateNormalizationScalar();
+
     // Increment version to trigger renderer update with new normalization state
     incrementVersionIfNotBatching();
 }
