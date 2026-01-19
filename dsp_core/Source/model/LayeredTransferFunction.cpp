@@ -188,6 +188,11 @@ double LayeredTransferFunction::computeCompositeAt(int index) const {
     // Normalize index to x-coordinate
     const double x = normalizeIndex(index);
 
+    // Check rendering mode - evaluate spline if in Spline mode
+    if (getRenderingMode() == RenderingMode::Spline) {
+        return splineLayer->evaluate(x);
+    }
+
     // Read base layer value
     const double baseValue = baseTable[index].load(std::memory_order_acquire);
 
@@ -415,16 +420,19 @@ void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, N
 void LayeredTransferFunction::setBaseLayerValue(plugin::MutationToken& token, int index, double value) {
     (void)token; // Token presence is the enforcement, not the value
     setBaseLayerValue(index, value);
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::clearBaseLayer(plugin::MutationToken& token) {
     (void)token;
     clearBaseLayer();
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::setCoefficient(plugin::MutationToken& token, int index, double value) {
     (void)token;
     setCoefficient(index, value);
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::setHarmonicCoefficients(
@@ -432,17 +440,20 @@ void LayeredTransferFunction::setHarmonicCoefficients(
     const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs) {
     (void)token;
     setHarmonicCoefficients(coeffs);
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::setSplineAnchors(plugin::MutationToken& token,
                                                const std::vector<SplineAnchor>& anchors) {
     (void)token;
     setSplineAnchors(anchors);
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::clearSplineAnchors(plugin::MutationToken& token) {
     (void)token;
     clearSplineAnchors();
+    signalRevisionChange();
 }
 
 void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {

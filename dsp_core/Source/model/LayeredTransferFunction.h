@@ -71,6 +71,14 @@ class LayeredTransferFunction {
   public:
     LayeredTransferFunction(int tableSize, double minVal, double maxVal);
 
+    /**
+     * Set callback for revision increment.
+     * Called whenever state is mutated via token-gated methods.
+     */
+    void setRevisionCallback(std::function<void()> callback) {
+        onRevisionIncrement_ = std::move(callback);
+    }
+
     // Layer Access
 
     // Base layer (user-drawn wavetable)
@@ -130,15 +138,18 @@ class LayeredTransferFunction {
     /**
      * Compute composite value on-demand at specific index
      *
-     * Computes: normScalar * (wtCoeff * baseValue + harmonicValue)
+     * Behavior depends on current rendering mode:
+     * - Spline Mode: Returns splineLayer.evaluate(x) (direct spline evaluation)
+     * - Paint/Harmonic Mode: Returns normScalar * (wtCoeff * baseValue + harmonicValue)
      *
-     * This method computes the composite on-demand from UI state (base layer + harmonics).
-     * Used for baking operations and legacy interpolation methods.
+     * This method respects the current rendering mode to ensure consistency with
+     * what the user sees on screen. Used for baking operations, test assertions,
+     * and UI value queries.
      *
      * Thread-safe: Can be called from any thread (reads atomics with acquire ordering)
      *
      * @param index Table index [0, tableSize)
-     * @return Composite value with normalization applied, or 0.0 if index out of bounds
+     * @return Composite value based on current rendering mode, or 0.0 if index out of bounds
      */
     double computeCompositeAt(int index) const;
 
@@ -687,7 +698,22 @@ class LayeredTransferFunction {
         }
     }
 
+    /**
+     * Signal revision change to undo system
+     *
+     * Called by token-gated mutation methods to notify the undo endpoint
+     * that state has changed. This enables O(1) change detection via revision counter.
+     */
+    void signalRevisionChange() {
+        if (onRevisionIncrement_) {
+            onRevisionIncrement_();
+        }
+    }
+
     ExtrapolationMode extrapMode = ExtrapolationMode::Clamp;
+
+    // Revision tracking callback (for undo/redo change detection)
+    std::function<void()> onRevisionIncrement_;
 
     // Interpolation helper (Catmull-Rom) with dual-path optimization
     // Two code paths selected by a single branch on extrapMode:
