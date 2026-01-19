@@ -7,6 +7,11 @@
 #include <memory>
 #include <string>
 
+// Forward declaration for token-gated mutation API
+namespace plugin {
+class MutationToken;
+}
+
 namespace dsp_core {
 
 /**
@@ -73,6 +78,34 @@ class LayeredTransferFunction {
     void setBaseLayerValue(int index, double value);
     void clearBaseLayer(); // Set all base values to 0.0
 
+    //==========================================================================
+    // Token-Gated Mutation Methods (New API - Step 1 of undo cleanup)
+    //==========================================================================
+    // These methods require a MutationToken from IUndoEndpoint, enforcing that
+    // all mutations happen within undo boundaries. The token parameter provides
+    // compile-time enforcement: code without a token simply won't compile.
+    //
+    // Usage:
+    //   undoEndpoint.perform("Paint", [&](MutationToken& token) {
+    //       ltf.setBaseLayerValue(token, index, value);  // compiles
+    //   });
+    //
+    //   ltf.setBaseLayerValue(???, index, value);  // compile error - no token
+
+    /**
+     * Set a single base layer value (token-gated).
+     * @param token MutationToken from UndoEndpoint (enforces undo boundary)
+     * @param index Table index [0, tableSize)
+     * @param value Normalized value [-1, 1]
+     */
+    void setBaseLayerValue(plugin::MutationToken& token, int index, double value);
+
+    /**
+     * Clear base layer to y=x identity (token-gated).
+     * @param token MutationToken from UndoEndpoint
+     */
+    void clearBaseLayer(plugin::MutationToken& token);
+
     // Harmonic layer (read-only access - use setCoefficient/setHarmonicCoefficients to mutate)
     const HarmonicLayer& getHarmonicLayer() const;
 
@@ -82,6 +115,14 @@ class LayeredTransferFunction {
     // Coefficient access (includes WT mix at index 0 + harmonics at indices 1..N)
     void setCoefficient(int index, double value);
     double getCoefficient(int index) const;
+
+    /**
+     * Set a harmonic coefficient (token-gated).
+     * @param token MutationToken from UndoEndpoint
+     * @param index Coefficient index [0, 40] (0=WT, 1-40=harmonics)
+     * @param value Coefficient value [0, 1]
+     */
+    void setCoefficient(plugin::MutationToken& token, int index, double value);
     int getNumCoefficients() const {
         return static_cast<int>(coefficients.size());
     }
@@ -365,6 +406,14 @@ class LayeredTransferFunction {
      */
     void setHarmonicCoefficients(const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs);
 
+    /**
+     * Set all harmonic coefficients at once (token-gated).
+     * @param token MutationToken from UndoEndpoint
+     * @param coeffs Array of 41 coefficients [wtMix, h1, h2, ..., h40]
+     */
+    void setHarmonicCoefficients(plugin::MutationToken& token,
+                                 const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs);
+
     // Utilities (same API as TransferFunction for compatibility)
     int getTableSize() const {
         return tableSize;
@@ -503,6 +552,19 @@ class LayeredTransferFunction {
      * Clear all spline anchors (wrapper that increments version counter)
      */
     void clearSplineAnchors();
+
+    /**
+     * Set spline anchors (token-gated).
+     * @param token MutationToken from UndoEndpoint
+     * @param anchors Vector of anchor points
+     */
+    void setSplineAnchors(plugin::MutationToken& token, const std::vector<SplineAnchor>& anchors);
+
+    /**
+     * Clear all spline anchors (token-gated).
+     * @param token MutationToken from UndoEndpoint
+     */
+    void clearSplineAnchors(plugin::MutationToken& token);
 
     /**
      * Set normalization scalar directly (for worker thread to restore frozen state)

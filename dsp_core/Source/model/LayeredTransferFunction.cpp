@@ -1,5 +1,6 @@
 #include "LayeredTransferFunction.h"
 #include "../services/SplineEvaluator.h"
+#include <plugin-core/MutationToken.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -402,6 +403,46 @@ void LayeredTransferFunction::setHarmonicCoefficients(const std::array<double, N
 
     // Increment version to trigger renderer update
     incrementVersionIfNotBatching();
+}
+
+//==============================================================================
+// Token-Gated Mutation Methods (Step 1 of undo cleanup migration)
+//==============================================================================
+// These methods provide compile-time enforcement of mutation boundaries.
+// The token parameter is unused at runtime - its presence ensures mutations
+// only happen within IUndoEndpoint::perform() or gesture scopes.
+
+void LayeredTransferFunction::setBaseLayerValue(plugin::MutationToken& token, int index, double value) {
+    (void)token; // Token presence is the enforcement, not the value
+    setBaseLayerValue(index, value);
+}
+
+void LayeredTransferFunction::clearBaseLayer(plugin::MutationToken& token) {
+    (void)token;
+    clearBaseLayer();
+}
+
+void LayeredTransferFunction::setCoefficient(plugin::MutationToken& token, int index, double value) {
+    (void)token;
+    setCoefficient(index, value);
+}
+
+void LayeredTransferFunction::setHarmonicCoefficients(
+    plugin::MutationToken& token,
+    const std::array<double, NUM_HARMONIC_COEFFICIENTS>& coeffs) {
+    (void)token;
+    setHarmonicCoefficients(coeffs);
+}
+
+void LayeredTransferFunction::setSplineAnchors(plugin::MutationToken& token,
+                                               const std::vector<SplineAnchor>& anchors) {
+    (void)token;
+    setSplineAnchors(anchors);
+}
+
+void LayeredTransferFunction::clearSplineAnchors(plugin::MutationToken& token) {
+    (void)token;
+    clearSplineAnchors();
 }
 
 void LayeredTransferFunction::setRenderingMode(RenderingMode mode) {
