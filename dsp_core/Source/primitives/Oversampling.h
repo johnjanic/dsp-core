@@ -199,10 +199,11 @@ public:
         // Allocate internal AudioBuffer storage
         oversampledBuffer_.setSize(numChannels_, maxOversampledSize);
 
-        // Intermediate buffer for cascaded stages
+        // Intermediate buffers for cascaded stages (need two to avoid aliasing)
         if (order_ > 1)
         {
             tempBuffer_.resize(maxOversampledSize);
+            tempBuffer2_.resize(maxOversampledSize);
         }
 
         reset();
@@ -333,6 +334,7 @@ private:
             // First stage: 1x -> 2x
             int currentSize = numInputSamples;
             const T* currentInput = input;
+            // For order 1, write directly to output; otherwise use tempBuffer_
             T* currentOutput = (order_ == 1) ? output : tempBuffer_.data();
 
             for (int i = 0; i < currentSize; ++i)
@@ -342,17 +344,19 @@ private:
             currentSize *= 2;
 
             // Subsequent stages: 2x -> 4x -> 8x -> 16x
+            // Alternate between tempBuffer_ and tempBuffer2_ to avoid aliasing
             for (int stage = 1; stage < order_; ++stage)
             {
                 currentInput = currentOutput;
-                currentOutput = (stage == order_ - 1) ? output : tempBuffer_.data();
-
-                // Need to swap buffers for in-place processing
-                if (currentInput == currentOutput)
+                if (stage == order_ - 1)
                 {
-                    // Copy to temp, then process
-                    std::copy(currentInput, currentInput + currentSize, tempBuffer_.data());
-                    currentInput = tempBuffer_.data();
+                    // Final stage: write to output
+                    currentOutput = output;
+                }
+                else
+                {
+                    // Intermediate stage: alternate between temp buffers
+                    currentOutput = (stage % 2 == 1) ? tempBuffer2_.data() : tempBuffer_.data();
                 }
 
                 for (int i = 0; i < currentSize; ++i)
@@ -415,8 +419,9 @@ private:
     // Internal oversampled buffer storage
     audio::AudioBuffer<T> oversampledBuffer_;
 
-    // Temporary buffer for cascaded processing
+    // Temporary buffers for cascaded processing (need two to avoid aliasing)
     std::vector<T> tempBuffer_;
+    std::vector<T> tempBuffer2_;
 };
 
 } // namespace dsp
