@@ -321,6 +321,10 @@ class LayeredTransferFunction {
      * Harmonic → Base + harmonics with normalization
      * Spline   → Direct spline evaluation
      *
+     * IMPORTANT: This is SET by TransferFunctionController, not managed independently.
+     * The controller derives RenderingMode from EditingMode and updates it atomically.
+     * See TransferFunctionController::setEditingMode() for the single source of truth.
+     *
      * Thread-safe: Can be called from any thread
      *
      * @param mode The rendering mode to use
@@ -329,6 +333,10 @@ class LayeredTransferFunction {
 
     /**
      * Get current rendering mode
+     *
+     * NOTE: This returns the mode SET by the controller. The controller owns EditingMode
+     * and derives RenderingMode from it. Query controller.getEditingMode() for the
+     * authoritative editing mode.
      *
      * Thread-safe: Can be called from any thread
      *
