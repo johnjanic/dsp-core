@@ -23,6 +23,11 @@ class SplineFitterIntegrationTest : public ::testing::Test {
     void SetUp() override {
         // Use high resolution (16k samples) for realistic production workflow
         ltf = std::make_unique<LayeredTransferFunction>(16384, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
 
         // Initialize to identity curve
         setIdentityCurve();

@@ -13,6 +13,11 @@ class LayeredTransferFunctionSplineTest : public ::testing::Test {
   protected:
     void SetUp() override {
         ltf = std::make_unique<LayeredTransferFunction>(256, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
 
         // Create test anchors
         linearAnchors = {{-1.0, -1.0, false, 0.0}, {1.0, 1.0, false, 0.0}};
@@ -58,8 +63,9 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectEvaluationPath) {
     ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
-    // Evaluate (should use direct path since cache invalid)
-    double const result = ltf->applyTransferFunction(0.0);
+    // Use evaluateForRendering() which respects RenderingMode
+    // applyTransferFunction() always uses base+harmonics via computeCompositeAt()
+    double const result = ltf->evaluateForRendering(0.0, 1.0);
     EXPECT_NEAR(result, 0.5, kTolerance);
 }
 
@@ -67,9 +73,10 @@ TEST_F(LayeredTransferFunctionSplineTest, DirectPathAtAnchorPoints) {
     ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
-    EXPECT_NEAR(ltf->applyTransferFunction(-1.0), -1.0, kTolerance);
-    EXPECT_NEAR(ltf->applyTransferFunction(0.0), 0.5, kTolerance);
-    EXPECT_NEAR(ltf->applyTransferFunction(1.0), 1.0, kTolerance);
+    // Use evaluateForRendering() which respects RenderingMode for spline evaluation
+    EXPECT_NEAR(ltf->evaluateForRendering(-1.0, 1.0), -1.0, kTolerance);
+    EXPECT_NEAR(ltf->evaluateForRendering(0.0, 1.0), 0.5, kTolerance);
+    EXPECT_NEAR(ltf->evaluateForRendering(1.0, 1.0), 1.0, kTolerance);
 }
 
 //==============================================================================
@@ -120,14 +127,14 @@ TEST_F(LayeredTransferFunctionSplineTest, ComputeCompositeInSplineMode) {
     ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
-    // Verify on-demand computation matches direct evaluation
-    // Note: In spline mode, computeCompositeAt() returns base+harmonics (not spline)
-    // The audio thread uses applyTransferFunction() which routes to spline when enabled
+    // Verify evaluateForRendering() routes to spline in Spline mode
+    // Note: computeCompositeAt() and applyTransferFunction() always use base+harmonics
+    // Only evaluateForRendering() respects RenderingMode for mode-aware evaluation
     for (int i = 0; i < ltf->getTableSize(); i += 16) {
         double const x = ltf->normalizeIndex(i);
         double const splineDirect = ltf->getSplineLayer().evaluate(x);
-        double const audioResult = ltf->applyTransferFunction(x);
-        EXPECT_NEAR(audioResult, splineDirect, kTolerance);
+        double const renderResult = ltf->evaluateForRendering(x, 1.0);
+        EXPECT_NEAR(renderResult, splineDirect, kTolerance);
     }
 }
 
@@ -135,10 +142,10 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineEvaluationPreservesShape) {
     ltf->setSplineAnchors(threePtAnchors);
     ltf->setRenderingMode(RenderingMode::Spline);
 
-    // Check anchor points via audio evaluation path
+    // Check anchor points via evaluateForRendering() which respects RenderingMode
     int const midIdx = ltf->getTableSize() / 2;
     double const x = ltf->normalizeIndex(midIdx);
-    double const midValue = ltf->applyTransferFunction(x);
+    double const midValue = ltf->evaluateForRendering(x, 1.0);
 
     // Middle of curve should be close to 0.5 (from threePtAnchors)
     EXPECT_GT(midValue, 0.4);
@@ -162,6 +169,7 @@ TEST_F(LayeredTransferFunctionSplineTest, SplineModeUsesIdentityNormalization) {
     EXPECT_NEAR(ltf->getNormalizationScalar(), 1.0, 1e-9);
 
     // Result should be close to 2.0 at x=1 (not normalized)
-    double const result = ltf->applyTransferFunction(1.0);
+    // Use evaluateForRendering() which routes to spline in Spline mode
+    double const result = ltf->evaluateForRendering(1.0, 1.0);
     EXPECT_GT(result, 1.5); // Should not be normalized to 1.0
 }

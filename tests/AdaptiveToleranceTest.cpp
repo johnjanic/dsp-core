@@ -10,8 +10,15 @@ namespace dsp_core_test {
  */
 class AdaptiveToleranceTest : public ::testing::Test {
   protected:
-    // Default config for tests
-    dsp_core::Services::AdaptiveToleranceCalculator::Config defaultConfig;
+    void SetUp() override {
+        // Configure test defaults explicitly (independent of production defaults)
+        // These values match the original test expectations
+        testConfig.relativeErrorTarget = 0.01;      // 1% error target
+        testConfig.anchorDensityMultiplier = 2.0;   // Original default multiplier
+    }
+
+    // Explicit test config (not relying on production defaults)
+    dsp_core::Services::AdaptiveToleranceCalculator::Config testConfig;
 };
 
 // ============================================================================
@@ -28,7 +35,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_ZeroAnchors_ReturnsBaseline) {
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Expected: 2.0 × 0.01 = 0.02
     double const expectedBaseline = 2.0 * 0.01;
@@ -45,7 +52,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_HalfCapacity_ReturnsDoubled) {
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Expected: baseline × (1 + 0.5 × 2.0) = baseline × 2.0
     double const expectedBaseline = 2.0 * 0.01;
@@ -64,7 +71,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_FullCapacity_ReturnsTripled) {
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Expected: baseline × (1 + 1.0 × 2.0) = baseline × 3.0
     double const expectedBaseline = 2.0 * 0.01;
@@ -84,10 +91,10 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_LargeVerticalRange_ScalesWithRang
     int const maxAnchors = 64;
 
     double const smallTolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(
-        smallRange, currentAnchors, maxAnchors, defaultConfig);
+        smallRange, currentAnchors, maxAnchors, testConfig);
 
     double const largeTolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(
-        largeRange, currentAnchors, maxAnchors, defaultConfig);
+        largeRange, currentAnchors, maxAnchors, testConfig);
 
     // Large tolerance should be 10× the small tolerance
     EXPECT_DOUBLE_EQ(largeTolerance, smallTolerance * 10.0) << "Tolerance should scale linearly with vertical range";
@@ -103,7 +110,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_SmallVerticalRange_ScalesWithRang
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(tinyRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Expected: 0.1 × 0.01 = 0.001
     double const expectedTolerance = 0.1 * 0.01;
@@ -119,7 +126,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_NegativeAnchors_ClampsToZero) {
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Should treat as zero anchors
     double const expectedBaseline = 2.0 * 0.01;
@@ -135,7 +142,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_ExcessAnchors_ClampsToMax) {
     int const maxAnchors = 64;
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Should treat as 100% capacity (not 156%)
     double const expectedBaseline = 2.0 * 0.01;
@@ -153,7 +160,7 @@ TEST_F(AdaptiveToleranceTest, ComputeTolerance_ZeroMaxAnchors_ReturnsBaseline) {
     int const maxAnchors = 0; // Invalid
 
     double const tolerance = dsp_core::Services::AdaptiveToleranceCalculator::computeTolerance(verticalRange, currentAnchors,
-                                                                                         maxAnchors, defaultConfig);
+                                                                                         maxAnchors, testConfig);
 
     // Should fallback to baseline tolerance
     double const expectedBaseline = 2.0 * 0.01;

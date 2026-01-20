@@ -16,6 +16,11 @@ class SymmetryAnalyzerTest : public ::testing::Test {
 
     void SetUp() override {
         ltf = std::make_unique<LayeredTransferFunction>(tableSize, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
     }
 
     // Helper: Set curve to polynomial: y = x^n

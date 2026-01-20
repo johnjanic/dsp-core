@@ -36,14 +36,16 @@ LayeredTransferFunction::LayeredTransferFunction(int tableSize, double minVal, d
       coefficients(kTotalCoefficients, 0.0),        // kTotalCoefficients: [0] = WT, [1..40] = harmonics
       baseTable(tableSize) {
 
-    // Initialize coefficients
-    coefficients[0] = 1.0; // Default WT mix = 1.0 (full base layer)
-    // coefficients[1..40] already initialized to 0.0
+    // Initialize coefficients: WT=0.0, H1=1.0, others=0.0
+    // This results in y=x (linear) at startup, but tanh(2x) is one slider move away
+    coefficients[0] = 0.0; // WT mix = 0.0 (base layer not mixed in yet)
+    coefficients[1] = 1.0; // H1 = 1.0 (linear harmonic)
+    // coefficients[2..40] already initialized to 0.0
 
-    // Initialize base layer to identity: y = x
+    // Initialize base layer to tanh(2x) - classic distortion ready to use
     for (int i = 0; i < tableSize; ++i) {
         const double x = normalizeIndex(i);
-        baseTable[i].store(x, std::memory_order_release);
+        baseTable[i].store(std::tanh(2.0 * x), std::memory_order_release);
     }
 
     // Precompute harmonic basis functions

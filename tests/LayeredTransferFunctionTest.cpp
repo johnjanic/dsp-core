@@ -13,6 +13,17 @@ class LayeredTransferFunctionTest : public ::testing::Test {
   protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        // The constructor now uses WT=0.0, H1=1.0 for plugin initialization
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
+        // Reset base layer to linear for predictable testing
+        for (int i = 0; i < ltf->getTableSize(); ++i) {
+            const double x = ltf->normalizeIndex(i);
+            ltf->setBaseLayerValue(i, x);
+        }
     }
 
     std::unique_ptr<dsp_core::LayeredTransferFunction> ltf;

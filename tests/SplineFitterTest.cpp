@@ -20,6 +20,12 @@ class SplineFitterTest : public ::testing::Test {
   protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        // The constructor now uses WT=0.0, H1=1.0 for plugin initialization
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
     }
 
     // Helper: Set base layer to identity curve (y = x)
@@ -766,6 +772,11 @@ class FeatureBasedFittingTest : public ::testing::Test {
 
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(256, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
     }
 
     // Helper: Setup curve from function
@@ -1305,6 +1316,11 @@ class BacktranslationTest : public ::testing::Test {
     void SetUp() override {
         // High resolution: 16384 samples to minimize quantization error
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
     }
 
     /**
@@ -2066,6 +2082,11 @@ class ZeroCrossingTest : public ::testing::Test {
   protected:
     void SetUp() override {
         ltf = std::make_unique<dsp_core::LayeredTransferFunction>(16384, -1.0, 1.0);
+        // Reset coefficients to traditional test defaults (WT=1.0, all harmonics=0.0)
+        ltf->setCoefficient(0, 1.0);
+        for (int i = 1; i < ltf->getNumCoefficients(); ++i) {
+            ltf->setCoefficient(i, 0.0);
+        }
     }
 
     // Helper: Set base layer to tanh curve (zero-crossing at x=0)

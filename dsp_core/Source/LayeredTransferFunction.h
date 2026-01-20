@@ -560,7 +560,8 @@ class LayeredTransferFunction {
 
     // Rendering mode (determines evaluation path for LUT rendering)
     // This is the single source of truth for which evaluation path to use
-    std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Paint)};
+    // Default to Harmonic mode to enable H1 linear blending with base layer
+    std::atomic<int> renderingMode{static_cast<int>(RenderingMode::Harmonic)};
 
     /**
      * Version counter for dirty detection (used by SeamlessTransferFunction)
