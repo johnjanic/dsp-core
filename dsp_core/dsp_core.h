@@ -29,6 +29,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include "Source/AudioHistoryBuffer.h"
+#include "Source/StereoHistoryBuffer.h"
 #include "Source/ExpressionEvaluator.h"
 #include "Source/HarmonicLayer.h"
 #include "Source/LayeredTransferFunction.h"

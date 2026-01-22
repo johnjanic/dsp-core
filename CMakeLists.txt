@@ -28,6 +28,8 @@ target_sources(dsp_core PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineLayer.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineLayer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/SplineTypes.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/StereoHistoryBuffer.h"
+    "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/StereoHistoryBuffer.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.h"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/TransferFunction.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/dsp_core/Source/Services/AdaptiveToleranceCalculator.h"

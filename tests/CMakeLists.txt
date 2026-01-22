@@ -614,3 +614,28 @@ endif()
 
 add_test(NAME AudioPipelineBuilderTests COMMAND audio_pipeline_builder_tests)
 
+# StereoHistoryBuffer tests
+add_executable(stereo_history_buffer_tests
+    StereoHistoryBufferTest.cpp
+)
+
+target_include_directories(stereo_history_buffer_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(stereo_history_buffer_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(stereo_history_buffer_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(stereo_history_buffer_tests)
+endif()
+
+add_test(NAME StereoHistoryBufferTests COMMAND stereo_history_buffer_tests)
+
