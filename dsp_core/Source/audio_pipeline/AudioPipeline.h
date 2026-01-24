@@ -17,6 +17,7 @@ namespace dsp_core::audio_pipeline {
 enum class StageTag {
     InputGain,
     AudioInputWriter,
+    SoftClip,
     Waveshaper,
     Oversampling,
     DCBlock,
@@ -33,6 +34,8 @@ inline std::string stageTagToString(StageTag tag) {
             return "inputGain";
         case StageTag::AudioInputWriter:
             return "audioInputWriter";
+        case StageTag::SoftClip:
+            return "softClip";
         case StageTag::Waveshaper:
             return "waveshaper";
         case StageTag::Oversampling:

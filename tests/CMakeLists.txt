@@ -639,3 +639,28 @@ endif()
 
 add_test(NAME StereoHistoryBufferTests COMMAND stereo_history_buffer_tests)
 
+# SoftClippingComparison tests (harmonic analysis of hard vs soft clipping)
+add_executable(soft_clipping_comparison_tests
+    SoftClippingComparisonTest.cpp
+)
+
+target_include_directories(soft_clipping_comparison_tests
+    PRIVATE
+    ${GOOGLETEST_SOURCE_DIR}/googletest/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(soft_clipping_comparison_tests
+    PRIVATE
+    dsp_core
+    GTest::gtest_main
+)
+
+if(CMAKE_GENERATOR STREQUAL Xcode)
+  gtest_discover_tests(soft_clipping_comparison_tests DISCOVERY_MODE PRE_TEST)
+else()
+  gtest_discover_tests(soft_clipping_comparison_tests)
+endif()
+
+add_test(NAME SoftClippingComparisonTests COMMAND soft_clipping_comparison_tests)
+

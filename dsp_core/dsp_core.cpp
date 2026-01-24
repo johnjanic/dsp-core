@@ -30,4 +30,5 @@
 #include "Source/audio_pipeline/WaveshapingStage.cpp"
 #include "Source/audio_pipeline/OversamplingWrapper.cpp"
 #include "Source/audio_pipeline/DCBlockingFilter.cpp"
+#include "Source/audio_pipeline/SoftClippingStage.cpp"
 #include "Source/audio_pipeline/AudioPipelineBuilder.cpp"
